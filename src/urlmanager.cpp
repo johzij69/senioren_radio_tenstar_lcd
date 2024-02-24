@@ -1,21 +1,25 @@
 #include "UrlManager.h"
+#include <Arduino.h>
 
-UrlManager::UrlManager(const char *namespaceName) : preferences(), namespaceName(namespaceName) {
-    preferences.begin(namespaceName, false);
-
-    // Load saved URLs on startup
-    for (int i = 0; i < preferences.getUInt("url_count", 0); i++) {
+UrlManager::UrlManager(MyPreferences& prefs) : myPreferences(prefs) {
+    // Laad URL's vanuit Preferences bij het initialiseren
+    uint32_t urlCount = myPreferences.readValue("url_count", 0);
+    for (uint32_t i = 0; i < urlCount; ++i) {
         String key = "url" + String(i);
-        const char *storedURL = preferences.getString(key.c_str(), "").c_str(); // Convert to const char*
-        if (storedURL != nullptr && storedURL[0] != '\0') {
-            urls.push_back(storedURL);
-        } else {
-            break; // Stop at the first empty key
-        }
+        String url = myPreferences.readString(key.c_str(), "");
+        urls.push_back(url);
     }
 }
 
-void UrlManager::addUrl(const char *url) {
+void UrlManager::readAndPrintValue(const char* key) {
+    // Lees de waarde vanuit UrlManager
+    int value = myPreferences.readValue(key, 0);
+    Serial.println("Waarde gelezen vanuit UrlManager: " + String(value));
+}
+
+void UrlManager::addUrl(const char* url) {
+     Serial.println("Toevogen url: " + String(url));
+    
     // Controleer of de URL al bestaat
     if (std::find(urls.begin(), urls.end(), url) != urls.end()) {
         Serial.println("URL bestaat al, wordt niet toegevoegd: " + String(url));
@@ -25,34 +29,44 @@ void UrlManager::addUrl(const char *url) {
     // Voeg de URL toe aan de lijst en Preferences
     urls.push_back(url);
     String key = "url" + String(urls.size() - 1);
-    preferences.putString(key.c_str(), url);
-    preferences.putUInt("url_count", urls.size());
+    myPreferences.writeString(key.c_str(), url);
+    myPreferences.putUInt("url_count", urls.size());
     Serial.println("URL toegevoegd: " + String(url));
 }
 
-void UrlManager::removeUrl(const char *url) {
-    auto it = std::find(urls.begin(), urls.end(), url);
-    if (it != urls.end()) {
-        size_t index = std::distance(urls.begin(), it);
-        urls.erase(it);
-        preferences.remove(("url" + String(index)).c_str());
-        preferences.putUInt("url_count", urls.size());
-        Serial.println("URL verwijderd: " + String(url));
-    } else {
-        Serial.println("URL niet gevonden om te verwijderen.");
+void UrlManager::printAllUrls() {
+    Serial.println("Alle URLs:");
+    for (const auto& url : urls) {
+        Serial.println(url);
     }
 }
 
-void UrlManager::printUrls() {
-    for (size_t i = 0; i < urls.size(); i++) {
-        Serial.println("URL " + String(i) + ": " + urls[i]);
-    }
-}
-
-const char *UrlManager::getUrlAtIndex(int index) {
-    if (index >= 0 && static_cast<size_t>(index) < urls.size()) {
+const char *UrlManager::getUrlAtIndex(int index)
+{
+    if (index >= 0 && static_cast<size_t>(index) < urls.size())
+    {
         return urls[index].c_str();
-    } else {
+    }
+    else
+    {
         return nullptr;
     }
 }
+
+String UrlManager::CreateDivUrls()
+{
+
+    String result = "";
+
+    for (size_t i = 0; i < urls.size(); i++)
+    {
+        Serial.println(urls[i]);
+        result += "<div><p>URL " + String(i) + ": " + urls[i] + "<p><div>";
+    }
+
+    return result;
+}
+
+
+
+

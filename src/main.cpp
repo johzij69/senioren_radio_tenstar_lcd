@@ -6,7 +6,7 @@
 #include "WiFi.h"
 #include <WiFiManager.h>
 #include <AsyncTCP.h>
-#include "webhandler.h"
+#include "PrioWebserver.h"
 
 #include <SPI.h>
 #include <Preferences.h>
@@ -15,6 +15,9 @@
 #include <ezButton.h> // the library to use for SW pin
 #include "player.h"
 #include "urlmanager.h"
+
+#include "MyPreferences.h"
+#include "UrlManager.h"
 
 #define VS1053_CS 5
 #define VS1053_DCS 16
@@ -47,13 +50,19 @@ ezButton next_button(NEXT_BUTTON_PIN);
 
 TaskHandle_t Task1;
 
-UrlManager urlManager("myApp");
 
-PrioWebServer webServer(80);
 
 Play player(VS1053_CS, VS1053_DCS, VS1053_DREQ);
 
+// Maak een instantie van MyPreferences in de main
+MyPreferences myPrefs("myRadio");
 
+// Maak een instantie van AnotherClass in de main
+UrlManager UrlManagerInstance(myPrefs);
+
+
+
+PrioWebServer webServer(UrlManagerInstance, myPrefs, 80);
 
 
 void setup()
@@ -93,10 +102,6 @@ void setup()
 
   // Gebruik de klasse in de main
 
-  urlManager.addUrl("https://icecast.omroep.nl/radio1-bb-mp3:443");
-  urlManager.addUrl("https://icecast.omroep.nl/radio2-bb-mp3:443");
-  urlManager.addUrl("hhttps://icecast.omroep.nl/3fm-bb-mp3:443");
-
   Serial.println("\n\nSimple Radio Node WiFi Radio");
 
   SPI.begin();
@@ -126,7 +131,19 @@ void setup()
     Serial.print("Gateway address: ");
     Serial.println(WiFi.gatewayIP());
 
-    current_url = urlManager.getUrlAtIndex(stream_counter);
+    // urlManager.addUrl("https://icecast.omroep.nl/radio1-bb-mp3:443");
+    // urlManager.addUrl("https://icecast.omroep.nl/radio2-bb-mp3:443");
+    // urlManager.addUrl("https://icecast.omroep.nl/3fm-bb-mp3:443");
+
+    UrlManagerInstance.addUrl("https://icecast.omroep.nl/radio1-bb-mp3:443");
+    UrlManagerInstance.addUrl("https://icecast.omroep.nl/radio2-bb-mp3:443");
+    UrlManagerInstance.addUrl("https://icecast.omroep.nl/3fm-bb-mp3:443");
+
+    // Druk alle URLs af vanuit AnotherClass
+    UrlManagerInstance.printAllUrls();
+
+    //   current_url = urlManager.getUrlAtIndex(stream_counter);
+    current_url = UrlManagerInstance.getUrlAtIndex(stream_counter);
     Serial.println("Huidige url");
     Serial.println(current_url);
 
@@ -135,6 +152,12 @@ void setup()
     player.setVolume(VOLUME);
     webServer.begin();
   }
+
+  // Schrijf een waarde vanuit de main
+  myPrefs.writeValue("myKey", 42);
+
+  // Lees en print de waarde vanuit AnotherClass
+  UrlManagerInstance.readAndPrintValue("myKey");
 }
 
 void loop()
@@ -143,7 +166,6 @@ void loop()
   // rotary encoder
   button.loop(); // MUST call the loop() function first
   next_button.loop();
-
 
   // read the current state of the rotary encoder's CLK pin
   CLK_state = digitalRead(CLK_PIN);
@@ -204,19 +226,19 @@ void loop()
     {
       stream_counter++;
     }
-    current_url = urlManager.getUrlAtIndex(stream_counter);
+    current_url = UrlManagerInstance.getUrlAtIndex(stream_counter);
     Serial.println("playing:");
     Serial.println(current_url);
     // player.stop();
-    // player.resetStream();
+    player.resetStream();
   }
 
   if (next_button.isReleased())
     Serial.println("The button is released");
 
-//  player.play(current_url);
-    Serial.println("Playing:");
-    Serial.println(urlManager.getUrlAtIndex(stream_counter));
+  player.play(current_url);
+  // Serial.println("Playing:");
+  // Serial.println(urlManager.getUrlAtIndex(stream_counter));
 }
 
 void Task1code(void *pvParameters)

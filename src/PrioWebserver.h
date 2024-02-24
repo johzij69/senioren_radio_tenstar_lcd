@@ -2,18 +2,20 @@
 #define webhandler_h
 
 #include <ESPAsyncWebServer.h>
+// #include "AnotherClass.h"
+#include "UrlManager.h"
 
 class PrioWebServer
 {
 public:
-  PrioWebServer(int port);
+  PrioWebServer(UrlManager &urlManager, MyPreferences &prefs, int port);
 
   void begin();
 
 private:
   AsyncWebServer server;
-
-  const char *PARAM_MESSAGE;
+  UrlManager &urlManager;
+  MyPreferences &myPreferences;
 
   void handleRoot(AsyncWebServerRequest *request);
 };

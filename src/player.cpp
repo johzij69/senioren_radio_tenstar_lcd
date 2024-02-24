@@ -46,66 +46,32 @@ void Play::splitUrl(const char *url, char *host, char *path, int &port)
     strcpy(path, fullPath.c_str());
 }
 
-bool Play::connect(const char *url)
-{
-    char host[100];
-    char path[254];
-    int port;
-
-    bool blResult = false;
-
-    splitUrl(url, host, path, port);
-
-    Serial.println("connecting...");
-   Serial.println(url);
-    Serial.println(host);
-    Serial.println(path);
-    Serial.println(port);
-
-    if (client.connect(host, port))
-    {
-        blResult = true;
-        strncpy(current_host, host, sizeof(host) - 1);
-        strncpy(current_path, path, sizeof(path) - 1);
-        current_url = url;
-        current_port = port;
-
-        Serial.println("Connected now");
-    }
-    return blResult;
-}
 void Play::play(const char *url)
 {
-    if (url == current_url)
-    {
-        playUrl();
-    }
-    else
-    {
-        Serial.println("connecting to new station:");
-        if (connect(url))
-        {
-            Serial.println("playUrl");
-            playUrl();
-        }
-    }
+    splitUrl(url, current_host, current_path, current_port);
+    playUrl();
 }
+
 void Play::playChunk(uint8_t *buffer, uint8_t length)
 {
     player.playChunk(buffer, length);
 }
+
 void Play::setVolume(int iVolume)
 {
     player.setVolume(iVolume);
 }
+
 void Play::begin()
 {
     player.begin();
 }
+
 void Play::switchToMp3Mode()
 {
     player.switchToMp3Mode();
 }
+
 void Play::stop()
 {
     player.stopSong();

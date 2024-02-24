@@ -1,23 +1,23 @@
-#ifndef urlmanager_h
-#define urlmanager_h
+#ifndef URLMANAGER_H
+#define URLMANAGER_H
 
-#include <Arduino.h>
-#include <Preferences.h>
+#include "UrlManager.h"
+#include "MyPreferences.h"
 #include <vector>
 
-class UrlManager {
+class UrlManager
+{
 public:
-    UrlManager(const char *namespaceName);
-
+    UrlManager(MyPreferences &prefs);
+    void readAndPrintValue(const char *key);
     void addUrl(const char *url);
-    void removeUrl(const char *url);
-    void printUrls();
+    void printAllUrls();
     const char *getUrlAtIndex(int index);
+        String CreateDivUrls();
 
 private:
-    Preferences preferences;
-    const char *namespaceName;
-    std::vector<String> urls; // Use std::vector for dynamic URL management
+    MyPreferences &myPreferences;
+    std::vector<String> urls;
 };
 
-#endif
+#endif // ANOTHER_CLASS_H
