@@ -1,23 +1,23 @@
-#ifndef webhandler_h
-#define webhandler_h
+#ifndef PrioWebServer_H
+#define PrioWebServer_H
 
 #include <ESPAsyncWebServer.h>
-// #include "AnotherClass.h"
 #include "UrlManager.h"
 
 class PrioWebServer
 {
 public:
-  PrioWebServer(UrlManager &urlManager, MyPreferences &prefs, int port);
+  PrioWebServer(UrlManager &urlManager, int port);
 
   void begin();
 
 private:
   AsyncWebServer server;
   UrlManager &urlManager;
-  MyPreferences &myPreferences;
 
+  String getHtmlStart();
   void handleRoot(AsyncWebServerRequest *request);
+  void deleteStreamItem(AsyncWebServerRequest *request);
 };
 
 #endif

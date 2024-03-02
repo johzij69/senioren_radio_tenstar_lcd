@@ -13,11 +13,18 @@ public:
     void addUrl(const char *url);
     void printAllUrls();
     const char *getUrlAtIndex(int index);
-        String CreateDivUrls();
+    String CreateDivUrls();
+    void begin();
+    void loadUrls();
+    void PrinturlsFromPrev();
+    void deleteUrl(int index);
+
+    uint32_t urlCount;
+    std::vector<String> urls;
 
 private:
     MyPreferences &myPreferences;
-    std::vector<String> urls;
+  
 };
 
 #endif // ANOTHER_CLASS_H

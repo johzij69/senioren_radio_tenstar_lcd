@@ -3,7 +3,7 @@
 Play::Play(int csPin, int dcsPin, int dreqPin) : player(csPin, dcsPin, dreqPin)
 {
     // Other constructor initialization if needed
-    loadUrls();
+    
 }
 
 void Play::playUrl()
@@ -15,22 +15,37 @@ void Play::playUrl()
         Serial.println(current_host);
         Serial.println(current_path);
         Serial.println(current_port);
+        if (current_port == 0  ) {
+            current_port = 443;
+        }
+        
+        if(current_host == "" || current_path == "" || current_port < 80) {
+          Serial.print("Check url and retry again!");
+          return;    
+        }
+          delay(1000);        
         if (client.connect(current_host, current_port))
-        {
-            client.print(String("GET ") + current_path + " HTTP/1.0\r\n" +
+         {
+
+             Serial.println("connected data");
+            client.print(String("GET ") + current_path + " HTTP/1.1\r\n" +
                          "Host: " + current_host + "\r\n" +
+  //                       "Icy-MetaData:1\r\n" : "" +
                          "Connection: close\r\n\r\n");
         }
         else
         {
-            Serial.print("Could not connect to ");
-            Serial.println(current_url);
+            Serial.print("Could not connect to: ");
+            Serial.println(current_host);
+            Serial.println(current_path);
+            Serial.println(current_port);
             return;
         }
     }
 
     if (client.available() > 0)
     {
+       // Serial.println("data available getting data");
         // The buffer size 64 seems to be optimal. At 32 and 128 the sound might be brassy.
         uint8_t bytesread = client.read(mp3buff, 64);
         playChunk(mp3buff, bytesread);
@@ -41,8 +56,7 @@ void Play::splitUrl(const char *url, char *host, char *path, int &port)
 {
     // Parse the URL to extract host, path, and port
     sscanf(url, "https://%99[^/]/%199[^:]:%d", host, path, &port);
-    // Voeg "//" toe aan het begin van het pad
-    String fullPath = "//" + String(path);
+    String fullPath = "/" + String(path);
     strcpy(path, fullPath.c_str());
 }
 
@@ -87,28 +101,3 @@ void Play::resetStream()
     client.flush();
 }
 
-void Play::updateUrls(const char *newUrls)
-{
-    // Update de lijst met URLs
-    strcpy(path, newUrls);
-    saveUrls();
-}
-
-void Play::saveUrls()
-{
-    // Sla de lijst met URLs op in Preferences
-    Preferences preferences;
-    preferences.begin(this->preferencesNamespace, false);
-    preferences.putString("urls", path);
-    preferences.end();
-}
-
-void Play::loadUrls()
-{
-    // Laad de lijst met URLs uit Preferences
-    Preferences preferences;
-    preferences.begin(this->preferencesNamespace, true);
-    String savedUrls = preferences.getString("urls", "");
-    strcpy(path, savedUrls.c_str());
-    preferences.end();
-}
