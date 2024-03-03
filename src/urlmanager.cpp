@@ -111,14 +111,18 @@ void UrlManager::deleteUrl(int index)
 
     if (index < urls.size())
     {
-        Serial.println("Deleting" + String(urls[index]));
+        Serial.println("Deleting: " + String(urls[index]));
         urls.erase(urls.begin() + index);
 
         String key = "url" + String(index);
-        myPreferences.remove(key.c_str());
-        myPreferences.putUInt("url_count", urls.size());
-        Serial.println("URL verwijderd: " + String(urls[index]));
+        if (myPreferences.remove(key.c_str())) {
+            Serial.println(key+ ": verwijdert.");
+        }
 
+        myPreferences.putUInt("url_count", urls.size());
+Serial.println("kom ik hier");
+        Serial.println("URL verwijderd: " + String(urls[index]));
+Serial.println("kom ik hier2");
         this->loadUrls();
     }
 }

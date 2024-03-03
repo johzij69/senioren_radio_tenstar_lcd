@@ -38,8 +38,6 @@ MyPreferences::~MyPreferences()
 void MyPreferences::writeValue(const char *key, int value)
 {
     preferences.putInt(key, value);
-    Serial.println("Reading written value back");
-    Serial.println(String(this->readValue(key, 0)));
 }
 
 int MyPreferences::readValue(const char *key, int defaultValue)
@@ -49,9 +47,7 @@ int MyPreferences::readValue(const char *key, int defaultValue)
 
 void MyPreferences::writeString(const char *key, const char *value)
 {
-    Serial.println("Reading written string back");
     preferences.putString(key, value);
-    Serial.println(this->readString(key, "not found"));
 }
 
 String MyPreferences::readString(const char *key, const char *defaultValue)
@@ -75,9 +71,9 @@ bool MyPreferences::isNVSInitialized()
     return err == ESP_OK;
 }
 
-void MyPreferences::remove(const char *key)
+bool MyPreferences::remove(const char *key)
 {
-    preferences.remove(key);
+    return preferences.remove(key);
 }
 
 void MyPreferences::initializeNVS()

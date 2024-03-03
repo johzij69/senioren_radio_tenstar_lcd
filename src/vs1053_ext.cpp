@@ -421,11 +421,6 @@ void VS1053::begin()
     write_register(SCI_MODE, _BV(SM_SDINEW) | _BV(SM_LINE1));
     await_data_request();
     m_endFillByte = wram_read(0x1E06) & 0xFF;
-#ifdef LOAD_VS0153_PLUGIN
-    loadUserCode(); // flac patch, does not work with all boards, try it
-    m_f_VUmeter = true;
-#endif
-    Serial.println("Sometimes we are haging here, need to find out why ");
     uint16_t status = read_register(SCI_STATUS);
     if (status)
     {

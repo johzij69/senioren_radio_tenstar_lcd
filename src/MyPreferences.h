@@ -15,7 +15,7 @@ public:
     String readString(const char* key, const char *defaultValue);
     void putUInt(const char* key, uint32_t value);
     uint32_t getUInt(const char* key, uint32_t defaultValue);
-    void remove(const char* key);
+    bool remove(const char* key);
 
 private:
     Preferences preferences;

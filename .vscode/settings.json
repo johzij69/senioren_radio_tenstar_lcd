@@ -11,6 +11,8 @@
         "string_view": "cpp",
         "initializer_list": "cpp",
         "regex": "cpp",
-        "system_error": "cpp"
+        "system_error": "cpp",
+        "cstdlib": "cpp",
+        "random": "cpp"
     }
 }

@@ -36,16 +36,11 @@
 #define MIN_VOLUME 0
 #define DEF_VOLUME 20
 
-int counter_volume = DEF_VOLUME;
 int stream_index = 0;
-int max_volume = 100;
-int min_volume = 0;
-int direction = DIRECTION_CW;
-int CLK_state;
-int prev_CLK_state;
 int next_button_state = 0; // variable for reading the button status
+int last_volume;
 
-ezButton button(SW_PIN); // create ezButton object that attach to pin 27;
+ezButton rotary_button(SW_PIN); // create ezButton object that attach to pin 27;
 ezButton next_button(NEXT_BUTTON_PIN);
 
 // TaskHandle_t Task1;
@@ -63,29 +58,15 @@ PrioRotary rotaryInstance(CLK_PIN, DT_PIN);
 
 String default_url = "https://icecast.omroep.nl/radio1-bb-mp3:443";
 
+String last_url;
+
 const char *current_url;
-
-String piet;
-
-// A turn counter for the rotary encoder (negative = anti-clockwise)
-int rotationCounter = 200;
-
-// Flag from interrupt routine (moved=true)
-volatile bool rotaryEncoder = false;
-
-// Interrupt routine just sets a flag when rotation is detected
-void IRAM_ATTR rotary()
-{
-  rotaryEncoder = true;
-}
 
 // Interrupt routine just sets a flag when rotation is detected
 void IRAM_ATTR checkVolume()
 {
   rotaryInstance.rotaryEncoder = true;
 }
-
-/
 
 void setup()
 {
@@ -109,25 +90,16 @@ void setup()
   // );
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-                       // configure encoder pins as inputs
+  
+  // configure encoder pins as inputs
   pinMode(CLK_PIN, INPUT);
   pinMode(DT_PIN, INPUT);
-  button.setDebounceTime(50); // set debounce time to 50 milliseconds
+  rotary_button.setDebounceTime(50); // set debounce time to 50 milliseconds
 
-  // read the initial state of the rotary encoder's CLK pin
-  prev_CLK_state = digitalRead(CLK_PIN);
-
-  next_button_state = next_button.getState();
-
-  // pinMode(NEXT_BUTTON_PIN, INPUT_PULLUP);
+ 
+  pinMode(NEXT_BUTTON_PIN, INPUT_PULLUP);
   next_button.setDebounceTime(50);
-
-  // This can be set in the IDE no need for ext library
-  // system_update_cpu_freq(160);
-
-  // Gebruik de klasse in de main
-
-  Serial.println("\n\nSimple Radio Node WiFi Radio");
+  next_button_state = next_button.getState();
 
   WiFiManager wm;
   // wm.setSaveParamsCallback(saveParamCallback);
@@ -156,89 +128,78 @@ void setup()
 
     myPrefs.begin();
     UrlManagerInstance.begin();
-
-    // urlManager.addUrl("https://icecast.omroep.nl/radio1-bb-mp3:443");
-    // urlManager.addUrl("https://icecast.omroep.nl/radio2-bb-mp3:443");
-    // urlManager.addUrl("https://icecast.omroep.nl/3fm-bb-mp3:443");
-
-    UrlManagerInstance.addUrl("https://icecast.omroep.nl/radio1-bb-mp3:443");
-    UrlManagerInstance.addUrl("https://icecast.omroep.nl/radio2-bb-mp3:443");
-    UrlManagerInstance.addUrl("https://icecast.omroep.nl/3fm-bb-mp3:443");
+    UrlManagerInstance.addUrl("https://icecast.omroep.nl/radio1-bb-mp3");
+    // UrlManagerInstance.addUrl("https://icecast.omroep.nl/radio2-bb-mp3:443");
+    // UrlManagerInstance.addUrl("https://icecast.omroep.nl/3fm-bb-mp3:443");
 
     // Druk alle URLs af vanuit AnotherClass
     UrlManagerInstance.printAllUrls();
 
-    piet = myPrefs.readString("lasturl", default_url.c_str());
-    current_url = piet.c_str();
+    last_url = myPrefs.readString("lasturl", default_url.c_str());
+    current_url = last_url.c_str();
 
-    Serial.println(piet);
-
+    Serial.print("Last url: ");
+    Serial.println(last_url);
     Serial.print("Huidige url: ");
     Serial.println(current_url);
     Serial.print("Aantal urls: ");
     Serial.println(UrlManagerInstance.urlCount);
 
-    // player.begin();
-    // player.switchToMp3Mode();
-    // int ivol = myPrefs.readValue("volume", VOLUME);
-    // player.setVolume(ivol);
-    // player.play(current_url);
-
     Serial.println("mp3 begin");
     mp3.begin();
-    Serial.println("set volume steps");
 
+    Serial.println("set volume steps");
     mp3.setVolumeSteps(MAX_VOLUME);
+
     Serial.println("set volume");
-    mp3.setVolume(DEF_VOLUME);
+    last_volume = myPrefs.readValue("volume", DEF_VOLUME);
+    mp3.setVolume(last_volume);
+
     Serial.println("conecting");
-    // mp3.connecttohost("https://icecast.omroep.nl/radio1-bb-mp3");
-    // mp3.connecttohost("https://20133.live.streamtheworld.com/100PNL_MP3_SC");
     mp3.connecttohost("https://stream.100p.nl/100pctnl.mp3");
     Serial.println("conected");
-
-    webServer.begin();
-
-    // rotary encoder interrupts
-    //  We need to monitor both pins, rising and falling for all states
-    //  attachInterrupt(digitalPinToInterrupt(CLK_PIN), rotary, CHANGE);
-    //  attachInterrupt(digitalPinToInterrupt(DT_PIN), rotary, CHANGE);
 
     attachInterrupt(digitalPinToInterrupt(CLK_PIN), checkVolume, CHANGE);
     attachInterrupt(digitalPinToInterrupt(DT_PIN), checkVolume, CHANGE);
     rotaryInstance.begin();
-    mp3.setVolume(rotaryInstance.ReadRotaryValue());
-    // Set de functiepointer vanuit de main
-    //  rotaryInstance.useValuePointer = mp3.setVolume;
+    rotaryInstance.rotary_value = last_volume;
+    webServer.begin();
   }
 }
 void loop()
 {
   mp3.loop();
   rotaryInstance.loop();
+  next_button.loop();
+  rotary_button.loop();
   if (rotaryInstance.rotary_value_changed)
   {
     mp3.setVolume(rotaryInstance.ReadRotaryValue());
+    myPrefs.writeValue("volume", rotaryInstance.rotary_value);
   }
 
-  // if (rotaryEncoder)
-  // {
-  //   // Get the movement (if valid)
-  //   int8_t rotationValue = checkRotaryEncoder();
+  //next_button_state = next_button.getState();
 
-  //   // If valid movement, do something
-  //   if (rotationValue != 0)
-  //   {
+  if (next_button.isPressed())
+  {
+    Serial.println("The button is pressed");
+    if (stream_index == UrlManagerInstance.urlCount - 1)
+    {
+      stream_index = 0;
+    }
+    else
+    {
+      stream_index++;
+    }
+    current_url = UrlManagerInstance.getUrlAtIndex(stream_index);
+    myPrefs.writeString("lasturl", current_url);
+    Serial.println("playing:");
+    Serial.println(current_url);
+    mp3.connecttohost(current_url);
+  }
 
-  //     if (counter_volume > MIN_VOLUME && counter_volume < MAX_VOLUME || counter_volume == MAX_VOLUME && rotationValue == -1 || counter_volume == MIN_VOLUME && rotationValue == 1)
-  //     {
-  //       rotationValue < 1 ? counter_volume-- : counter_volume++;
-  //     }
-  //     Serial.print("volume:");
-  //     Serial.println(String(counter_volume));
-  //     mp3.setVolume(counter_volume);
-  //   }
-  // }
+  //   if (next_button.isReleased())
+  //     Serial.println("The button is released");
 }
 //  void loop()
 // {
@@ -247,42 +208,6 @@ void loop()
 //   button.loop(); // MUST call the loop() function first
 //   next_button.loop();
 
-//   // read the current state of the rotary encoder's CLK pin
-//   CLK_state = digitalRead(CLK_PIN);
-
-//   // If the state of CLK is changed, then pulse occurred
-//   // React to only the rising edge (from LOW to HIGH) to avoid double count
-//   if (CLK_state != prev_CLK_state && CLK_state == HIGH)
-//   {
-//     // if the DT state is HIGH
-//     // the encoder is rotating in counter-clockwise direction => decrease the counter
-//     if (digitalRead(DT_PIN) == HIGH)
-//     {
-//       if (counter_volume > 0)
-//       {
-//         counter_volume--;
-//       }
-//       direction = DIRECTION_CCW;
-//     }
-//     else
-//     {
-//       // the encoder is rotating in clockwise direction => increase the counter
-//       if (counter_volume < 100)
-//       {
-//         counter_volume++;
-//       }
-//       direction = DIRECTION_CW;
-//     }
-
-//     Serial.print("Rotary Encoder:: direction: ");
-//     if (direction == DIRECTION_CW)
-//       Serial.print("Clockwise");
-//     else
-//       Serial.print("Counter-clockwise");
-
-//     Serial.print(" - count: ");
-//     Serial.println(counter_volume);
-//     player.setVolume(counter_volume);
 //     myPrefs.writeValue("volume", counter_volume);
 //   }
 

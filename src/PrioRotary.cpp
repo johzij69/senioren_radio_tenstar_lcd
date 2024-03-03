@@ -77,18 +77,12 @@ void PrioRotary::loop()
         // If valid movement, do something
         if (rotationValue != 0)
         {
-
+//  Serial.println(String(rotationValue));
             if (rotary_value > MIN_VOLUME && rotary_value < MAX_VOLUME || rotary_value == MAX_VOLUME && rotationValue == -1 || rotary_value == MIN_VOLUME && rotationValue == 1)
             {
                 rotationValue < 1 ? rotary_value-- : rotary_value++;
                 rotary_value_changed = true;
             }
-            // Gebruik de functiepointer om de functie vanuit de main aan te roepen
-            // if (useValuePointer)
-            // {
-            //     useValuePointer(rotary_value);
-            // }
-
             Serial.println(String(rotary_value));
         }
     }

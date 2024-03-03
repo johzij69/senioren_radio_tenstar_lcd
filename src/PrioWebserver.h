@@ -16,7 +16,12 @@ private:
   UrlManager &urlManager;
 
   String getHtmlStart();
+  String getHtmlEnd();
+  String getTopMenu();
+  String getStyling();
+  String createHtmlPage(String html);
   void handleRoot(AsyncWebServerRequest *request);
+  void handleAddUrl(AsyncWebServerRequest *request);
   void deleteStreamItem(AsyncWebServerRequest *request);
 };
 
