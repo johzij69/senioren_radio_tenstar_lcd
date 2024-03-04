@@ -62,6 +62,8 @@ String last_url;
 
 const char *current_url;
 
+bool next_button_isreleased = true;
+
 // Interrupt routine just sets a flag when rotation is detected
 void IRAM_ATTR checkVolume()
 {
@@ -90,15 +92,14 @@ void setup()
   // );
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-  
+
   // configure encoder pins as inputs
   pinMode(CLK_PIN, INPUT);
   pinMode(DT_PIN, INPUT);
   rotary_button.setDebounceTime(50); // set debounce time to 50 milliseconds
 
- 
   pinMode(NEXT_BUTTON_PIN, INPUT_PULLUP);
-  next_button.setDebounceTime(50);
+  next_button.setDebounceTime(150);
   next_button_state = next_button.getState();
 
   WiFiManager wm;
@@ -178,11 +179,12 @@ void loop()
     myPrefs.writeValue("volume", rotaryInstance.rotary_value);
   }
 
-  //next_button_state = next_button.getState();
+  next_button_state = next_button.getState();
 
-  if (next_button.isPressed())
+  if (next_button.isPressed() && next_button_isreleased == true)
   {
     Serial.println("The button is pressed");
+    next_button_isreleased = false;
     if (stream_index == UrlManagerInstance.urlCount - 1)
     {
       stream_index = 0;
@@ -198,76 +200,13 @@ void loop()
     mp3.connecttohost(current_url);
   }
 
-  //   if (next_button.isReleased())
-  //     Serial.println("The button is released");
+  if (next_button.isReleased())
+  {
+    /* we only will listen to button input if it was released */
+    next_button_isreleased = true;
+    Serial.println("The button is released");
+  }
 }
-//  void loop()
-// {
-
-//   // rotary encoder
-//   button.loop(); // MUST call the loop() function first
-//   next_button.loop();
-
-//     myPrefs.writeValue("volume", counter_volume);
-//   }
-
-//   // save last CLK state
-//   prev_CLK_state = CLK_state;
-
-//   if (button.isPressed())
-//   {
-//     Serial.println("The button is pressed");
-//     Serial.println(String(myPrefs.readValue("volume", 80)));
-//     Serial.println(myPrefs.readString("lasturl", String(" ").c_str()));
-//   }
-
-//   next_button_state = next_button.getState();
-
-//   if (next_button.isPressed())
-//   {
-//     Serial.println("The button is pressed");
-//     if (stream_index == UrlManagerInstance.urlCount - 1)
-//     {
-//       stream_index = 0;
-//     }
-//     else
-//     {
-//       stream_index++;
-//     }
-//     current_url = UrlManagerInstance.getUrlAtIndex(stream_index);
-//     myPrefs.writeString("lasturl", current_url);
-//     Serial.println("playing:");
-//     Serial.println(current_url);
-//     // player.resetStream();
-//       player.play(current_url);
-//   }
-
-//   if (next_button.isReleased())
-//     Serial.println("The button is released");
-
-//   if (current_url != "")
-//   {
-//     player.play(current_url);
-//   }
-//   else
-//   {
-//     Serial.println("Url is empty, trying last");
-//     current_url = readDefaultUrl().c_str();
-//     delay(1000);
-//   }
-// }
-
-// void Task1code(void *pvParameters)
-// {
-//   while (1)
-//   {
-//     // Serial.print("Hello");
-//     delay(500); // wait for half a second
-//     // Serial.print(" World from loop2() at ");
-//     // Serial.println(xPortGetCoreID());
-//     // delay(500); // wait for half a second
-//   }
-// }
 
 String readDefaultUrl()
 {

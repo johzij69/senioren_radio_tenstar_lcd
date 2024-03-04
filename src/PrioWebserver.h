@@ -3,6 +3,7 @@
 
 #include <ESPAsyncWebServer.h>
 #include "UrlManager.h"
+#include "favicon.h"
 
 class PrioWebServer
 {

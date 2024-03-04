@@ -9,6 +9,8 @@ void PrioWebServer::begin()
 {
 
   // Route definities
+  server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request)
+            { request->send_P(200, "image/x-icon", favicon, sizeof(favicon)); });
   server.on("/", HTTP_GET, std::bind(&PrioWebServer::handleRoot, this, std::placeholders::_1));
   server.on("/addurl", HTTP_GET, std::bind(&PrioWebServer::handleAddUrl, this, std::placeholders::_1));
 
@@ -44,14 +46,15 @@ void PrioWebServer::begin()
               if (request->hasParam("newurl", true))
               {
                 newurl = request->getParam("newurl", true)->value();
+                urlManager.addUrl(newurl.c_str());
+                request->redirect("/");
               }
-              else
-              {
-                newurl = "No message sent";
-              }
-              request->send(200, "text/plain", "Url toevoegen: " + newurl);
-
-               urlManager.addUrl(newurl.c_str()); });
+              // else
+              // {
+              //   newurl = "No message sent";
+              // }
+              // request->send(200, "text/plain", "Url toevoegen: " + newurl);
+            });
   server.on("/showprefs", HTTP_GET, [this](AsyncWebServerRequest *request)
             {
         Serial.println("getting urls from prferences:");
@@ -66,8 +69,8 @@ void PrioWebServer::handleAddUrl(AsyncWebServerRequest *request)
 {
   String body = "";
   body += "<form method='post' action='/updateurls'>";
-  body += "Nieuwe URL-lijst: <input type='text' name='newurl'>";
-  body += "<input type='submit' value='Bijwerken'>";
+  body += "Nieuwe URL-lijst: <input class='input_url' type='text' name='newurl'>";
+  body += "<input  class='input_button' type='submit' value='Bijwerken'>";
   body += "</form>";
   request->send(200, "text/html", createHtmlPage(body));
 }
@@ -96,7 +99,7 @@ void PrioWebServer::deleteStreamItem(AsyncWebServerRequest *request)
     body += "<span>";
     body += urlManager.urls[i];
     body += "</span>";
-    body += "<button type='submit' name='urlindex' value='" + String(i) + "'>Verwijder</button>";
+    body += "<button class='input_button' type='submit' name='urlindex' value='" + String(i) + "'>X</button>";
     body += "</p>";
     body += "</form>";
   }
@@ -129,12 +132,15 @@ String PrioWebServer::getHtmlStart()
   html += "</head>";
   html += "<body>";
   html += getTopMenu();
+  html += "<div class='content'>";
   return html;
 }
 
 String PrioWebServer::getHtmlEnd()
 {
-  String endHtml = "</body>";
+  String endHtml = "";
+  endHtml += "</div>";
+  endHtml += "</body>";
   endHtml += "</html>";
   return endHtml;
 }
@@ -145,8 +151,8 @@ String PrioWebServer::getTopMenu()
   String html = "";
   html += "<div class='top-menu'>";
   html += "<a href='/'>Overzicht</a>";
-  html += "<a href='/deleteurl'>Bewerk stations</a>";
-  html += "<a href='#'>Services</a>";
+  html += "<a href='/deleteurl'>Verwijder</a>";
+  html += "<a href='/addurl'>Voeg toe</a>";
   html += "<a href='#'>Contact</a>";
   html += "</div>";
 
@@ -157,6 +163,10 @@ String PrioWebServer::getStyling()
 {
   String Style = "";
   Style += "body { margin: 0; font-family: Arial, sans-serif;}";
+  Style += ".content { margin-top: 10px; margin-left: 10px; margin-font-family: Arial, sans-serif;}";
+  Style += ".content input { padding: 5px; font-family: Arial, sans-serif;}";
+  Style += ".input_url { padding: 5px; width: 350px; border-radius: 5px; border-width: thin; margin-left: 5px; margin-right: 5px;}";
+  Style += ".input_button { padding: 5px; border-radius: 5px; border-width: thin; padding-left: 10px; padding-right: 10px; margin-left: 10px;} ";
   Style += ".top-menu { background-color: #333; overflow: hidden;}";
   Style += ".top-menu a { float: left; display: block; color: white; text-align: center; padding: 14px 16px; text-decoration: none;}";
   Style += ".top-menu a:hover { background-color: #ddd; color: black;}";
