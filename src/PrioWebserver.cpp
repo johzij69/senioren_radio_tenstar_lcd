@@ -11,7 +11,9 @@ void PrioWebServer::begin()
   // Route definities
   server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request)
             { request->send_P(200, "image/x-icon", favicon, sizeof(favicon)); });
+
   server.on("/", HTTP_GET, std::bind(&PrioWebServer::handleRoot, this, std::placeholders::_1));
+
   server.on("/addurl", HTTP_GET, std::bind(&PrioWebServer::handleAddUrl, this, std::placeholders::_1));
 
   server.on("/deleteurl", HTTP_GET, [this](AsyncWebServerRequest *request)
@@ -19,26 +21,25 @@ void PrioWebServer::begin()
 
   server.on("/deleteurl", HTTP_POST, [this](AsyncWebServerRequest *request)
             {
-    String index;
-    if (request->hasParam("urlindex", true))
-    {
-      index = request->getParam("urlindex", true)->value();
-      urlManager.deleteUrl(index.toInt());
-      request->redirect("/showurls");
-    }
-    else
-    {
-      request->send(200, "text/plain", "Url not found");
-    } });
-  server.on("/showurls", HTTP_GET, [this](AsyncWebServerRequest *request)
-            {
-        Serial.println("getting urls from prferences:");
-        urlManager.printAllUrls();
-        
+              String index;
+              if (request->hasParam("urlindex", true))
+              {
+                index = request->getParam("urlindex", true)->value();
+                urlManager.deleteUrl(index.toInt());
+                request->redirect("/showurls");
+              }
+              else
+              {
+                request->send(200, "text/plain", "Url not found");
+              } });
+  // server.on("/showurls", HTTP_GET, [this](AsyncWebServerRequest *request)
+  //           {
+  //           Serial.println("getting urls from prferences:");
+  //           urlManager.printAllUrls();
 
-        String urlsAsString = urlManager.CreateDivUrls();
-        Serial.println(urlsAsString);
-        request->send(200, "text/html", urlsAsString); });
+  //       String urlsAsString = urlManager.CreateDivUrls();
+  //       Serial.println(urlsAsString);
+  //       request->send(200, "text/html", urlsAsString); });
 
   server.on("/updateurls", HTTP_POST, [this](AsyncWebServerRequest *request)
             {
@@ -49,17 +50,12 @@ void PrioWebServer::begin()
                 urlManager.addUrl(newurl.c_str());
                 request->redirect("/");
               }
-              // else
-              // {
-              //   newurl = "No message sent";
-              // }
-              // request->send(200, "text/plain", "Url toevoegen: " + newurl);
             });
-  server.on("/showprefs", HTTP_GET, [this](AsyncWebServerRequest *request)
-            {
-        Serial.println("getting urls from prferences:");
-        urlManager.PrinturlsFromPrev();
-        request->send(200, "text/html", "see console"); });
+  // server.on("/showprefs", HTTP_GET, [this](AsyncWebServerRequest *request)
+  //           {
+  //       Serial.println("getting urls from prferences:");
+  //       urlManager.PrinturlsFromPrev();
+  //       request->send(200, "text/html", "see console"); });
 
   // Begin de server
   server.begin();
@@ -77,19 +73,16 @@ void PrioWebServer::handleAddUrl(AsyncWebServerRequest *request)
 
 void PrioWebServer::handleRoot(AsyncWebServerRequest *request)
 {
-
   String body = "";
   for (size_t i = 0; i < urlManager.urls.size(); i++)
   {
     body += "<div id=\"" + String(i) + "\"><p>URL " + String(i) + ": " + urlManager.urls[i] + "<p><div>";
   }
-
   request->send(200, "text/html", createHtmlPage(body));
 }
 
 void PrioWebServer::deleteStreamItem(AsyncWebServerRequest *request)
 {
-
   String body = "";
   for (size_t i = 0; i < urlManager.urls.size(); i++)
   {

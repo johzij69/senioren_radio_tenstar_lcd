@@ -6,6 +6,7 @@
 #include "PrioWebserver.h"
 
 #include "SPI.h"
+#include <TFT_eSPI.h>
 // #include "FS.h"
 // #include "SD.h"
 #include "vs1053_ext.h"
@@ -30,11 +31,14 @@
 #define DIRECTION_CW 0  // clockwise direction
 #define DIRECTION_CCW 1 // counter-clockwise direction
 
-#define NEXT_BUTTON_PIN 32 // ESP32 pin GPIO18, which connected to button
+#define NEXT_BUTTON_PIN 34 // ESP32 pin GPIO34, which connected to button
 
 #define MAX_VOLUME 50
 #define MIN_VOLUME 0
 #define DEF_VOLUME 20
+
+TFT_eSPI tft = TFT_eSPI();
+
 
 int stream_index = 0;
 int next_button_state = 0; // variable for reading the button status
@@ -165,6 +169,24 @@ void setup()
     rotaryInstance.begin();
     rotaryInstance.rotary_value = last_volume;
     webServer.begin();
+
+
+
+
+
+
+  tft.init();
+  tft.setRotation(3);
+  tft.fillScreen(TFT_BLACK);
+  tft.setCursor(0,0,4);
+  tft.setTextColor(TFT_WHITE);
+  tft.println ("PRIO-WEBRADIO");
+  tft.print("IP address: ");
+  tft.println(WiFi.localIP());
+
+
+
+
   }
 }
 void loop()
@@ -226,16 +248,19 @@ void vs1053_showstation(const char *info)
 { // called from vs1053
   Serial.print("STATION:      ");
   Serial.println(info); // Show station name
+  tft.println(info); // Show title
 }
 void vs1053_showstreamtitle(const char *info)
 { // called from vs1053
   Serial.print("STREAMTITLE:  ");
   Serial.println(info); // Show title
+  tft.println(info); // Show title
 }
 void vs1053_showstreaminfo(const char *info)
 { // called from vs1053
   Serial.print("STREAMINFO:   ");
   Serial.println(info); // Show streaminfo
+  tft.println(info); // Show title
 }
 void vs1053_eof_mp3(const char *info)
 { // called from vs1053
