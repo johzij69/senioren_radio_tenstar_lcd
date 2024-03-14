@@ -15,6 +15,11 @@
 #include "MyPreferences.h"
 #include "UrlManager.h"
 #include "PrioRotary.h"
+//#include "Wire.h"
+
+// #include <GT911.h>
+
+// GT911 ts = GT911();
 
 #define VS1053_MOSI 23
 #define VS1053_MISO 19
@@ -31,7 +36,7 @@
 #define DIRECTION_CW 0  // clockwise direction
 #define DIRECTION_CCW 1 // counter-clockwise direction
 
-#define NEXT_BUTTON_PIN 34 // ESP32 pin GPIO34, which connected to button
+#define NEXT_BUTTON_PIN 1 // ESP32 pin GPIO34, which connected to button
 
 #define MAX_VOLUME 50
 #define MIN_VOLUME 0
@@ -77,6 +82,8 @@ void IRAM_ATTR checkVolume()
 void setup()
 {
   Serial.begin(115200);
+   while(!Serial);
+   Serial.println("Test");
 
   //    SPI.setHwCs(true);
 
@@ -170,7 +177,10 @@ void setup()
     rotaryInstance.rotary_value = last_volume;
     webServer.begin();
 
-
+//  GTConfig *cfg = ts.readConfig();
+//   cfg->hSpace = (5 | (5 << 4));
+//   cfg->vSpace = (5 | (5 << 4));
+//   ts.writeConfig();
 
 
 
@@ -228,8 +238,41 @@ void loop()
     next_button_isreleased = true;
     Serial.println("The button is released");
   }
-}
 
+
+
+
+
+  // getTouch();
+
+
+}
+void getTouch() {
+  // uint16_t x, y;
+  // static uint16_t color;
+
+  // if (tft.getTouch(&x, &y)) {
+
+  //   tft.setCursor(5, 5, 2);
+  //   tft.printf("x: %i     ", x);
+  //   tft.setCursor(5, 20, 2);
+  //   tft.printf("y: %i    ", y);
+
+  //   tft.drawPixel(x, y, color);
+  //   color += 155;
+  // }
+
+
+//  uint8_t touches = ts.touched(GT911_MODE_POLLING);
+
+//   if (touches) {
+//     GTPoint* tp = ts.getPoints();
+//     for (uint8_t  i = 0; i < touches; i++) {
+//       Serial.printf("#%d  %d,%d s:%d\n", tp[i].trackId, tp[i].x, tp[i].y, tp[i].area);
+//     }
+//   }
+
+}
 String readDefaultUrl()
 {
 
