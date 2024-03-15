@@ -7,6 +7,7 @@
 
 #include "SPI.h"
 #include <TFT_eSPI.h>
+#include "Free_Fonts.h"
 // #include "FS.h"
 // #include "SD.h"
 #include "vs1053_ext.h"
@@ -15,7 +16,7 @@
 #include "MyPreferences.h"
 #include "UrlManager.h"
 #include "PrioRotary.h"
-//#include "Wire.h"
+// #include "Wire.h"
 
 // #include <GT911.h>
 
@@ -36,14 +37,15 @@
 #define DIRECTION_CW 0  // clockwise direction
 #define DIRECTION_CCW 1 // counter-clockwise direction
 
-#define NEXT_BUTTON_PIN 1 // ESP32 pin GPIO34, which connected to button
+#define NEXT_BUTTON_PIN 33 // ESP32 pin GPIO33, which connected to button
 
 #define MAX_VOLUME 50
 #define MIN_VOLUME 0
 #define DEF_VOLUME 20
 
 TFT_eSPI tft = TFT_eSPI();
-
+int title_lenght;
+int station_lenght;
 
 int stream_index = 0;
 int next_button_state = 0; // variable for reading the button status
@@ -82,8 +84,9 @@ void IRAM_ATTR checkVolume()
 void setup()
 {
   Serial.begin(115200);
-   while(!Serial);
-   Serial.println("Test");
+  while (!Serial)
+    ;
+  Serial.println("Test");
 
   //    SPI.setHwCs(true);
 
@@ -91,7 +94,7 @@ void setup()
   // otherwise the system might not start up correctly
 
   SPI.begin(VS1053_SCK, VS1053_MISO, VS1053_MOSI);
-  delay(3000);
+
   // xTaskCreatePinnedToCore(
   //     Task1code, // Function to implement the task
   //     "Task1",   // Name of the task
@@ -103,12 +106,12 @@ void setup()
   // );
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-
+  Serial.println("Test2");
   // configure encoder pins as inputs
   pinMode(CLK_PIN, INPUT);
+
   pinMode(DT_PIN, INPUT);
   rotary_button.setDebounceTime(50); // set debounce time to 50 milliseconds
-
   pinMode(NEXT_BUTTON_PIN, INPUT_PULLUP);
   next_button.setDebounceTime(150);
   next_button_state = next_button.getState();
@@ -120,7 +123,7 @@ void setup()
   // res = wm.autoConnect(); // auto generated AP name from chipid
   // res = wm.autoConnect("AutoConnectAP"); // anonymous ap
   res = wm.autoConnect("espprio"); // password protected ap
-
+  Serial.println("Test3");
   if (!res)
   {
     Serial.println("Failed to connect");
@@ -177,28 +180,27 @@ void setup()
     rotaryInstance.rotary_value = last_volume;
     webServer.begin();
 
-//  GTConfig *cfg = ts.readConfig();
-//   cfg->hSpace = (5 | (5 << 4));
-//   cfg->vSpace = (5 | (5 << 4));
-//   ts.writeConfig();
+    //  GTConfig *cfg = ts.readConfig();
+    //   cfg->hSpace = (5 | (5 << 4));
+    //   cfg->vSpace = (5 | (5 << 4));
+    //   ts.writeConfig();
 
+    tft.init();
+    tft.setRotation(3);
+    tft.fillScreen(TFT_BLACK);
+    tft.setCursor(0, 0, 4);
+    tft.setTextColor(TFT_WHITE);
+    tft.println("PRIO-WEBRADIO");
+    tft.print("IP address: ");
+    tft.println(WiFi.localIP());
 
-
-
-  tft.init();
-  tft.setRotation(3);
-  tft.fillScreen(TFT_BLACK);
-  tft.setCursor(0,0,4);
-  tft.setTextColor(TFT_WHITE);
-  tft.println ("PRIO-WEBRADIO");
-  tft.print("IP address: ");
-  tft.println(WiFi.localIP());
-
-
-
-
+    
   }
 }
+
+// void loop(){
+//   Serial.println("The button is pressed");
+// }
 void loop()
 {
   mp3.loop();
@@ -239,15 +241,10 @@ void loop()
     Serial.println("The button is released");
   }
 
-
-
-
-
   // getTouch();
-
-
 }
-void getTouch() {
+void getTouch()
+{
   // uint16_t x, y;
   // static uint16_t color;
 
@@ -262,16 +259,14 @@ void getTouch() {
   //   color += 155;
   // }
 
+  //  uint8_t touches = ts.touched(GT911_MODE_POLLING);
 
-//  uint8_t touches = ts.touched(GT911_MODE_POLLING);
-
-//   if (touches) {
-//     GTPoint* tp = ts.getPoints();
-//     for (uint8_t  i = 0; i < touches; i++) {
-//       Serial.printf("#%d  %d,%d s:%d\n", tp[i].trackId, tp[i].x, tp[i].y, tp[i].area);
-//     }
-//   }
-
+  //   if (touches) {
+  //     GTPoint* tp = ts.getPoints();
+  //     for (uint8_t  i = 0; i < touches; i++) {
+  //       Serial.printf("#%d  %d,%d s:%d\n", tp[i].trackId, tp[i].x, tp[i].y, tp[i].area);
+  //     }
+  //   }
 }
 String readDefaultUrl()
 {
@@ -291,19 +286,28 @@ void vs1053_showstation(const char *info)
 { // called from vs1053
   Serial.print("STATION:      ");
   Serial.println(info); // Show station name
+  station_lenght = tft.textWidth(info, 3);
+  tft.setCursor(0, 50, 3);
+  tft.setTextPadding(station_lenght);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.println(info); // Show title
 }
 void vs1053_showstreamtitle(const char *info)
 { // called from vs1053
   Serial.print("STREAMTITLE:  ");
   Serial.println(info); // Show title
+  tft.setCursor(0, 75, FSB18);
+   tft.setFreeFont(FSB18);
+  title_lenght = tft.textWidth(info, FSB18);
+  tft.setTextPadding(title_lenght);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.println(info); // Show title
 }
 void vs1053_showstreaminfo(const char *info)
 { // called from vs1053
   Serial.print("STREAMINFO:   ");
   Serial.println(info); // Show streaminfo
-  tft.println(info); // Show title
+  // tft.println(info); // Show title
 }
 void vs1053_eof_mp3(const char *info)
 { // called from vs1053
