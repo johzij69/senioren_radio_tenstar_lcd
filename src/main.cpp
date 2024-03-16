@@ -1,5 +1,6 @@
-#include "main.h"
+// inspired by https://github.com/schreibfaul1/ESP32-MiniWebRadio/tree/master
 
+#include "main.h"
 #include "WiFi.h"
 #include <WiFiManager.h>
 #include <AsyncTCP.h>
@@ -8,42 +9,45 @@
 #include "SPI.h"
 #include <TFT_eSPI.h>
 #include "Free_Fonts.h"
-// #include "FS.h"
-// #include "SD.h"
 #include "vs1053_ext.h"
 #include <ezButton.h> // the library to use for SW pin
-// #include "player.h"
 #include "MyPreferences.h"
 #include "UrlManager.h"
 #include "PrioRotary.h"
-// #include "Wire.h"
+#include "smallFont.h" // bar
+#include "middleFont.h" // bar
 
-// #include <GT911.h>
+/* touch */
+#define TOUCH_SDA 21
+#define TOUCH_SCL 22
+#define TOUCH_WIDTH 480
+#define TOUCH_HEIGHT 320
 
-// GT911 ts = GT911();
-
+/* DAC */
 #define VS1053_MOSI 23
 #define VS1053_MISO 19
 #define VS1053_SCK 18
-
 #define VS1053_CS 5
 #define VS1053_DCS 16
 #define VS1053_DREQ 4
 
-#define CLK_PIN 25 // ESP32 pin GPIO25 connected to the rotary encoder's CLK pin
-#define DT_PIN 26  // ESP32 pin GPIO26 connected to the rotary encoder's DT pin
-#define SW_PIN 27  // ESP32 pin GPIO27 connected to the rotary encoder's SW pin
-
+/* Rotary Volume */
+#define CLK_PIN 25      // ESP32 pin GPIO25 connected to the rotary encoder's CLK pin
+#define DT_PIN 26       // ESP32 pin GPIO26 connected to the rotary encoder's DT pin
+#define SW_PIN 27       // ESP32 pin GPIO27 connected to the rotary encoder's SW pin
 #define DIRECTION_CW 0  // clockwise direction
 #define DIRECTION_CCW 1 // counter-clockwise direction
 
-#define NEXT_BUTTON_PIN 33 // ESP32 pin GPIO33, which connected to button
-
-#define MAX_VOLUME 50
+#define MAX_VOLUME 40
 #define MIN_VOLUME 0
 #define DEF_VOLUME 20
 
+/* Next Button */
+#define NEXT_BUTTON_PIN 33 // ESP32 pin GPIO33, which connected to button
+
 TFT_eSPI tft = TFT_eSPI();
+PRIO_GT911 touchp = PRIO_GT911(TOUCH_SDA, TOUCH_SCL, TOUCH_WIDTH, TOUCH_HEIGHT);
+
 int title_lenght;
 int station_lenght;
 
@@ -75,6 +79,14 @@ const char *current_url;
 
 bool next_button_isreleased = true;
 
+TFT_eSprite barSpr = TFT_eSprite(&tft);
+
+int16_t x[5], y[5];
+
+unsigned short grays[15];
+unsigned short blue=0x3DB9;
+int barValue=4;
+
 // Interrupt routine just sets a flag when rotation is detected
 void IRAM_ATTR checkVolume()
 {
@@ -88,12 +100,11 @@ void setup()
     ;
   Serial.println("Test");
 
-  //    SPI.setHwCs(true);
-
-  // Wait for VS1053 and PAM8403 to power up
-  // otherwise the system might not start up correctly
-
   SPI.begin(VS1053_SCK, VS1053_MISO, VS1053_MOSI);
+
+  /* start touch */
+  touchp.begin();
+  touchp.setRotation(ROTATION_LEFT);
 
   // xTaskCreatePinnedToCore(
   //     Task1code, // Function to implement the task
@@ -106,22 +117,18 @@ void setup()
   // );
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-  Serial.println("Test2");
-  // configure encoder pins as inputs
+  /* Rotary button */
   pinMode(CLK_PIN, INPUT);
-
   pinMode(DT_PIN, INPUT);
   rotary_button.setDebounceTime(50); // set debounce time to 50 milliseconds
+
+  /* Next Button */
   pinMode(NEXT_BUTTON_PIN, INPUT_PULLUP);
   next_button.setDebounceTime(150);
   next_button_state = next_button.getState();
 
   WiFiManager wm;
-  // wm.setSaveParamsCallback(saveParamCallback);
-
   bool res;
-  // res = wm.autoConnect(); // auto generated AP name from chipid
-  // res = wm.autoConnect("AutoConnectAP"); // anonymous ap
   res = wm.autoConnect("espprio"); // password protected ap
   Serial.println("Test3");
   if (!res)
@@ -131,7 +138,6 @@ void setup()
   }
   else
   {
-    // if you get here you have connected to the WiFi
     Serial.println("connected...yeey :)");
     Serial.println("WiFi connected");
     Serial.print("IP address: ");
@@ -144,11 +150,6 @@ void setup()
     myPrefs.begin();
     UrlManagerInstance.begin();
     UrlManagerInstance.addUrl("https://icecast.omroep.nl/radio1-bb-mp3");
-    // UrlManagerInstance.addUrl("https://icecast.omroep.nl/radio2-bb-mp3:443");
-    // UrlManagerInstance.addUrl("https://icecast.omroep.nl/3fm-bb-mp3:443");
-
-    // Druk alle URLs af vanuit AnotherClass
-    UrlManagerInstance.printAllUrls();
 
     last_url = myPrefs.readString("lasturl", default_url.c_str());
     current_url = last_url.c_str();
@@ -178,14 +179,11 @@ void setup()
     attachInterrupt(digitalPinToInterrupt(DT_PIN), checkVolume, CHANGE);
     rotaryInstance.begin();
     rotaryInstance.rotary_value = last_volume;
+
     webServer.begin();
 
-    //  GTConfig *cfg = ts.readConfig();
-    //   cfg->hSpace = (5 | (5 << 4));
-    //   cfg->vSpace = (5 | (5 << 4));
-    //   ts.writeConfig();
-
-    tft.init();
+    /* sceen output */ 
+        tft.init();
     tft.setRotation(3);
     tft.fillScreen(TFT_BLACK);
     tft.setCursor(0, 0, 4);
@@ -193,14 +191,39 @@ void setup()
     tft.println("PRIO-WEBRADIO");
     tft.print("IP address: ");
     tft.println(WiFi.localIP());
-
-    
   }
+  barSpr.createSprite(30, 320);
+  barSpr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  barSpr.setTextDatum(4);
+ //   barSpr.setSwapBytes(true);
+
+  drawBar();
 }
 
-// void loop(){
-//   Serial.println("The button is pressed");
-// }
+void drawBar()
+{
+  Serial.println("drawbar");
+  barSpr.fillSprite(TFT_GREEN);
+  barSpr.drawRect(0, 0, 30, 320, grays[8]);
+  barSpr.loadFont(smallFont);
+  barSpr.setTextColor(grays[5], TFT_BLACK);
+  barSpr.drawString("VOL",5, 15, 2);
+  barSpr.unloadFont();
+  barSpr.loadFont(middleFont);
+  barSpr.setTextColor(grays[4], TFT_BLACK);
+  barSpr.drawString(String(rotaryInstance.rotary_value), 5, 30, 4);
+  barSpr.unloadFont();
+
+   for (int i = 0; i < MAX_VOLUME; i++)
+     barSpr.fillRect(2, 320 - (i * 8), 28, 7, grays[14]);
+
+   for (int i = 0; i < rotaryInstance.rotary_value; i++)
+     barSpr.fillRect(2, 320 - (i * 8), 28, 7, blue);
+  barSpr.pushSprite(450, 0);
+}
+
+
+
 void loop()
 {
   mp3.loop();
@@ -209,6 +232,8 @@ void loop()
   rotary_button.loop();
   if (rotaryInstance.rotary_value_changed)
   {
+    barValue = rotaryInstance.rotary_value;
+    drawBar();
     mp3.setVolume(rotaryInstance.ReadRotaryValue());
     myPrefs.writeValue("volume", rotaryInstance.rotary_value);
   }
@@ -241,33 +266,30 @@ void loop()
     Serial.println("The button is released");
   }
 
-  // getTouch();
+  getTouch(touchp);
+
 }
-void getTouch()
+void getTouch(PRIO_GT911 &tp)
 {
-  // uint16_t x, y;
-  // static uint16_t color;
-
-  // if (tft.getTouch(&x, &y)) {
-
-  //   tft.setCursor(5, 5, 2);
-  //   tft.printf("x: %i     ", x);
-  //   tft.setCursor(5, 20, 2);
-  //   tft.printf("y: %i    ", y);
-
-  //   tft.drawPixel(x, y, color);
-  //   color += 155;
-  // }
-
-  //  uint8_t touches = ts.touched(GT911_MODE_POLLING);
-
-  //   if (touches) {
-  //     GTPoint* tp = ts.getPoints();
-  //     for (uint8_t  i = 0; i < touches; i++) {
-  //       Serial.printf("#%d  %d,%d s:%d\n", tp[i].trackId, tp[i].x, tp[i].y, tp[i].area);
-  //     }
-  //   }
+  tp.read();
+  if (tp.isTouched)
+  {
+    for (int i = 0; i < tp.touches; i++)
+    {
+      Serial.print("Touch ");
+      Serial.print(i + 1);
+      Serial.print(": ");
+      Serial.print("  x: ");
+      Serial.print(tp.points[i].x);
+      Serial.print("  y: ");
+      Serial.print(tp.points[i].y);
+      Serial.print("  size: ");
+      Serial.println(tp.points[i].size);
+      Serial.println(' ');
+    }
+  }
 }
+
 String readDefaultUrl()
 {
 
@@ -286,22 +308,25 @@ void vs1053_showstation(const char *info)
 { // called from vs1053
   Serial.print("STATION:      ");
   Serial.println(info); // Show station name
-  station_lenght = tft.textWidth(info, 3);
-  tft.setCursor(0, 50, 3);
-  tft.setTextPadding(station_lenght);
+  tft.fillRect(0, 50, 480, 17, TFT_BLACK);
+  tft.setCursor(0, 50);
+  tft.setFreeFont(FSB9);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.println(info); // Show title
+  tft.drawString(info, 0, 50);
 }
 void vs1053_showstreamtitle(const char *info)
 { // called from vs1053
+
+  // see -> https://github.com/RalphBacon/205-Internet-Radio/blob/main/PlatformIO/ESP32%20Better%20Internet%20Radio%20-%20YouTube/include/tftHelpers.h
   Serial.print("STREAMTITLE:  ");
   Serial.println(info); // Show title
-  tft.setCursor(0, 75, FSB18);
-   tft.setFreeFont(FSB18);
-  title_lenght = tft.textWidth(info, FSB18);
-  tft.setTextPadding(title_lenght);
+  tft.fillRect(0, 75, 480, 17, TFT_BLACK);
+  tft.setCursor(0, 75);
+  tft.setFreeFont(FSB9);
+  // tft.setTextSize(1);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.println(info); // Show title
+  // tft.println(info); // Show title
+  tft.drawString(info, 0, 75);
 }
 void vs1053_showstreaminfo(const char *info)
 { // called from vs1053
@@ -339,3 +364,4 @@ void vs1053_lasthost(const char *info)
   Serial.print("lastURL:      ");
   Serial.println(info);
 }
+
