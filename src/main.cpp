@@ -5,7 +5,8 @@
 #include <WiFiManager.h>
 #include <AsyncTCP.h>
 #include "PrioWebserver.h"
-
+#include "PrioBar.h"
+#include "StreamLogo.h"
 #include "SPI.h"
 #include <TFT_eSPI.h>
 #include "Free_Fonts.h"
@@ -14,8 +15,14 @@
 #include "MyPreferences.h"
 #include "UrlManager.h"
 #include "PrioRotary.h"
-#include "smallFont.h" // bar
+#include "smallFont.h"  // bar
 #include "middleFont.h" // bar
+#include <SPIFFS.h>   // Include the SPIFFS library
+
+#include <HTTPClient.h> // Include the HTTPClient library
+#include "fetchImage.h"
+// Include the jpeg decoder library
+
 
 /* touch */
 #define TOUCH_SDA 21
@@ -38,7 +45,7 @@
 #define DIRECTION_CW 0  // clockwise direction
 #define DIRECTION_CCW 1 // counter-clockwise direction
 
-#define MAX_VOLUME 40
+#define VOLUME_STEPS 30
 #define MIN_VOLUME 0
 #define DEF_VOLUME 20
 
@@ -54,6 +61,7 @@ int station_lenght;
 int stream_index = 0;
 int next_button_state = 0; // variable for reading the button status
 int last_volume;
+int max_volume = 25; // Set default to 25.
 
 ezButton rotary_button(SW_PIN); // create ezButton object that attach to pin 27;
 ezButton next_button(NEXT_BUTTON_PIN);
@@ -79,19 +87,17 @@ const char *current_url;
 
 bool next_button_isreleased = true;
 
-TFT_eSprite barSpr = TFT_eSprite(&tft);
+PrioBar pBar(&tft);
 
-int16_t x[5], y[5];
-
-unsigned short grays[15];
-unsigned short blue=0x3DB9;
-int barValue=4;
+StreamLogo strLogo(&tft);
 
 // Interrupt routine just sets a flag when rotation is detected
 void IRAM_ATTR checkVolume()
 {
   rotaryInstance.rotaryEncoder = true;
 }
+
+
 
 void setup()
 {
@@ -165,26 +171,28 @@ void setup()
     mp3.begin();
 
     Serial.println("set volume steps");
-    mp3.setVolumeSteps(MAX_VOLUME);
+    mp3.setVolumeSteps(VOLUME_STEPS);
+    max_volume = mp3.maxVolume();
 
-    Serial.println("set volume");
+
     last_volume = myPrefs.readValue("volume", DEF_VOLUME);
+    if (last_volume > max_volume)
+      last_volume = max_volume;
     mp3.setVolume(last_volume);
-
     Serial.println("conecting");
     mp3.connecttohost("https://stream.100p.nl/100pctnl.mp3");
     Serial.println("conected");
 
     attachInterrupt(digitalPinToInterrupt(CLK_PIN), checkVolume, CHANGE);
     attachInterrupt(digitalPinToInterrupt(DT_PIN), checkVolume, CHANGE);
-    rotaryInstance.begin();
-    rotaryInstance.rotary_value = last_volume;
+    rotaryInstance.begin(MIN_VOLUME, max_volume, DEF_VOLUME);
+    rotaryInstance.current_value = last_volume;
 
     webServer.begin();
 
-    /* sceen output */ 
-        tft.init();
-    tft.setRotation(3);
+    /* sceen output */
+    tft.init();
+    tft.setRotation(1);
     tft.fillScreen(TFT_BLACK);
     tft.setCursor(0, 0, 4);
     tft.setTextColor(TFT_WHITE);
@@ -192,34 +200,13 @@ void setup()
     tft.print("IP address: ");
     tft.println(WiFi.localIP());
   }
-  barSpr.createSprite(30, 320);
-  barSpr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  barSpr.setTextDatum(4);
- //   barSpr.setSwapBytes(true);
 
-  drawBar();
-}
+  pBar.begin(450, 0, 30, 320, TFT_LIGHTGREY, TFT_BLACK, max_volume);
+  pBar.draw(last_volume);
 
-void drawBar()
-{
-  Serial.println("drawbar");
-  barSpr.fillSprite(TFT_GREEN);
-  barSpr.drawRect(0, 0, 30, 320, grays[8]);
-  barSpr.loadFont(smallFont);
-  barSpr.setTextColor(grays[5], TFT_BLACK);
-  barSpr.drawString("VOL",5, 15, 2);
-  barSpr.unloadFont();
-  barSpr.loadFont(middleFont);
-  barSpr.setTextColor(grays[4], TFT_BLACK);
-  barSpr.drawString(String(rotaryInstance.rotary_value), 5, 30, 4);
-  barSpr.unloadFont();
+  strLogo.begin();
+  strLogo.Show(35,100,"https://img.prio-ict.nl/api/images/NPO-Radio1.jpg");
 
-   for (int i = 0; i < MAX_VOLUME; i++)
-     barSpr.fillRect(2, 320 - (i * 8), 28, 7, grays[14]);
-
-   for (int i = 0; i < rotaryInstance.rotary_value; i++)
-     barSpr.fillRect(2, 320 - (i * 8), 28, 7, blue);
-  barSpr.pushSprite(450, 0);
 }
 
 
@@ -230,12 +217,11 @@ void loop()
   rotaryInstance.loop();
   next_button.loop();
   rotary_button.loop();
-  if (rotaryInstance.rotary_value_changed)
+  if (rotaryInstance.current_value_changed)
   {
-    barValue = rotaryInstance.rotary_value;
-    drawBar();
+    pBar.draw(rotaryInstance.current_value);
     mp3.setVolume(rotaryInstance.ReadRotaryValue());
-    myPrefs.writeValue("volume", rotaryInstance.rotary_value);
+    myPrefs.writeValue("volume", rotaryInstance.current_value);
   }
 
   next_button_state = next_button.getState();
@@ -267,8 +253,8 @@ void loop()
   }
 
   getTouch(touchp);
-
 }
+
 void getTouch(PRIO_GT911 &tp)
 {
   tp.read();
@@ -308,7 +294,7 @@ void vs1053_showstation(const char *info)
 { // called from vs1053
   Serial.print("STATION:      ");
   Serial.println(info); // Show station name
-  tft.fillRect(0, 50, 480, 17, TFT_BLACK);
+  tft.fillRect(0, 50, 450, 17, TFT_BLACK);
   tft.setCursor(0, 50);
   tft.setFreeFont(FSB9);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -320,7 +306,7 @@ void vs1053_showstreamtitle(const char *info)
   // see -> https://github.com/RalphBacon/205-Internet-Radio/blob/main/PlatformIO/ESP32%20Better%20Internet%20Radio%20-%20YouTube/include/tftHelpers.h
   Serial.print("STREAMTITLE:  ");
   Serial.println(info); // Show title
-  tft.fillRect(0, 75, 480, 17, TFT_BLACK);
+  tft.fillRect(0, 75, 450, 17, TFT_BLACK);
   tft.setCursor(0, 75);
   tft.setFreeFont(FSB9);
   // tft.setTextSize(1);
@@ -364,4 +350,5 @@ void vs1053_lasthost(const char *info)
   Serial.print("lastURL:      ");
   Serial.println(info);
 }
+
 
