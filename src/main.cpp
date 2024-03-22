@@ -205,7 +205,8 @@ void setup()
   pBar.draw(last_volume);
 
   strLogo.begin();
-  strLogo.Show(35,100,"https://img.prio-ict.nl/api/images/NPO-Radio1.jpg");
+  // Set default logo
+  strLogo.Show(35,100,"https://img.prio-ict.nl/api/images/webradio-default.jpg");
 
 }
 

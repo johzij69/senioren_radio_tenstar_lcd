@@ -44,13 +44,23 @@ void PrioWebServer::begin()
   server.on("/updateurls", HTTP_POST, [this](AsyncWebServerRequest *request)
             {
               String newurl;
+              String newurl_logo;
               if (request->hasParam("newurl", true))
               {
                 newurl = request->getParam("newurl", true)->value();
-                urlManager.addUrl(newurl.c_str());
+                
+                if (request->hasParam("newurl_logo", true)) {
+                  newurl_logo = request->hasParam("newurl_logo", true);
+                  if(newurl_logo != "") {
+                    urlManager.addUrl(newurl.c_str(), newurl_logo.c_str());
+                  }
+                } else {
+                    urlManager.addUrl(newurl.c_str());
+                }
+                
+  
                 request->redirect("/");
-              }
-            });
+              } });
   // server.on("/showprefs", HTTP_GET, [this](AsyncWebServerRequest *request)
   //           {
   //       Serial.println("getting urls from prferences:");
@@ -65,7 +75,8 @@ void PrioWebServer::handleAddUrl(AsyncWebServerRequest *request)
 {
   String body = "";
   body += "<form method='post' action='/updateurls'>";
-  body += "Nieuwe URL-lijst: <input class='input_url' type='text' name='newurl'>";
+  body += "Nieuwe URL: <input class='input_url' type='text' name='newurl'>";
+  body += "Nieuwe URL-logo: <input class='input_url_logo' type='text' name='newurl_logo'>";
   body += "<input  class='input_button' type='submit' value='Bijwerken'>";
   body += "</form>";
   request->send(200, "text/html", createHtmlPage(body));

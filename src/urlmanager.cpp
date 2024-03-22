@@ -1,10 +1,13 @@
 #include "UrlManager.h"
 #include <Arduino.h>
 
+
+
 UrlManager::UrlManager(MyPreferences &prefs) : myPreferences(prefs)
 {
     // Laad URL's vanuit Preferences bij het initialiseren
     urlCount = myPreferences.getUInt("url_count", 0);
+    default_logo = "https://img.prio-ict.nl/api/images/webradio-default.jpg";
 }
 
 void UrlManager::begin()
@@ -24,8 +27,13 @@ void UrlManager::loadUrls()
     for (uint32_t i = 0; i < urlCount; ++i)
     {
         String key = "url" + String(i);
+        String logo_key = "logo_url" + String(i);
+        
         String url = myPreferences.readString(key.c_str(), "");
+        String logo_url = myPreferences.readString(logo_key.c_str(), default_logo.c_str());
+        
         urls.push_back(url);
+        logo_urls.push_back(logo_url);
     }
 }
 
@@ -35,8 +43,11 @@ void UrlManager::readAndPrintValue(const char *key)
     int value = myPreferences.readValue(key, 0);
     Serial.println("Waarde gelezen vanuit UrlManager: " + String(value));
 }
-
 void UrlManager::addUrl(const char *url)
+{
+    this->addUrl(url,default_logo.c_str());
+}    
+void UrlManager::addUrl(const char *url, const char *logo_url)
 {
     Serial.println("Toevogen url: " + String(url));
 

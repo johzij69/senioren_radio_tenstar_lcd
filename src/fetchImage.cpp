@@ -3,7 +3,7 @@
 // Return 1 if a web fetch was needed or 0 if file already exists
 
 
-#define FORMAT_LITTLEFS_IF_FAILED true
+#define FORMAT_LITTLEFS_IF_FAILED false
 
 bool getFile(String url, String filename)
 {
