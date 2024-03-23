@@ -20,10 +20,13 @@ private:
   String getHtmlEnd();
   String getTopMenu();
   String getStyling();
+  String getScript();
+  String getEditUrlContainer();
   String createHtmlPage(String html);
   void handleRoot(AsyncWebServerRequest *request);
   void handleAddUrl(AsyncWebServerRequest *request);
   void deleteStreamItem(AsyncWebServerRequest *request);
+  void searchAndReplace(String *htmlString, String findPattern, String replaceWith);
 };
 
 #endif
