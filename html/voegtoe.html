@@ -13,7 +13,7 @@
       .content {
         margin-top: 10px;
         margin-left: 10px;
-        margin-font-family: Arial, sans-serif;
+        font-family: Arial, sans-serif;
       }
       .content input {
         padding: 5px;
@@ -59,24 +59,218 @@
           text-align: left;
         }
       }
+      .stream_item {
+        padding: 5px;
+        padding-left: 15px;
+        border: 2px solid lightgray;
+        border-radius: 8px;
+        margin-bottom: 5px;
+        max-width: 380px;
+        padding-bottom: 50px;
+        cursor: move; /* Add cursor style */
+      }
+      .edit-label {
+        margin-top: 5px;
+        margin-left: 7px;
+        font-size: 14px;
+        font-weight: bold;
+        margin-bottom: 2px;
+      }
+      .align-right {
+        float: right;
+        margin-right: 15px;
+        margin-top: 15px;
+      }
+      .url-container {
+        margin-top: 15px;
+      }
+      .drop-zone {
+        border: 2px dashed lightgray; /* Border style for drop zone */
+        border-radius: 8px;
+      }
+      .drag-over {
+        background-color: rgba(
+          0,
+          0,
+          0,
+          0.1
+        ); /* Background color for drag-over */
+      }
     </style>
+    <script>
+      function toggleEdit() {
+        var inputs = document.querySelectorAll(".input_url");
+        var button = document.querySelector(".input_button");
+
+        if (button.value === "Bijwerken") {
+          inputs.forEach(function (input) {
+            input.removeAttribute("readonly");
+          });
+          button.value = "Opslaan";
+          document
+            .getElementById("updateForm")
+            .setAttribute("onsubmit", "submitForm(); return false;");
+        } else {
+          inputs.forEach(function (input) {
+            input.setAttribute("readonly", true);
+          });
+          button.value = "Bijwerken";
+          document.getElementById("updateForm").removeAttribute("onsubmit");
+        }
+      }
+
+      function submitForm() {
+        document.getElementById("updateForm").submit();
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        const streamItems = document.querySelectorAll(".stream_item");
+
+        content.addEventListener("dragstart", dragStart);
+        content.addEventListener("dragover", dragOver);
+        content.addEventListener("dragleave", dragLeave);
+        content.addEventListener("drop", drop);
+
+        function dragStart(event) {
+          if (event.target.classList.contains("stream_item")) {
+            dragSrcEl = event.target;
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/html", this.outerHTML);
+            this.classList.add("dragging");
+          }
+        }
+
+        function dragOver(event) {
+          event.preventDefault();
+          if (event.target.classList.contains("stream_item")) {
+            event.target.classList.add("drag-over");
+          }
+        }
+
+        function dragLeave(event) {
+          if (event.target.classList.contains("stream_item")) {
+            event.target.classList.remove("drag-over");
+          }
+        }
+
+        function drop(event) {
+          event.preventDefault();
+          if (event.target.classList.contains("stream_item")) {
+            if (dragSrcEl !== this) {
+              const droppedHTML = event.dataTransfer.getData("text/html");
+              const droppedElement = document.createElement("div");
+              droppedElement.innerHTML = droppedHTML;
+              const dragElement = droppedElement.firstChild;
+              this.parentNode.insertBefore(dragElement, this);
+              this.parentNode.insertBefore(this, dragSrcEl);
+            }
+            event.target.classList.remove("drag-over");
+          }
+        }
+      });
+    </script>
   </head>
   <body>
     <div class="top-menu">
-      <a href="/">Overzicht</a><a href="/deleteurl">Verwijder</a
-      ><a href="/addurl">Voeg toe</a><a href="#">Contact</a>
+      <a href="/">Overzicht</a>
+      <a href="/deleteurl">Verwijder</a>
+      <a href="/addurl">Voeg toe</a>
+      <a href="#">Contact</a>
     </div>
     <div class="content">
-      <form method="post" action="/updateurls">
-        Nieuwe URL:
-        <input class="input_url" type="text" name="newurl" /><br />Nieuwe
-        URL-logo:
-        <input
-          class="input_url_logo"
-          type="text"
-          name="newurl_logo"
-        /><br /><input class="input_button" type="submit" value="Bijwerken" />
-      </form>
+      <span id="drag_indicator-0"></span>
+      <div id="0" class="stream_item" draggable="true">
+        <form method="post" action="/updateurls">
+          <div id="url-0" class="url-container">
+            <div class="edit-label">Stream url:</div>
+            <input
+              readonly
+              class="input_url"
+              type="text"
+              name="newurl"
+              value="https://icecast.omroep.nl/radio1-bb-mp3"
+            />
+          </div>
+          <div id="url-log-0" class="url-container">
+            <div class="edit-label">Logo url:</div>
+            <input
+              readonly
+              class="input_url"
+              type="text"
+              name="newurl_logo"
+              value="https://img.prio-ict.nl/api/images/webradio-default.jpg"
+            />
+          </div>
+          <input
+            class="input_button align-right"
+            type="button"
+            value="Bijwerken"
+            onclick="toggleEdit()"
+          />
+        </form>
+      </div>
+      <span id="drag_indicator-1"></span>
+      <div id="1" class="stream_item" draggable="true">
+        <form method="post" action="/updateurls">
+          <div id="url-1" class="url-container">
+            <div class="edit-label">Stream url:</div>
+            <input
+              readonly
+              class="input_url"
+              type="text"
+              name="newurl"
+              value="https://icecast.omroep.nl/radio2-bb-mp3"
+            />
+          </div>
+          <div id="url-log-1" class="url-container">
+            <div class="edit-label">Logo url:</div>
+            <input
+              readonly
+              class="input_url"
+              type="text"
+              name="newurl_logo"
+              value="https://img.prio-ict.nl/api/images/webradio-default.jpg"
+            />
+          </div>
+          <input
+            class="input_button align-right"
+            type="button"
+            value="Bijwerken"
+            onclick="toggleEdit()"
+          />
+        </form>
+      </div>
+      <span id="drag_indicator-2"></span>
+      <div id="2" class="stream_item" draggable="true">
+        <form method="post" action="/updateurls">
+          <div id="url-2" class="url-container">
+            <div class="edit-label">Stream url:</div>
+            <input
+              readonly
+              class="input_url"
+              type="text"
+              name="newurl"
+              value="https://icecast.omroep.nl/radio3-bb-mp3"
+            />
+          </div>
+          <div id="url-log-2" class="url-container">
+            <div class="edit-label">Logo url:</div>
+            <input
+              readonly
+              class="input_url"
+              type="text"
+              name="newurl_logo"
+              value="https://img.prio-ict.nl/api/images/webradio3-default.jpg"
+            />
+          </div>
+          <input
+            class="input_button align-right"
+            type="button"
+            value="Bijwerken"
+            onclick="toggleEdit()"
+          />
+        </form>
+      </div>
     </div>
   </body>
 </html>

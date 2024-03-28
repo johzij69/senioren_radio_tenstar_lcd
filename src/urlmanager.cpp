@@ -18,7 +18,6 @@ void UrlManager::begin()
 void UrlManager::loadUrls()
 {
     urlCount = myPreferences.getUInt("url_count", 0);
-    Serial.println(String(urlCount));
     if (urlCount < 1)
     {
         return;
@@ -35,6 +34,24 @@ void UrlManager::loadUrls()
         urls.push_back(url);
         logo_urls.push_back(logo_url);
     }
+}
+
+void UrlManager::saveUrls()
+{
+    urlCount = urls.size();
+    if (urlCount < 1)
+    {
+        return;
+    }
+    for (uint32_t i = 0; i < urlCount; ++i)
+    {
+        String key = "url" + String(i);
+        String logo_key = "logo_url" + String(i);
+
+        myPreferences.writeString(key.c_str(), urls[i].c_str());
+        myPreferences.writeString(logo_key.c_str(), logo_urls[i].c_str());
+    }
+    myPreferences.putUInt("url_count", urls.size());
 }
 
 void UrlManager::readAndPrintValue(const char *key)

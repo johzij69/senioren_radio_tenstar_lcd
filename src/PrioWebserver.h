@@ -4,6 +4,8 @@
 #include <ESPAsyncWebServer.h>
 #include "UrlManager.h"
 #include "favicon.h"
+// #include "AsyncJson.h"
+#include "ArduinoJson.h"
 
 class PrioWebServer
 {
@@ -26,6 +28,7 @@ private:
   void handleRoot(AsyncWebServerRequest *request);
   void handleAddUrl(AsyncWebServerRequest *request);
   void deleteStreamItem(AsyncWebServerRequest *request);
+  void handleSettings(AsyncWebServerRequest *request, uint8_t *data);
   void searchAndReplace(String *htmlString, String findPattern, String replaceWith);
 };
 

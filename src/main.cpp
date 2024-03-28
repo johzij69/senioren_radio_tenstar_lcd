@@ -102,9 +102,9 @@ void IRAM_ATTR checkVolume()
 void setup()
 {
   Serial.begin(115200);
-  while (!Serial)
-    ;
-  Serial.println("Test");
+  // while (!Serial)
+  //   ;
+  
 
   SPI.begin(VS1053_SCK, VS1053_MISO, VS1053_MOSI);
 

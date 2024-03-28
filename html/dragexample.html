@@ -123,86 +123,126 @@
         document.getElementById("updateForm").submit();
       }
 
-      document.addEventListener("DOMContentLoaded", function () {
-        const streamItems = document.querySelectorAll(".stream_item");
 
-        streamItems.forEach((streamItem) => {
-          streamItem.setAttribute("draggable", "true"); // Make stream items draggable
-          streamItem.addEventListener("dragstart", dragStart);
-          streamItem.addEventListener("dragover", dragOver);
-          streamItem.addEventListener("dragleave", dragLeave);
-          streamItem.addEventListener("drop", drop);
-        });
-      });
+      // document.addEventListener("DOMContentLoaded", function () {
+      //   const content = document.querySelector(".content");
+      //   const itemContainers = document.querySelectorAll(".item-container");
 
-      let dragSrcEl = null;
-      let dropZone = null;
+      //   let dragSrcContainer = null;
 
-      function dragStart(event) {
-        dragSrcEl = this;
+      //   content.addEventListener("dragstart", dragStart);
+      //   content.addEventListener("dragover", dragOver);
+      //   content.addEventListener("dragleave", dragLeave);
+      //   content.addEventListener("drop", drop);
+
+      //   function dragStart(event) {
+      //     if (event.target.classList.contains("item-container")) {
+      //       dragSrcContainer = event.target;
+      //       event.dataTransfer.effectAllowed = "move";
+      //       event.dataTransfer.setData("text/html", this.innerHTML);
+      //       this.innerHTML = "";
+      //       this.classList.add("dragging");
+      //     }
+      //   }
+
+      //   function dragOver(event) {
+      //     event.preventDefault();
+      //     if (event.target.classList.contains("item-container")) {
+      //       event.target.classList.add("drag-over");
+      //     }
+      //   }
+
+      //   function dragLeave(event) {
+      //     if (event.target.classList.contains("item-container")) {
+      //       event.target.classList.remove("drag-over");
+      //     }
+      //   }
+
+      //   function drop(event) {
+      //     event.preventDefault();
+      //     if (event.target.classList.contains("item-container")) {
+      //       if (dragSrcContainer !== event.target) {
+      //         event.target.innerHTML = event.dataTransfer.getData("text/html");
+      //         dragSrcContainer.innerHTML = event.target.innerHTML;
+      //       }
+      //       event.target.classList.remove("drag-over");
+      //     }
+      //   }
+
+      //   content.addEventListener("dragend", function () {
+      //     itemContainers.forEach((container) => {
+      //       container.classList.remove("drag-over");
+      //       container.classList.remove("dragging");
+      //     });
+      //   });
+      // });
+	  
+	  
+	  
+	  
+
+  document.addEventListener("DOMContentLoaded", function () {
+    const alles = document.getElementById("alles");
+
+    alles.addEventListener("dragstart", dragStart);
+    alles.addEventListener("dragover", dragOver);
+    alles.addEventListener("dragleave", dragLeave);
+    alles.addEventListener("drop", drop);
+
+    let dragSrcContainer = null;
+
+    function dragStart(event) {
+      if (event.target.id.startsWith("content-")) {
+        dragSrcContainer = event.target.closest("[id^='container-']");
         event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData("text/html", this.outerHTML);
-        this.classList.add("dragging");
+        event.dataTransfer.setData("text/html", event.target.outerHTML);
+        event.target.remove();
       }
+    }
 
-      function dragOver(event) {
-        event.preventDefault();
-        event.dataTransfer.dropEffect = "move";
+    function dragOver(event) {
+      event.preventDefault();
+	  if (event.target.classList.contains("item-container")) {
+            event.target.classList.add("drag-over");
+      }
+    }
 
-        const targetItem = event.target.closest(".stream_item");
-        if (targetItem) {
-          const rect = targetItem.getBoundingClientRect();
+    function dragLeave(event) {
+      event.preventDefault();
+    }
 
-          // **Aanpassing:** Bepaal positie cursor in element
-          const relativeY = event.clientY - rect.top;
-          const isTopHalf = relativeY < rect.height / 2;
+    function drop(event) {
+      event.preventDefault();
+      if (event.target.id.startsWith("container-")) {
+        const targetContainer = event.target;
+        const droppedHTML = event.dataTransfer.getData("text/html");
+        const droppedElement = document.createElement("div");
+        droppedElement.innerHTML = droppedHTML;
+        const dragElement = droppedElement.firstChild;
 
-          // **Aanpassing:** Plaats item boven of onderaan op basis van cursorpositie
-          if (isTopHalf) {
-            targetItem.parentNode.insertBefore(dragSrcEl, targetItem);
-          } else {
-            targetItem.parentNode.insertBefore(
-              dragSrcEl,
-              targetItem.nextSibling
-            );
-          }
+        const targetPosition = parseInt(targetContainer.id.split("-")[1].trim().replace("container-", ""));
+        const dragPosition = parseInt(dragSrcContainer.id.split("-")[1].trim().replace("container-", ""));
 
-          targetItem.classList.add("drop-zone");
-          dropZone = targetItem;
+        if (targetPosition < dragPosition) {
+          targetContainer.parentNode.insertBefore(dragElement, targetContainer);
         } else {
-          const dropZones = document.querySelectorAll(".drop-zone");
-          if (dropZones.length > 0) {
-            dropZones.forEach((dropZone) => {
-              dropZone.classList.remove("drop-zone");
-            });
-          }
+          targetContainer.parentNode.insertBefore(dragElement, targetContainer.nextSibling);
         }
 
-        return false;
+        dragSrcContainer.parentNode.insertBefore(targetContainer, dragSrcContainer);
       }
-
-      function dragLeave(event) {
-        if (dropZone === this) {
-          dropZone.classList.remove("drop-zone");
-          dropZone = null;
-        }
-      }
-
-      function drop(event) {
-        event.preventDefault();
-        if (dragSrcEl !== this) {
-          if (dropZone === this) {
-            dropZone.classList.remove("drop-zone");
-            dropZone = null;
-          }
-          this.parentNode.insertBefore(
-            document.getElementById(dragSrcEl.id),
-            this
-          );
-          this.parentNode.insertBefore(this, dragSrcEl);
-        }
-        return false;
-      }
+    }
+  });
+  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
     </script>
   </head>
   <body>
@@ -212,9 +252,34 @@
       <a href="/addurl">Voeg toe</a>
       <a href="#">Contact</a>
     </div>
+	
+	<div id="alles">
+<div id="container-1" class="item-container">
+<div class="stream_item" draggable="true" id=content-1>hallo 1</div>
+</div>
+<div id="container-2"  class="item-container">
+<div class="stream_item" draggable="true" id=content-2>hallo 2</div>
+</div>
+<div id="container-3"  class="item-container">
+<div class="stream_item" draggable="true" id=content-3>hallo 3</div>
+</div>
+<div id="container-4"  class="item-container">
+<div class="stream_item" draggable="true" id=content-4>hallo 4</div>
+</div>
+<div id="container-5"  class="item-container">
+<div class="stream_item" draggable="true" id=content-5>hallo 5</div>
+</div>
+<div id="container-6"  class="item-container">
+<div class="stream_item" draggable="true" id=content-6>hallo 6</div>
+</div>
+<div id="container-7"  class="item-container">
+<div class="stream_item" draggable="true" id=content-7>hallo 7</div>
+</div>
+</div>
+	
     <div class="content">
       <div id="item-container-0">
-        <div id="0" class="stream_item">
+        <div id="0" class="stream_item" draggable="true">
           <form method="post" action="/updateurls">
             <div id="url-0" class="url-container">
               <div class="edit-label">Stream url:</div>
@@ -246,7 +311,7 @@
         </div>
       </div>
       <div id="item-container-1">
-        <div id="1" class="stream_item">
+        <div id="1" class="stream_item" draggable="true">
           <form method="post" action="/updateurls">
             <div id="url-1" class="url-container">
               <div class="edit-label">Stream url:</div>
@@ -278,7 +343,7 @@
         </div>
       </div>
       <div id="item-container-2">
-        <div id="2" class="stream_item">
+        <div id="2" class="stream_item" draggable="true">
           <form method="post" action="/updateurls">
             <div id="url-2" class="url-container">
               <div class="edit-label">Stream url:</div>

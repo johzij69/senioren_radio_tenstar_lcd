@@ -19,6 +19,7 @@ public:
     void loadUrls();
     void PrinturlsFromPrev();
     void deleteUrl(int index);
+    void saveUrls();
 
     uint32_t urlCount;
     std::vector<String> urls;
