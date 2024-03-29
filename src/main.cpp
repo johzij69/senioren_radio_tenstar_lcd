@@ -188,7 +188,7 @@ void setup()
     rotaryInstance.begin(MIN_VOLUME, max_volume, DEF_VOLUME);
     rotaryInstance.current_value = last_volume;
 
-    webServer.begin();
+
 
     /* sceen output */
     tft.init();
@@ -207,6 +207,8 @@ void setup()
   strLogo.begin();
   // Set default logo
   strLogo.Show(35,100,"https://img.prio-ict.nl/api/images/webradio-default.jpg");
+
+      webServer.begin();
 
 }
 
@@ -240,6 +242,7 @@ void loop()
       stream_index++;
     }
     current_url = UrlManagerInstance.getUrlAtIndex(stream_index);
+
     myPrefs.writeString("lasturl", current_url);
     Serial.println("playing:");
     Serial.println(current_url);
@@ -251,6 +254,7 @@ void loop()
     /* we only will listen to button input if it was released */
     next_button_isreleased = true;
     Serial.println("The button is released");
+        Serial.println(UrlManagerInstance.Streams[stream_index].url);
   }
 
   getTouch(touchp);

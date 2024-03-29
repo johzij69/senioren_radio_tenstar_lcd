@@ -1,18 +1,18 @@
 #include "UrlManager.h"
 #include <Arduino.h>
 
-
-
 UrlManager::UrlManager(MyPreferences &prefs) : myPreferences(prefs)
 {
     // Laad URL's vanuit Preferences bij het initialiseren
     urlCount = myPreferences.getUInt("url_count", 0);
+    streamCount = myPreferences.getUInt("stream_count", 0);
     default_logo = "https://img.prio-ict.nl/api/images/webradio-default.jpg";
 }
 
 void UrlManager::begin()
 {
     this->loadUrls();
+    this->loadStreams();
 }
 
 void UrlManager::loadUrls()
@@ -27,13 +27,154 @@ void UrlManager::loadUrls()
     {
         String key = "url" + String(i);
         String logo_key = "logo_url" + String(i);
-        
+
         String url = myPreferences.readString(key.c_str(), "");
         String logo_url = myPreferences.readString(logo_key.c_str(), default_logo.c_str());
-        
+
         urls.push_back(url);
         logo_urls.push_back(logo_url);
     }
+}
+
+void UrlManager::loadStreams()
+{
+
+    streamCount = myPreferences.getUInt("stream_count", 0);
+    Serial.println("loading streams");
+    Serial.println("stream count is:" + String(streamCount));
+
+    for (int i = 0; i < streamCount; i++)
+    {
+        String keyId = "Id" + String(i);
+        String keyName = "name" + String(i);
+        String keyUrl = "url" + String(i);
+        String keyLogo = "logo" + String(i);
+        Streams[i].id = myPreferences.getUInt(keyId.c_str(), i);
+        Streams[i].name = myPreferences.readString(keyName.c_str(), "");
+        Streams[i].url = myPreferences.readString(keyUrl.c_str(), "");
+        Streams[i].logo = myPreferences.readString(keyLogo.c_str(), "");
+    }
+}
+
+void UrlManager::saveStreams(uint8_t *data)
+{
+
+    int index = 0; // Teller voor de index
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, data);
+
+    if (error)
+    {
+        Serial.print("deserializeJson() returned ");
+        Serial.println(error.c_str());
+        //    return false;
+    }
+
+    for (JsonPair item : doc.as<JsonObject>())
+    {
+        const char *item_key = item.key().c_str(); // "container-0", "container-1", "container-2", ...
+
+        Serial.println("saved:" + String(item_key));
+
+        index = atoi(item_key + strlen("container-"));
+
+        //    const char *value_stream_id = item.value()["stream_id"];   // "0", "1", "2", "3", "4", "5", "6"
+        const char *value_name = item.value()["name"]; // "https://icecast.omroep.nl/radio1-bb-mp3", ...
+        const char *value_url = item.value()["url"];
+        const char *value_logo = item.value()["logo"];
+
+        Serial.println("saved:1");
+        Serial.println(String(index));
+        Serial.println(String(value_name));
+        Serial.println(String(value_url));
+        Serial.println(String(value_logo));
+
+        Streams[index].id = item.value()["id"];
+        Streams[index].name = value_name;
+        Streams[index].url = value_url;
+        Streams[index].logo = value_logo;
+
+        Serial.println("saved:");
+        Serial.println(String(Streams[index].id));
+        Serial.println(String(Streams[index].name));
+        Serial.println(String(Streams[index].url));
+        Serial.println(String(Streams[index].logo));
+    }
+    streamCount = index;
+    this->saveToPreferences();
+}
+
+void UrlManager::addStream(uint8_t *data)
+{
+
+    // Max # of streams is 40
+    if (streamCount == 39)
+    {
+        return;
+    }
+
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, data);
+    if (error)
+    {
+        Serial.print("deserializeJson() returned ");
+        Serial.println(error.c_str());
+        return;
+    }
+
+    // const char *value_name = doc["name"];
+    // const char *value_url = doc["url"];
+    // const char *value_logo = doc["logo"];
+
+    const char *value_name = "johan";//doc["name"];
+    const char *value_url = "piet";//doc["url"];
+    const char *value_logo = "klaas"; //doc["logo"];
+
+
+
+    Streams[streamCount].id = streamCount;
+    Streams[streamCount].name = value_name;
+    Streams[streamCount].url = value_url;
+    Streams[streamCount].logo = value_logo;
+
+    Serial.println("addstream:1");
+    Serial.println(String(streamCount));
+    Serial.println(String(value_name));
+    Serial.println(String(value_url));
+    Serial.println(String(value_logo));
+
+    Serial.println("addstream:");
+    Serial.println(String(Streams[streamCount].id));
+    Serial.println(String(Streams[streamCount].name));
+    Serial.println(String(Streams[streamCount].url));
+    Serial.println(String(Streams[streamCount].logo));
+
+    this->streamCount++;
+    this->saveToPreferences();
+}
+
+void UrlManager::saveToPreferences()
+{
+
+    Serial.println("saving to prefs");
+    for (int i = 0; i < streamCount; i++)
+    {
+        String keyId = "Id" + String(i);
+        String keyName = "name" + String(i);
+        String keyUrl = "url" + String(i);
+        String keyLogo = "logo" + String(i);
+
+        Serial.println(Streams[i].id);
+        Serial.println(Streams[i].name);
+        Serial.println(Streams[i].url);
+        Serial.println(Streams[i].logo);
+
+        myPreferences.putUInt(keyId.c_str(), Streams[i].id);
+        myPreferences.writeString(keyName.c_str(), Streams[i].name.c_str());
+        myPreferences.writeString(keyUrl.c_str(), Streams[i].url.c_str());
+        myPreferences.writeString(keyLogo.c_str(), Streams[i].logo.c_str());
+    }
+    myPreferences.putUInt("stream_count", streamCount);
 }
 
 void UrlManager::saveUrls()
@@ -62,8 +203,8 @@ void UrlManager::readAndPrintValue(const char *key)
 }
 void UrlManager::addUrl(const char *url)
 {
-    this->addUrl(url,default_logo.c_str());
-}    
+    this->addUrl(url, default_logo.c_str());
+}
 void UrlManager::addUrl(const char *url, const char *logo_url)
 {
     Serial.println("Toevogen url: " + String(url));
@@ -143,14 +284,15 @@ void UrlManager::deleteUrl(int index)
         urls.erase(urls.begin() + index);
 
         String key = "url" + String(index);
-        if (myPreferences.remove(key.c_str())) {
-            Serial.println(key+ ": verwijdert.");
+        if (myPreferences.remove(key.c_str()))
+        {
+            Serial.println(key + ": verwijdert.");
         }
 
         myPreferences.putUInt("url_count", urls.size());
-Serial.println("kom ik hier");
+        Serial.println("kom ik hier");
         Serial.println("URL verwijderd: " + String(urls[index]));
-Serial.println("kom ik hier2");
+        Serial.println("kom ik hier2");
         this->loadUrls();
     }
 }
