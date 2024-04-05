@@ -208,7 +208,8 @@ void setup()
   // Set default logo
   strLogo.Show(35,100,"https://img.prio-ict.nl/api/images/webradio-default.jpg");
 
-      webServer.begin();
+  webServer.ip = WiFi.localIP().toString();
+  webServer.begin();
 
 }
 

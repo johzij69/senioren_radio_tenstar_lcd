@@ -10,34 +10,54 @@
         margin: 0;
         font-family: Arial, sans-serif;
       }
+
+      /* top menu */
+      .top-menu {
+        background-color: #333;
+        overflow: hidden;
+      }
+      .top-menu a {
+        float: left;
+        display: block;
+        color: white;
+        text-align: center;
+        padding: 14px 16px;
+        text-decoration: none;
+      }
+      .top-menu a:hover {
+        background-color: #ddd;
+        color: black;
+      }
+      /* content */
       .content {
         margin-top: 10px;
         margin-left: 10px;
         font-family: Arial, sans-serif;
+      }
+
+      .stream_item {
+        padding: 10px;
+        border: 2px solid lightgray;
+        border-radius: 8px;
+        margin-bottom: 5px;
+        max-width: 52vh;
+        cursor: move; /* Add cursor style */
       }
       .content input {
         padding: 5px;
         font-family: Arial, sans-serif;
       }
       .input_url {
-        padding: 5px;
-        width: 50%;
         border-radius: 5px;
         border-width: thin;
-        margin-left: 5px;
-        margin-right: 5px;
         width: 48vh;
       }
 
       .input_naam {
-        padding: 5px;
         border-radius: 5px;
         border-width: thin;
-        margin-left: 5px;
-        margin-right: 5px;
       }
       .input_button {
-        padding: 5px;
         border-radius: 5px;
         border-width: thin;
         padding-left: 10px;
@@ -46,6 +66,33 @@
         margin-top: 10px;
       }
 
+      .url-container {
+        margin-top: 15px;
+        margin-bottom: 15px;
+      }
+      .edit-label {
+        margin-left: 5px;
+        font-size: 14px;
+        font-weight: bold;
+        margin-bottom: 2px;
+      }
+
+      .container {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+
+      .pagination {
+        margin-right: 20px;
+      }
+
+      .pagesize-container {
+        display: flex;
+        align-items: center;
+      }
+
+      /* animated saver loader */
       #saving {
         position: absolute;
         top: 45px;
@@ -78,45 +125,7 @@
         }
       }
 
-      .top-menu {
-        background-color: #333;
-        overflow: hidden;
-      }
-      .top-menu a {
-        float: left;
-        display: block;
-        color: white;
-        text-align: center;
-        padding: 14px 16px;
-        text-decoration: none;
-      }
-      .top-menu a:hover {
-        background-color: #ddd;
-        color: black;
-      }
-
-      .stream_item {
-        padding: 5px;
-        padding-left: 15px;
-        border: 2px solid lightgray;
-        border-radius: 8px;
-        margin-bottom: 5px;
-        max-width: 52vh;
-        padding-bottom: 24px;
-        cursor: move; /* Add cursor style */
-      }
-      .edit-label {
-        margin-top: 5px;
-        margin-left: 7px;
-        font-size: 14px;
-        font-weight: bold;
-        margin-bottom: 2px;
-      }
-
-      .url-container {
-        margin-top: 15px;
-      }
-
+      /* drag and Drop */
       .drop-zone {
         border: 2px dashed lightgray; /* Border style for drop zone */
         border-radius: 8px;
@@ -129,86 +138,217 @@
           0.1
         ); /* Background color for drag-over */
       }
-
-      @media screen and (max-width: 600px) {
-        .top-menu a {
-          float: none;
-          display: block;
-          width: 100%;
-          text-align: left;
-        }
-
-        .stream_item {
-          max-width: 31vh;
-        }
-
-        .input_url {
-          width: 29vh;
-        }
-
-        .input_button {
-          margin-left: 25vh;
-        }
-      }
     </style>
+
+    <script></script>
+  </head>
+  <body>
+    <div class="top-menu">
+      <a href="/">Overzicht</a>
+      <a href="/deleteurl">Verwijder</a>
+      <a href="/addurl">Voeg toe</a>
+      <a href="#">Contact</a>
+    </div>
+    <div class="content">
+      <h2>Radio Streams</h2>
+      <div class="container">
+        <div class="pagination">
+          <button id="prevBtn" disabled>Previous</button>
+          <span id="currentPage">Page 1</span>
+          <button id="nextBtn">Next</button>
+        </div>
+        <span class="pagesize-container">
+          <label for="pagesize">pagesize:</label>
+          <select name="pagesize" id="pagesize">
+            <option value="3">3</option>
+            <option value="5" selected="selected">5</option>
+            <option value="8">8</option>
+            <option value="10">10</option>
+          </select>
+        </span>
+      </div>
+      <form method="post" id="updateForm">
+        <div id="saving"><div class="loader"></div></div>
+        <div id="streams"></div>
+      </form>
+      <span
+        ><input
+          class="input_button"
+          type="button"
+          value="Opslaan"
+          onclick="saveStreams()"
+        />
+      </span>
+    </div>
+
     <script>
-      function toggleEdit() {
-        // Verzamel de gegevens van het formulier
-        document.getElementById("saving").style.display = "block";
+      const streamsContainer = document.getElementById("streams");
+      const prevButton = document.getElementById("prevBtn");
+      const nextButton = document.getElementById("nextBtn");
+      const currentPageSpan = document.getElementById("currentPage");
+      const pagesizeSelect = document.getElementById("pagesize");
+      let currentPage = 1;
+      let pagesize = 5;
 
-        var formData = {};
-        var containers = document.querySelectorAll(".item-container");
-        containers.forEach(function (container) {
-          var containerId = container.getAttribute("id");
-          var streamItem = container.querySelector(".stream_item");
-          var streamId = streamItem.getAttribute("id");
-          var streamUrl = streamItem.querySelector(".input_url").value;
-          var streamNaam = streamItem.querySelector(".input_naam").value;
-          var logoUrl = streamItem.querySelector(
-            '.input_url[name^="newurl_logo"]'
-          ).value;
-          formData[containerId] = {
-            id: streamId,
-            naam: streamNaam,
-            url: streamUrl,
-            logo: logoUrl,
-          };
-        });
+      const requestOptions = {
+        method: "GET",
+        redirect: "follow",
+      };
 
-        // Converteer de gegevens naar JSON en geef deze een naam
-        var jsonData = JSON.stringify(formData);
-        var postData = { json_settings: jsonData };
-
-        // Doe hier iets met postData, bijvoorbeeld het naar de server sturen via een AJAX-verzoek
-        // Voorbeeld met AJAX:
-        var xhr = new XMLHttpRequest();
-        xhr.open("POST", "/updateurls", true);
-        xhr.setRequestHeader("Content-Type", "application/json");
-        xhr.onreadystatechange = function () {
-          if (xhr.readyState === 4 && xhr.status === 200) {
-            document.getElementById("saving").style.display = "none";
+      async function fetchStreams(page, size) {
+        console.log("kom ik hier");
+        const response = await fetch(
+          `http://192.168.1.120/api/streams?page=${page}&size=${size}`,
+          requestOptions
+        );
+        console.log(response);
+        if (response.ok) {
+          const data = await response.json();
+          displayStreams(data.data);
+          currentPage = page;
+          currentPageSpan.textContent = `Page ${currentPage}`;
+          if (currentPage === 1) {
+            prevButton.disabled = true;
+          } else {
+            prevButton.disabled = false;
           }
-        };
-        xhr.send(JSON.stringify(postData));
+          if (data.total_pages === currentPage) {
+            nextButton.disabled = true;
+          } else {
+            nextButton.disabled = false;
+          }
+        }
       }
 
-      document.addEventListener("DOMContentLoaded", function () {
-        // Stel event listeners in voor alle draggable elementen
-        const draggables = document.querySelectorAll(".stream_item");
-        draggables.forEach((draggable) => {
-          draggable.addEventListener("dragstart", handleDragStart);
-        });
+      function displayStreams(streams) {
+        streamsContainer.innerHTML = "";
+        streams.forEach((stream) => {
+          const streamContainer = document.createElement("div");
+          streamContainer.setAttribute("id", `container-${stream.id}`);
+          streamContainer.setAttribute("class", "item-container");
+          streamContainer.addEventListener("dragover", handleDragOver);
+          streamContainer.addEventListener("drop", handleDrop);
+          streamContainer.addEventListener("dragleave", dragLeave);
 
-        // Stel event listeners in voor alle dropzone containers
-        const dropzones = document.querySelectorAll(".item-container");
-        console.log(dropzones);
-        dropzones.forEach((dropzone) => {
-          console.log(dropzone.id);
-          dropzone.addEventListener("dragover", handleDragOver);
-          dropzone.addEventListener("drop", handleDrop);
-          dropzone.addEventListener("dragleave", dragLeave);
+          const streamItem = document.createElement("div");
+          streamItem.setAttribute("id", stream.id);
+          streamItem.setAttribute("class", "stream_item");
+          streamItem.setAttribute("draggable", "true");
+          streamItem.addEventListener("dragstart", handleDragStart);
+          streamItem.innerHTML = `
+                 <div id="naam-${stream.id}" class="naam-container">
+                    <div class="edit-label">Stream naam:</div>
+                    <input
+                      class="input_naam"
+                      type="text"
+                      name="naam-${stream.id}"
+                      value="${stream.name}"
+                    />
+                  </div>
+                  <div id="url-${stream.id}" class="url-container">
+                    <div class="edit-label">Stream url:</div>
+                    <input
+                      class="input_url"
+                      type="text"
+                      name="newurl-${stream.id}"
+                      value="${stream.url}"
+                    />
+                  </div>
+                  <div id="url-log-${stream.id}" class="url-container">
+                    <div class="edit-label">Logo url:</div>
+                    <input
+                      class="input_url"
+                      type="text"
+                      name="newurl_logo_${stream.id}"S
+                      value="${stream.logo}"
+                    />
+                  </div>
+               `;
+          streamContainer.appendChild(streamItem);
+          streamsContainer.appendChild(streamContainer);
         });
-      });
+      }
+
+      async function saveStream() {
+        try {
+          // Verzamel de gegevens van het formulier
+          document.getElementById("saving").style.display = "block";
+          const formData = {};
+          const streamNaam = document.getElementById("input_naam").value;
+          const streamUrl = document.getElementById("input_url").value;
+          const streamLogo = document.getElementById("input_logo").value;
+
+          formData["json_settings"] = {
+            name: streamNaam,
+            url: streamUrl,
+            logo: streamLogo,
+          };
+
+          // Maak een POST-verzoek met fetch
+          const url = "/addstream";
+          const options = {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(formData),
+          };
+
+          const response = await fetch(url, options);
+          if (!response.ok) {
+            throw new Error("Network response was not ok");
+          }
+
+          document.getElementById("saving").style.display = "none";
+        } catch (error) {
+          console.error("Er is een fout opgetreden:", error);
+        }
+      }
+
+      async function saveStreams() {
+        try {
+          // Verzamel de gegevens van het formulier
+          document.getElementById("saving").style.display = "block";
+
+          const formData = {};
+          const containers = document.querySelectorAll(".item-container");
+          containers.forEach((container) => {
+            const containerId = container.getAttribute("id");
+            const streamItem = container.querySelector(".stream_item");
+            const streamId = streamItem.getAttribute("id");
+            const streamUrl = streamItem.querySelector(".input_url").value;
+            const streamNaam = streamItem.querySelector(".input_naam").value;
+            const logoUrl = streamItem.querySelector(
+              '.input_url[name^="newurl_logo"]'
+            ).value;
+            formData[containerId] = {
+              id: streamId,
+              name: streamNaam,
+              url: streamUrl,
+              logo: logoUrl,
+            };
+          });
+
+          // Maak een POST-verzoek met fetch
+          const url = "http://192.168.1.120/updateurls";
+          const options = {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(formData),
+          };
+
+          const response = await fetch(url, options);
+          if (!response.ok) {
+            throw new Error("Network response was not ok");
+          }
+
+          document.getElementById("saving").style.display = "none";
+        } catch (error) {
+          console.error("Er is een fout opgetreden:", error);
+        }
+      }
 
       // Behandel dragstart event
       function handleDragStart(event) {
@@ -217,8 +357,6 @@
         const parentContainer = draggedElement.parentNode;
 
         // Stel data-transfer object in met element ID
-        //   console.log("set id van gesleept element");
-        //    console.log(draggedElement.id);
         event.dataTransfer.setData("dragged_element_id", draggedElement.id);
         event.dataTransfer.setData("parentContainer", parentContainer.id);
       }
@@ -235,6 +373,7 @@
           targetItem.classList.add("drag-over");
         }
       }
+
       // remove indicator drag-over
       function dragLeave(event) {
         const targetItem = event.target.closest(".stream_item");
@@ -258,247 +397,25 @@
         source_container.appendChild(orig_element);
         orig_element.classList.remove("drag-over");
       }
+
+      prevButton.addEventListener("click", () => {
+        if (currentPage > 1) {
+          fetchStreams(currentPage - 1, pagesize);
+        }
+      });
+
+      nextButton.addEventListener("click", () => {
+        fetchStreams(currentPage + 1, pagesize);
+      });
+
+      pagesizeSelect.addEventListener("change", () => {
+        if (pagesizeSelect.value != pagesize) {
+          currentPage = 1;
+          pagesize = pagesizeSelect.value;
+          fetchStreams(currentPage, pagesize);
+        }
+      });
+      fetchStreams(currentPage, pagesize);
     </script>
-  </head>
-  <body>
-    <div class="top-menu">
-      <a href="/">Overzicht</a><a href="/deleteurl">Verwijder</a
-      ><a href="/addurl">Voeg toe</a><a href="#">Contact</a>
-    </div>
-    <div class="content">
-      <div class="content">
-        <form method="post" id="updateForm" action="/updateurls">
-          <div id="container-0" class="item-container">
-            <div id="0" class="stream_item" draggable="true">
-              <div id="naam-0" class="naam-container">
-                <div class="edit-label">Stream naam:</div>
-                <input
-                  class="input_naam"
-                  type="text"
-                  name="naam-0"
-                  value="@stream_naam"
-                />
-              </div>
-              <div id="url-0" class="url-container">
-                <div class="edit-label">Stream url:</div>
-                <input
-                  class="input_url"
-                  type="text"
-                  name="newurl"
-                  value="https://icecast.omroep.nl/radio1-bb-mp3"
-                />
-              </div>
-              <div id="url-log-0" class="url-container">
-                <div class="edit-label">Logo url:</div>
-                <input
-                  class="input_url"
-                  type="text"
-                  name="newurl_logo"
-                  value="https://img.prio-ict.nl/api/images/NPO-Radio1.jpg"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div id="container-1" class="item-container">
-            <div id="1" class="stream_item" draggable="true">
-              <div id="naam-1" class="naam-container">
-                <div class="edit-label">Stream naam:</div>
-                <input
-                  class="input_naam"
-                  type="text"
-                  name="naam-1"
-                  value="@stream_naam"
-                />
-              </div>
-              <div id="url-1" class="url-container">
-                <div class="edit-label">Stream url:</div>
-                <input
-                  class="input_url"
-                  type="text"
-                  name="newurl"
-                  value="https://icecast.omroep.nl/radio2-sb-mp3"
-                />
-              </div>
-              <div id="url-log-1" class="url-container">
-                <div class="edit-label">Logo url:</div>
-                <input
-                  class="input_url"
-                  type="text"
-                  name="newurl_logo"
-                  value="https://img.prio-ict.nl/api/images/webradio-default.jpg"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div id="container-2" class="item-container">
-            <div id="2" class="stream_item" draggable="true">
-              <div id="naam-2" class="naam-container">
-                <div class="edit-label">Stream naam:</div>
-                <input
-                  class="input_naam"
-                  type="text"
-                  name="naam-2"
-                  value="@stream_naam"
-                />
-              </div>
-              <div id="url-2" class="url-container">
-                <div class="edit-label">Stream url:</div>
-                <input
-                  class="input_url"
-                  type="text"
-                  name="newurl"
-                  value="https://icecast.omroep.nl/3fm-bb-mp3"
-                />
-              </div>
-              <div id="url-log-2" class="url-container">
-                <div class="edit-label">Logo url:</div>
-                <input
-                  class="input_url"
-                  type="text"
-                  name="newurl_logo"
-                  value="https://img.prio-ict.nl/api/images/webradio-default.jpg"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div id="container-3" class="item-container">
-            <div id="3" class="stream_item" draggable="true">
-              <div id="naam-3" class="naam-container">
-                <div class="edit-label">Stream naam:</div>
-                <input
-                  class="input_naam"
-                  type="text"
-                  name="naam-3"
-                  value="@stream_naam"
-                />
-              </div>
-              <div id="url-3" class="url-container">
-                <div class="edit-label">Stream url:</div>
-                <input
-                  class="input_url"
-                  type="text"
-                  name="newurl"
-                  value="https://icecast.omroep.nl/radio5-bb-mp3"
-                />
-              </div>
-              <div id="url-log-3" class="url-container">
-                <div class="edit-label">Logo url:</div>
-                <input
-                  class="input_url"
-                  type="text"
-                  name="newurl_logo"
-                  value="https://img.prio-ict.nl/api/images/webradio-default.jpg"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div id="container-4" class="item-container">
-            <div id="4" class="stream_item" draggable="true">
-              <div id="naam-4" class="naam-container">
-                <div class="edit-label">Stream naam:</div>
-                <input
-                  class="input_naam"
-                  type="text"
-                  name="naam-4"
-                  value="@stream_naam"
-                />
-              </div>
-              <div id="url-4" class="url-container">
-                <div class="edit-label">Stream url:</div>
-                <input
-                  class="input_url"
-                  type="text"
-                  name="newurl"
-                  value="https://playerservices.streamtheworld.com/api/livestream-redirect/RADIO10.mp3"
-                />
-              </div>
-              <div id="url-log-4" class="url-container">
-                <div class="edit-label">Logo url:</div>
-                <input
-                  class="input_url"
-                  type="text"
-                  name="newurl_logo"
-                  value="https://img.prio-ict.nl/api/images/webradio-default.jpg"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div id="container-5" class="item-container">
-            <div id="5" class="stream_item" draggable="true">
-              <div id="naam-5" class="naam-container">
-                <div class="edit-label">Stream naam:</div>
-                <input
-                  class="input_naam"
-                  type="text"
-                  name="naam-5"
-                  value="@stream_naam"
-                />
-              </div>
-              <div id="url-5" class="url-container">
-                <div class="edit-label">Stream url:</div>
-                <input
-                  class="input_url"
-                  type="text"
-                  name="newurl"
-                  value="https://stream.100p.nl/100pctnl.mp3"
-                />
-              </div>
-              <div id="url-log-5" class="url-container">
-                <div class="edit-label">Logo url:</div>
-                <input
-                  class="input_url"
-                  type="text"
-                  name="newurl_logo"
-                  value="https://img.prio-ict.nl/api/images/webradio-default.jpg"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div id="container-6" class="item-container">
-            <div id="6" class="stream_item" draggable="true">
-              <div id="naam-6" class="naam-container">
-                <div class="edit-label">Stream naam:</div>
-                <input
-                  class="input_naam"
-                  type="text"
-                  name="naam-6"
-                  value="@stream_naam"
-                />
-              </div>
-              <div id="url-6" class="url-container">
-                <div class="edit-label">Stream url:</div>
-                <input
-                  class="input_url"
-                  type="text"
-                  name="newurl"
-                  value="https://stream.joe.nl/joe/mp3"
-                />
-              </div>
-              <div id="url-log-6" class="url-container">
-                <div class="edit-label">Logo url:</div>
-                <input
-                  class="input_url"
-                  type="text"
-                  name="newurl_logo"
-                  value="https://img.prio-ict.nl/api/images/webradio-default.jpg"
-                />
-              </div>
-            </div>
-          </div>
-          <input
-            class="input_button"
-            type="button"
-            value="Bijwerken"
-            onclick="toggleEdit()"
-          />
-        </form>
-      </div>
-    </div>
   </body>
 </html>

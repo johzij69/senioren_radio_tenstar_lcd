@@ -67,7 +67,7 @@ void UrlManager::saveStreams(uint8_t *data)
     {
         Serial.print("deserializeJson() returned ");
         Serial.println(error.c_str());
-        //    return false;
+        return ;
     }
 
     for (JsonPair item : doc.as<JsonObject>())
@@ -83,24 +83,42 @@ void UrlManager::saveStreams(uint8_t *data)
         const char *value_url = item.value()["url"];
         const char *value_logo = item.value()["logo"];
 
-        Serial.println("saved:1");
-        Serial.println(String(index));
-        Serial.println(String(value_name));
-        Serial.println(String(value_url));
-        Serial.println(String(value_logo));
-
         Streams[index].id = item.value()["id"];
         Streams[index].name = value_name;
         Streams[index].url = value_url;
         Streams[index].logo = value_logo;
 
-        Serial.println("saved:");
+        Serial.print("saved:");
         Serial.println(String(Streams[index].id));
         Serial.println(String(Streams[index].name));
         Serial.println(String(Streams[index].url));
         Serial.println(String(Streams[index].logo));
+   
     }
-    streamCount = index;
+
+    this->saveToPreferences();
+}
+
+void UrlManager::deleteStream(int index)
+{
+
+    if (index < 0 || index > streamCount - 1)
+    {
+        Serial.println("Ongeldige index");
+        return;
+    }
+
+    // Schuif alle items na de verwijderde index één plaats naar links
+    for (int i = index; i < 39; i++)
+    {
+        Streams[i] = Streams[i + 1];
+    }
+
+    // Verwijder het laatste item door het te resetten naar de standaardwaarden
+    StreamItem defaultItem;
+    Streams[39] = defaultItem;
+
+    this->streamCount--;
     this->saveToPreferences();
 }
 
@@ -114,7 +132,9 @@ void UrlManager::addStream(uint8_t *data)
     }
 
     JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, data);
+    char *jsonString = reinterpret_cast<char *>(data);
+    DeserializationError error = deserializeJson(doc, jsonString);
+
     if (error)
     {
         Serial.print("deserializeJson() returned ");
@@ -122,26 +142,16 @@ void UrlManager::addStream(uint8_t *data)
         return;
     }
 
-    // const char *value_name = doc["name"];
-    // const char *value_url = doc["url"];
-    // const char *value_logo = doc["logo"];
+    JsonObject json_settings = doc["json_settings"];
 
-    const char *value_name = "johan";//doc["name"];
-    const char *value_url = "piet";//doc["url"];
-    const char *value_logo = "klaas"; //doc["logo"];
-
-
+    const char *json_settings_name = json_settings["name"];
+    const char *json_settings_url = json_settings["url"];
+    const char *json_settings_logo = json_settings["logo"];
 
     Streams[streamCount].id = streamCount;
-    Streams[streamCount].name = value_name;
-    Streams[streamCount].url = value_url;
-    Streams[streamCount].logo = value_logo;
-
-    Serial.println("addstream:1");
-    Serial.println(String(streamCount));
-    Serial.println(String(value_name));
-    Serial.println(String(value_url));
-    Serial.println(String(value_logo));
+    Streams[streamCount].name = json_settings_name;
+    Streams[streamCount].url = json_settings_url;
+    Streams[streamCount].logo = json_settings_logo;
 
     Serial.println("addstream:");
     Serial.println(String(Streams[streamCount].id));
@@ -157,8 +167,12 @@ void UrlManager::saveToPreferences()
 {
 
     Serial.println("saving to prefs");
+    Serial.println(String(streamCount));
+
     for (int i = 0; i < streamCount; i++)
     {
+
+    Serial.println(String(streamCount));
         String keyId = "Id" + String(i);
         String keyName = "name" + String(i);
         String keyUrl = "url" + String(i);

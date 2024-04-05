@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Senior Webradio</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+      }
+      .content {
+        margin-top: 10px;
+        margin-left: 10px;
+        font-family: Arial, sans-serif;
+      }
+      .content input {
+        padding: 5px;
+        font-family: Arial, sans-serif;
+      }
+      .input_url {
+        padding: 5px;
+        width: 50%;
+        border-radius: 5px;
+        border-width: thin;
+        margin-left: 5px;
+        margin-right: 5px;
+        width: 48vh;
+      }
+
+      .input_naam {
+        padding: 5px;
+        border-radius: 5px;
+        border-width: thin;
+        margin-left: 5px;
+        margin-right: 5px;
+      }
+      .input_button {
+        padding: 5px;
+        border-radius: 5px;
+        border-width: thin;
+        padding-left: 10px;
+        padding-right: 10px;
+        margin-left: 45vh;
+        margin-top: 10px;
+      }
+
+      #saving {
+        position: absolute;
+        top: 45px;
+        left: 0px;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.5);
+        display: none;
+        z-index: 999;
+      }
+
+      .loader {
+        position: absolute;
+        left: 50vw;
+        border: 8px solid #f3f3f3;
+        border-top: 8px solid #3498db;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+        top: 50vh;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .top-menu {
+        background-color: #333;
+        overflow: hidden;
+      }
+      .top-menu a {
+        float: left;
+        display: block;
+        color: white;
+        text-align: center;
+        padding: 14px 16px;
+        text-decoration: none;
+      }
+      .top-menu a:hover {
+        background-color: #ddd;
+        color: black;
+      }
+
+      .stream_item {
+        padding: 5px;
+        padding-left: 15px;
+        border: 2px solid lightgray;
+        border-radius: 8px;
+        margin-bottom: 5px;
+        max-width: 52vh;
+        padding-bottom: 24px;
+        cursor: move; /* Add cursor style */
+      }
+      .edit-label {
+        margin-top: 5px;
+        margin-left: 7px;
+        font-size: 14px;
+        font-weight: bold;
+        margin-bottom: 2px;
+      }
+
+      .url-container {
+        margin-top: 15px;
+      }
+
+      .drop-zone {
+        border: 2px dashed lightgray; /* Border style for drop zone */
+        border-radius: 8px;
+      }
+      .drag-over {
+        background-color: rgba(
+          0,
+          0,
+          0,
+          0.1
+        ); /* Background color for drag-over */
+      }
+
+      @media screen and (max-width: 600px) {
+        .top-menu a {
+          float: none;
+          display: block;
+          width: 100%;
+          text-align: left;
+        }
+
+        .stream_item {
+          max-width: 31vh;
+        }
+
+        .input_url {
+          width: 29vh;
+        }
+
+        .input_button {
+          margin-left: 25vh;
+        }
+      }
+
+      .pagination-container {
+        display: flex;
+        align-items: center;
+        position: absolute;
+        bottom: 0;
+        justify-content: center;
+      }
+      .pagination-number,
+      .pagination-button {
+        font-size: 1.1rem;
+        background-color: transparent;
+        border: none;
+        margin: 0.25rem 0.25rem;
+        cursor: pointer;
+        height: 2.5rem;
+        width: 2.5rem;
+        border-radius: 0.2rem;
+      }
+      .pagination-number:hover,
+      .pagination-button:not(.disabled):hover {
+        background: #fff;
+      }
+      .pagination-number.active {
+        color: #fff;
+        background: #0085b6;
+      }
+    </style>
+    <script>
+      /*
+ function toggleEdit() {
+        var inputs = document.querySelectorAll(".input_url");
+        var button = document.querySelector("#url_button");
+
+        if (button.value === "Bijwerken") {
+          inputs.forEach(function (input) {
+            input.removeAttribute("readonly");
+          });
+          button.value = "Opslaan";
+		  button.type = "submit";
+          document
+            .getElementById("updateForm")
+            .setAttribute("onsubmit", "submitForm(); return false;");
+        } else {
+          inputs.forEach(function (input) {
+            input.setAttribute("readonly", true);
+          });
+          button.value = "Bijwerken";
+          document.getElementById("updateForm").removeAttribute("onsubmit");
+        }
+
+      }
+*/
+
+      function toggleEdit() {
+        // Verzamel de gegevens van het formulier
+        document.getElementById("saving").style.display = "block";
+
+        var formData = {};
+        var containers = document.querySelectorAll(".item-container");
+        containers.forEach(function (container) {
+          var containerId = container.getAttribute("id");
+          var streamItem = container.querySelector(".stream_item");
+          var streamId = streamItem.getAttribute("id");
+          var streamUrl = streamItem.querySelector(".input_url").value;
+          var streamNaam = streamItem.querySelector(".input_naam").value;
+          var logoUrl = streamItem.querySelector(
+            '.input_url[name^="newurl_logo"]'
+          ).value;
+          formData[containerId] = {
+            id: streamId,
+            naam: streamNaam,
+            url: streamUrl,
+            logo: logoUrl,
+          };
+        });
+
+        // Converteer de gegevens naar JSON en geef deze een naam
+        var jsonData = JSON.stringify(formData);
+        var postData = { json_settings: jsonData };
+
+        // Doe hier iets met postData, bijvoorbeeld het naar de server sturen via een AJAX-verzoek
+        // Voorbeeld met AJAX:
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "/updateurls", true);
+        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.onreadystatechange = function () {
+          if (xhr.readyState === 4 && xhr.status === 200) {
+            document.getElementById("saving").style.display = "none";
+          }
+        };
+        xhr.send(JSON.stringify(postData));
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        // Stel event listeners in voor alle draggable elementen
+        const draggables = document.querySelectorAll(".stream_item");
+        draggables.forEach((draggable) => {
+          draggable.addEventListener("dragstart", handleDragStart);
+        });
+
+        // Stel event listeners in voor alle dropzone containers
+        const dropzones = document.querySelectorAll(".item-container");
+        console.log(dropzones);
+        dropzones.forEach((dropzone) => {
+          console.log(dropzone.id);
+          dropzone.addEventListener("dragover", handleDragOver);
+          dropzone.addEventListener("drop", handleDrop);
+          dropzone.addEventListener("dragleave", dragLeave);
+        });
+      });
+
+      // Behandel dragstart event
+      function handleDragStart(event) {
+        // Identificeer het te verplaatsen element
+        const draggedElement = event.target;
+        const parentContainer = draggedElement.parentNode;
+
+        // Stel data-transfer object in met element ID
+        //   console.log("set id van gesleept element");
+        //    console.log(draggedElement.id);
+        event.dataTransfer.setData("dragged_element_id", draggedElement.id);
+        event.dataTransfer.setData("parentContainer", parentContainer.id);
+      }
+
+      // Behandel dragover event
+      function handleDragOver(event) {
+        // Voorkom standaard browsergedrag (zoals kopiëren)
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+
+        // indicator on stream _item
+        const targetItem = event.target.closest(".stream_item");
+        if (targetItem) {
+          targetItem.classList.add("drag-over");
+        }
+      }
+      // remove indicator drag-over
+      function dragLeave(event) {
+        const targetItem = event.target.closest(".stream_item");
+        if (targetItem) {
+          const rect = targetItem.classList.remove("drag-over");
+        }
+      }
+
+      // Swap dragged item in container
+      function handleDrop(event) {
+        event.preventDefault();
+        const orig_element = document.getElementById(this.id).children[0];
+        const draggedElementId =
+          event.dataTransfer.getData("dragged_element_id");
+        const dragged_element = document.getElementById(draggedElementId);
+        const sourceContainerId = event.dataTransfer.getData("parentContainer");
+        const target_container = document.getElementById(this.id);
+        const source_container = document.getElementById(sourceContainerId);
+        target_container.innerHTML = "";
+        target_container.appendChild(dragged_element);
+        source_container.appendChild(orig_element);
+        orig_element.classList.remove("drag-over");
+      }
+    </script>
+  </head>
+  <body>
+    <div class="top-menu">
+      <a href="/">Overzicht</a>
+      <a href="/deleteurl">Verwijder</a>
+      <a href="/addurl">Voeg toe</a>
+      <a href="#">Contact</a>
+    </div>
+
+    <div class="content">
+      <form method="post" action="/updateurls" id="updateForm">
+        <div id="saving"><div class="loader"></div></div>
+        <ul id="paginated-list" aria-live="polite">
+          <li id="container-0" class="item-container">
+            <div id="0" class="stream_item" draggable="true">
+              <div id="naam-0" class="naam-container">
+                <div class="edit-label">Stream naam:</div>
+                <input
+                  class="input_naam"
+                  type="text"
+                  name="naam-0"
+                  value="NPO-Radio1"
+                />
+              </div>
+              <div id="url-0" class="url-container">
+                <div class="edit-label">Stream url:</div>
+                <input
+                  class="input_url"
+                  type="text"
+                  name="newurl-0"
+                  value="https://icecast.omroep.nl/radio1-bb-mp3"
+                />
+              </div>
+              <div id="url-log-0" class="url-container">
+                <div class="edit-label">Logo url:</div>
+                <input
+                  class="input_url"
+                  type="text"
+                  name="newurl_logo_0"
+                  value="https://img.prio-ict.nl/api/images/webradio-default.jpg"
+                />
+              </div>
+            </div>
+          </li>
+          <!------------------------->
+          <li id="container-1" class="item-container">
+            <div id="1" class="stream_item" draggable="true">
+              <div id="naam-1" class="naam-container">
+                <div class="edit-label">Stream naam:</div>
+                <input
+                  class="input_naam"
+                  type="text"
+                  name="naam-1"
+                  value="NPO-Radio2"
+                />
+              </div>
+              <div id="url-1" class="url-container">
+                <div class="edit-label">Stream url:</div>
+                <input
+                  class="input_url"
+                  type="text"
+                  name="newurl-1"
+                  value="https://icecast.omroep.nl/radio2-bb-mp3"
+                />
+              </div>
+              <div id="url-log-1" class="url-container">
+                <div class="edit-label">Logo url:</div>
+                <input
+                  class="input_url"
+                  type="text"
+                  name="newurl_logo_1"
+                  value="https://img.prio-ict.nl/api/images/webradio-default.jpg"
+                />
+              </div>
+            </div>
+          </li>
+          <!---------------------------------->
+        </ul>
+        <input
+          id="url_button"
+          class="input_button"
+          type="button"
+          value="Opslaan"
+          onclick="toggleEdit()"
+        />
+        <!---------pagination-------------------------->
+        <nav class="pagination-container">
+          <button
+            class="pagination-button"
+            id="prev-button"
+            title="Previous page"
+            aria-label="Previous page"
+          >
+            &lt;
+          </button>
+
+          <div id="pagination-numbers"></div>
+
+          <button
+            class="pagination-button"
+            id="next-button"
+            title="Next page"
+            aria-label="Next page"
+          >
+            &gt;
+          </button>
+        </nav>
+      </form>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,38 @@
+{
+"page": 1,
+    "per_page": 5,
+    "total": 9,
+    "total_pages": 2,
+    "data": [
+        {
+            "id": 1,
+            "name": "npo-radio1",
+            "url": "https://icecast.omroep.nl/radio1-bb-mp3",
+            "logo": "https://img.prio-ict.nl/api/images/webradio-default.jpg"
+        },
+        {
+            "id": 2,
+            "name": "npo-radio2",
+            "url": "https://icecast.omroep.nl/radio2-bb-mp3",
+            "logo": "https://img.prio-ict.nl/api/images/webradio-default.jpg"
+        },
+        {
+            "id": 3,
+            "name": "npo-radio3",
+            "url": "https://icecast.omroep.nl/radio3-bb-mp3",
+            "logo": "https://img.prio-ict.nl/api/images/webradio-default.jpg"
+        },
+        {
+            "id": 4,
+            "name": "npo-radio4",
+            "url": "https://icecast.omroep.nl/radio4-bb-mp3",
+            "logo": "https://img.prio-ict.nl/api/images/webradio-default.jpg"
+        },
+        {
+            "id": 5,
+            "name": "npo-radio5",
+            "url": "https://icecast.omroep.nl/radio5-bb-mp3",
+            "logo": "https://img.prio-ict.nl/api/images/webradio-default.jpg"
+        }
+    ]
+}

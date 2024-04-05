@@ -24,6 +24,7 @@ public:
     void loadStreams();
     void saveStreams(uint8_t *data);
     void addStream(uint8_t *data);
+    void deleteStream(int index);
     void saveToPreferences();
 
 

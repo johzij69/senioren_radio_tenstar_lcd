@@ -4,8 +4,9 @@
 #include <ESPAsyncWebServer.h>
 #include "UrlManager.h"
 #include "favicon.h"
-// #include "AsyncJson.h"
 #include "ArduinoJson.h"
+#include "PrioWebjavascript.h"
+#include "PrioWebcss.h"
 
 class PrioWebServer
 {
@@ -13,6 +14,8 @@ public:
   PrioWebServer(UrlManager &urlManager, int port);
 
   void begin();
+  String ip;
+  
 
 private:
   AsyncWebServer server;
@@ -20,19 +23,25 @@ private:
 
   String htmlPage;
 
+  String PROGMEM bigString;
+
   String getHtmlStart();
   String getHtmlEnd();
   String getTopMenu();
-  String getStyling();
-  String getScript();
-  String getEditUrlContainer();
-  String createHtmlPage(String html);
+  String setHtmlBody(String body);
+
+
+  String createHtmlPage(String body);
   void handleRoot(AsyncWebServerRequest *request);
   void handleAddUrl(AsyncWebServerRequest *request);
+  void handleAddStream(AsyncWebServerRequest *request, uint8_t *data);
   void handleInputStream(AsyncWebServerRequest *request);
   void deleteStreamItem(AsyncWebServerRequest *request);
   void handleSettings(AsyncWebServerRequest *request, uint8_t *data);
-  void searchAndReplace(String *htmlString, String findPattern, String replaceWith);
+
+
+
+  void handleApi(AsyncWebServerRequest *request);
 };
 
 #endif
