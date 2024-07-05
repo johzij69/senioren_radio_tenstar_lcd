@@ -28,16 +28,15 @@ private:
   String getHtmlStart();
   String getHtmlEnd();
   String getTopMenu();
-  String setHtmlBody(String body);
-
-
+  String setHtmlBody(String body, String Script);
   String createHtmlPage(String body);
+
   void handleRoot(AsyncWebServerRequest *request);
-  void handleAddUrl(AsyncWebServerRequest *request);
   void handleAddStream(AsyncWebServerRequest *request, uint8_t *data);
   void handleInputStream(AsyncWebServerRequest *request);
-  void deleteStreamItem(AsyncWebServerRequest *request);
   void handleSettings(AsyncWebServerRequest *request, uint8_t *data);
+  void handleDeleteStream(AsyncWebServerRequest *request);
+
 
 
 

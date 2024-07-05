@@ -11,16 +11,16 @@ class UrlManager
 public:
     UrlManager(MyPreferences &prefs);
     void readAndPrintValue(const char *key);
-    void addUrl(const char *url);
-    void addUrl(const char *url, const char *logo_url);
+    // void addUrl(const char *url);
+    // void addUrl(const char *url, const char *logo_url);
     void printAllUrls();
     const char *getUrlAtIndex(int index);
     String CreateDivUrls();
     void begin();
-    void loadUrls();
-    void PrinturlsFromPrev();
-    void deleteUrl(int index);
-    void saveUrls();
+    // void loadUrls();
+    // void PrinturlsFromPrev();
+    // void deleteUrl(int index);
+    // void saveUrls();
     void loadStreams();
     void saveStreams(uint8_t *data);
     void addStream(uint8_t *data);
@@ -28,7 +28,7 @@ public:
     void saveToPreferences();
 
 
-    uint32_t urlCount;
+    //uint32_t urlCount;
     uint32_t streamCount;
     
     std::vector<String> urls;

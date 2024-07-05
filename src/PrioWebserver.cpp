@@ -14,38 +14,40 @@ void PrioWebServer::begin()
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type");
 
   server.onNotFound([this](AsyncWebServerRequest *request)
-  {
+                    {
     if (request->method() == HTTP_OPTIONS) {
       request->send(200);
     } else {
       request->send(404, "application/json", "{\"message\":\"Not found\"}");
-    }
-  });
+    } });
 
   server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request)
-  {
-    request->send_P(200, "image/x-icon", favicon, sizeof(favicon));
-  });
+            { request->send_P(200, "image/x-icon", favicon, sizeof(favicon)); });
 
-  server.on("/api/streams", HTTP_GET, std::bind(&PrioWebServer::handleApi, this, std::placeholders::_1));
-
+  /* root page , which handles overzicht */
   server.on("/", HTTP_GET, std::bind(&PrioWebServer::handleRoot, this, std::placeholders::_1));
+
+  /* deliver the streams in json format */
+  server.on("/api/streams", HTTP_GET, std::bind(&PrioWebServer::handleApi, this, std::placeholders::_1));
   
+  server.on("/api/deletestream", HTTP_GET, std::bind(&PrioWebServer::handleDeleteStream, this, std::placeholders::_1));
+
+  /* serves the html page to add a stream */
   server.on("/inpustream", HTTP_GET, std::bind(&PrioWebServer::handleInputStream, this, std::placeholders::_1));
 
   server.onRequestBody([this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
-  {
+                       {
     if (request->url() == "/updateurls")
     {
       this->handleSettings(request, data);
       request->send(200, "text/plain", "true");
     }
-    if (request->url() == "/addstream")
+    /* api addstream json in data */
+    if (request->url() == "/api/addstream")
     {
-      this->handleAddStream(request, data);
-     request->send(200, "text/plain", "true");
-    }
-  });
+      urlManager.addStream(data);
+      request->send(200, "text/plain", "true");
+    } });
 
   server.begin();
 }
@@ -94,7 +96,6 @@ void PrioWebServer::handleApi(AsyncWebServerRequest *request)
   }
 
   /* Determine start and end stream id*/
-
   start = (page - 1) * page_size;
   end = start + (page_size - 1);
 
@@ -103,9 +104,8 @@ void PrioWebServer::handleApi(AsyncWebServerRequest *request)
     end = urlManager.streamCount - 1;
   }
 
-
+  /* Create json return object*/
   JsonDocument doc;
-
   doc["page"] = page;
   doc["streams_per_page"] = page_size;
   doc["total_streams"] = urlManager.streamCount;
@@ -117,13 +117,14 @@ void PrioWebServer::handleApi(AsyncWebServerRequest *request)
 
   for (size_t i = start; i <= end; i++)
   {
-    JsonObject data_0 = data.add<JsonObject>();
-    data_0["id"] = i;
-    data_0["name"] = urlManager.Streams[i].name;
-    data_0["url"] = urlManager.Streams[i].url;
-    data_0["logo"] = urlManager.Streams[i].logo;
+    JsonObject stream = data.add<JsonObject>();
+    stream["id"] = i;
+    stream["name"] = urlManager.Streams[i].name;
+    stream["url"] = urlManager.Streams[i].url;
+    stream["logo"] = urlManager.Streams[i].logo;
   }
 
+  /* create response and send it*/
   String response;
 
   doc.shrinkToFit(); // optional
@@ -133,57 +134,41 @@ void PrioWebServer::handleApi(AsyncWebServerRequest *request)
   request->send(200, "application/json", response);
 }
 
+
+
+void PrioWebServer::handleDeleteStream(AsyncWebServerRequest *request)
+{
+
+  int paramsNr = request->params();
+
+  for (int i = 0; i < paramsNr; i++)
+  {
+    AsyncWebParameter *p = request->getParam(i);
+
+    if (p->name() == "id")
+    {
+      urlManager.deleteStream(p->value().toInt());
+    }
+  }
+  request->send(200, "text/plain", "ok");
+}  
+
 void PrioWebServer::handleRoot(AsyncWebServerRequest *request)
 {
-  String body = R"(
-    <div class="content">
-      <h2>Radio Streams</h2>
-      <div class="container">
-        <div class="pagination">
-          <button id="prevBtn" disabled>Previous</button>
-          <span id="currentPage">Page 1</span>
-          <button id="nextBtn">Next</button>
-        </div>
-        <span class="pagesize-container">
-          <label for="pagesize">pagesize:</label>
-          <select name="pagesize" id="pagesize">
-            <option value="3">3</option>
-            <option value="5" selected="selected">5</option>
-            <option value="8">8</option>
-            <option value="10">10</option>
-          </select>
-        </span>
-      </div>
-      <form method="post" id="updateForm">
-        <div id="saving"><div class="loader"></div></div>
-        <div id="streams"></div>
-      </form>
-      <span
-        ><input
-          class="input_button"
-          type="button"
-          value="Opslaan"
-          onclick='saveStreams()' 
-        />
-      </span>
-    </div>  
-      )";
+  String body PROGMEM = R"(<div id="content-container" class="content"></div>)";
+  String mybigString = "";
 
+  String h_start PROGMEM = getHtmlStart();
+  String h_script PROGMEM = getMainScript(this->ip);
+  String h_body PROGMEM = setHtmlBody(body, h_script);
+  String h_end PROGMEM = getHtmlEnd();
 
-bigString = "";
+  mybigString.concat(h_start);
+  mybigString.concat(h_body);
+  mybigString.concat(h_end);
 
-String h_start PROGMEM = getHtmlStart();
-String h_body PROGMEM = setHtmlBody(body);
-String h_end PROGMEM = getHtmlEnd();
-
-bigString.concat(h_start);
-bigString.concat(h_body);
-bigString.concat(h_end);
-
-
-//  bigString = createHtmlPage(body);
-  request->send_P(200, "text/html", this->bigString.c_str());
-  bigString = "";
+  request->send_P(200, "text/html", mybigString.c_str());
+  mybigString = "";
 }
 
 void PrioWebServer::handleAddStream(AsyncWebServerRequest *request, uint8_t *data)
@@ -193,54 +178,20 @@ void PrioWebServer::handleAddStream(AsyncWebServerRequest *request, uint8_t *dat
 
 void PrioWebServer::handleInputStream(AsyncWebServerRequest *request)
 {
-  String content PROGMEM = R"(
-      <div class="content">
-      <form method="post" id="updateForm">
-        <div id="saving"><div class="loader"></div></div>
-        <div class="stream_item">
-          <div id="naam" class="naam-container">
-            <div class="edit-label">Stream naam:</div>
-            <input
-              class="input_naam"
-              id="input_naam"
-              type="text"
-              name="naam"
-              value=""
-            />
-          </div>
-          <div id="url-0" class="url-container">
-            <div class="edit-label">Stream url:</div>
-            <input
-              class="input_url"
-              id="input_url"
-              type="text"
-              name="url"
-              value=""
-            />
-          </div>
-          <div id="url-log-0" class="url-container">
-            <div class="edit-label">Logo url:</div>
-            <input
-              class="input_url"
-              id="input_logo"
-              type="text"
-              name="logo"
-              value=""
-            />
-          </div>
-          <input
-            id="url_button"
-            class="input_button"
-            type="button"
-            value="Opslaan"
-            onclick='saveStream()'
-          />
-        </div>
-      </form>
-    </div>)";
+  String body PROGMEM = R"(<div id="content-container" class="content"></div>)";
+  String mybigString = "";
 
-  this->htmlPage = createHtmlPage(content);
-  request->send_P(200, "text/html", this->htmlPage.c_str());
+  String h_start PROGMEM = getHtmlStart();
+  String h_script PROGMEM = getAddScript(this->ip);
+  String h_body PROGMEM = setHtmlBody(body, h_script);
+  String h_end PROGMEM = getHtmlEnd();
+
+  mybigString.concat(h_start);
+  mybigString.concat(h_body);
+  mybigString.concat(h_end);
+
+  request->send_P(200, "text/html", mybigString.c_str());
+  mybigString = "";
 }
 
 void PrioWebServer::handleSettings(AsyncWebServerRequest *request, uint8_t *data)
@@ -252,42 +203,33 @@ void PrioWebServer::handleSettings(AsyncWebServerRequest *request, uint8_t *data
   urlManager.saveStreams(data);
 }
 
-void PrioWebServer::handleAddUrl(AsyncWebServerRequest *request)
-{
-  String body PROGMEM = "";
-  body += "<form method='post' action='/updateurls'>";
-  body += "Nieuwe URL: <input class='input_url' type='text' name='newurl'><br>";
-  body += "Nieuwe URL-logo: <input class='input_url_logo' type='text' name='newurl_logo'><br>";
-  body += "<input  class='input_button' type='submit' value='Bijwerken'>";
-  body += "</form>";
-  request->send(200, "text/html", createHtmlPage(body));
-}
 
-void PrioWebServer::deleteStreamItem(AsyncWebServerRequest *request)
-{
-  String body PROGMEM = "";
-  for (size_t i = 0; i < urlManager.urls.size(); i++)
-  {
-    body += "<form action='deleteurl' method='post'>";
-    body += "<p>";
-    body += "<label for='url'" + String(i) + ">URL" + String(i) + ":</label>";
-    body += "<span>";
-    body += urlManager.urls[i];
-    body += "</span>";
-    body += "<button class='input_button' type='submit' name='urlindex' value='" + String(i) + "'>X</button>";
-    body += "</p>";
-    body += "</form>";
-  }
 
-  request->send(200, "text/html", createHtmlPage(body));
-}
+// void PrioWebServer::deleteStreamItem(AsyncWebServerRequest *request)
+// {
+//   String body PROGMEM = "";
+//   for (size_t i = 0; i < urlManager.urls.size(); i++)
+//   {
+//     body += "<form action='deleteurl' method='post'>";
+//     body += "<p>";
+//     body += "<label for='url'" + String(i) + ">URL" + String(i) + ":</label>";
+//     body += "<span>";
+//     body += urlManager.urls[i];
+//     body += "</span>";
+//     body += "<button class='input_button' type='submit' name='urlindex' value='" + String(i) + "'>X</button>";
+//     body += "</p>";
+//     body += "</form>";
+//   }
+
+//   request->send(200, "text/html", createHtmlPage(body));
+// }
 
 String PrioWebServer::createHtmlPage(String body)
 {
 
   String page PROGMEM = "";
   page += getHtmlStart();
-  page += setHtmlBody(body);
+  page += setHtmlBody(body, getMainScript(this->ip));
   page += getHtmlEnd();
   return page;
 }
@@ -323,13 +265,13 @@ String PrioWebServer::getTopMenu()
   return html;
 }
 
-String PrioWebServer::setHtmlBody(String body)
+String PrioWebServer::setHtmlBody(String body, String script = "")
 {
   String html PROGMEM = "";
   html += "<body>";
   html += getTopMenu();
   html += body;
-  html += getScript(this->ip);
+  html += script;
   html += "</body>";
   return html;
 }

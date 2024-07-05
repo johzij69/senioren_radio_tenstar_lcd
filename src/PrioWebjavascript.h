@@ -2,6 +2,8 @@
 #define PrioWebjavascript_H
 #include <Arduino.h>
 #include "generalHelpers.h"
-String getScript(String ip);
+
+String getMainScript(String ip);
+String getAddScript(String ip);
 
 #endif

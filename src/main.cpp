@@ -17,12 +17,11 @@
 #include "PrioRotary.h"
 #include "smallFont.h"  // bar
 #include "middleFont.h" // bar
-#include <SPIFFS.h>   // Include the SPIFFS library
+#include <SPIFFS.h>     // Include the SPIFFS library
 
 #include <HTTPClient.h> // Include the HTTPClient library
 #include "fetchImage.h"
 // Include the jpeg decoder library
-
 
 /* touch */
 #define TOUCH_SDA 21
@@ -97,14 +96,11 @@ void IRAM_ATTR checkVolume()
   rotaryInstance.rotaryEncoder = true;
 }
 
-
-
 void setup()
 {
   Serial.begin(115200);
   // while (!Serial)
   //   ;
-  
 
   SPI.begin(VS1053_SCK, VS1053_MISO, VS1053_MOSI);
 
@@ -136,7 +132,7 @@ void setup()
   WiFiManager wm;
   bool res;
   res = wm.autoConnect("espprio"); // password protected ap
-  Serial.println("Test3");
+
   if (!res)
   {
     Serial.println("Failed to connect");
@@ -155,9 +151,9 @@ void setup()
 
     myPrefs.begin();
     UrlManagerInstance.begin();
-    UrlManagerInstance.addUrl("https://icecast.omroep.nl/radio1-bb-mp3");
-
-    last_url = myPrefs.readString("lasturl", default_url.c_str());
+    /* get last used stream*/
+    stream_index = myPrefs.getUInt("stream_index", 0);
+    last_url = UrlManagerInstance.Streams[stream_index].url;
     current_url = last_url.c_str();
 
     Serial.print("Last url: ");
@@ -165,7 +161,7 @@ void setup()
     Serial.print("Huidige url: ");
     Serial.println(current_url);
     Serial.print("Aantal urls: ");
-    Serial.println(UrlManagerInstance.urlCount);
+    Serial.println(UrlManagerInstance.streamCount);
 
     Serial.println("mp3 begin");
     mp3.begin();
@@ -174,21 +170,27 @@ void setup()
     mp3.setVolumeSteps(VOLUME_STEPS);
     max_volume = mp3.maxVolume();
 
-
     last_volume = myPrefs.readValue("volume", DEF_VOLUME);
     if (last_volume > max_volume)
+    {
       last_volume = max_volume;
+    }
     mp3.setVolume(last_volume);
     Serial.println("conecting");
-    mp3.connecttohost("https://stream.100p.nl/100pctnl.mp3");
+    if (last_url != "")
+    {
+      mp3.connecttohost(last_url.c_str());
+    }
+    else
+    {
+      mp3.connecttohost("https://stream.100p.nl/100pctnl.mp3");
+    }
     Serial.println("conected");
 
     attachInterrupt(digitalPinToInterrupt(CLK_PIN), checkVolume, CHANGE);
     attachInterrupt(digitalPinToInterrupt(DT_PIN), checkVolume, CHANGE);
     rotaryInstance.begin(MIN_VOLUME, max_volume, DEF_VOLUME);
     rotaryInstance.current_value = last_volume;
-
-
 
     /* sceen output */
     tft.init();
@@ -206,14 +208,16 @@ void setup()
 
   strLogo.begin();
   // Set default logo
-  strLogo.Show(35,100,"https://img.prio-ict.nl/api/images/webradio-default.jpg");
+  if(UrlManagerInstance.Streams[stream_index].logo != "")
+  {
+    strLogo.Show(35, 100, UrlManagerInstance.Streams[stream_index].logo.c_str());
+  } else {
+    strLogo.Show(35, 100, "https://img.prio-ict.nl/api/images/webradio-default.jpg");
+  }  
 
   webServer.ip = WiFi.localIP().toString();
   webServer.begin();
-
 }
-
-
 
 void loop()
 {
@@ -234,7 +238,7 @@ void loop()
   {
     Serial.println("The button is pressed");
     next_button_isreleased = false;
-    if (stream_index == UrlManagerInstance.urlCount - 1)
+    if (stream_index == UrlManagerInstance.streamCount - 1)
     {
       stream_index = 0;
     }
@@ -242,12 +246,22 @@ void loop()
     {
       stream_index++;
     }
-    current_url = UrlManagerInstance.getUrlAtIndex(stream_index);
+    current_url = UrlManagerInstance.Streams[stream_index].url.c_str();
 
     myPrefs.writeString("lasturl", current_url);
+    myPrefs.putUInt("lastStreamIndex", stream_index);
+
+    Serial.print("stream count: ");
+    Serial.println(UrlManagerInstance.streamCount);
+    Serial.print("stream index: ");
+    Serial.println(stream_index);
     Serial.println("playing:");
     Serial.println(current_url);
+    Serial.print("stream logo: ");
+    Serial.println(UrlManagerInstance.Streams[stream_index].logo);
+
     mp3.connecttohost(current_url);
+    strLogo.Show(35, 100, UrlManagerInstance.Streams[stream_index].logo);
   }
 
   if (next_button.isReleased())
@@ -255,7 +269,7 @@ void loop()
     /* we only will listen to button input if it was released */
     next_button_isreleased = true;
     Serial.println("The button is released");
-        Serial.println(UrlManagerInstance.Streams[stream_index].url);
+    Serial.println(current_url);
   }
 
   getTouch(touchp);
@@ -356,5 +370,3 @@ void vs1053_lasthost(const char *info)
   Serial.print("lastURL:      ");
   Serial.println(info);
 }
-
-

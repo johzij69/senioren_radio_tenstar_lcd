@@ -6,46 +6,96 @@
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <title>Senior Webradio</title>
     <style>
-      body {
+ 
+ body {
         margin: 0;
         font-family: Arial, sans-serif;
       }
+
+      /* top menu */
+      .top-menu {
+        background-color: #333;
+        overflow: hidden;
+      }
+      .top-menu a {
+        float: left;
+        display: block;
+        color: white;
+        text-align: center;
+        padding: 14px 16px;
+        text-decoration: none;
+      }
+      .top-menu a:hover {
+        background-color: #ddd;
+        color: black;
+      }
+      /* content */
       .content {
         margin-top: 10px;
         margin-left: 10px;
         font-family: Arial, sans-serif;
+      }
+
+      .stream_item {
+        padding: 10px;
+        padding-right:5px;
+        padding-bottom:8px;
+        border: 2px solid lightgray;
+        border-radius: 8px;
+        margin-bottom: 5px;
+        max-width: 50vh;
+        cursor: move; /* Add cursor style */
       }
       .content input {
         padding: 5px;
         font-family: Arial, sans-serif;
       }
       .input_url {
-        padding: 5px;
-        width: 50%;
         border-radius: 5px;
         border-width: thin;
-        margin-left: 5px;
-        margin-right: 5px;
         width: 48vh;
       }
 
       .input_naam {
-        padding: 5px;
         border-radius: 5px;
         border-width: thin;
-        margin-left: 5px;
-        margin-right: 5px;
       }
       .input_button {
-        padding: 5px;
         border-radius: 5px;
         border-width: thin;
         padding-left: 10px;
         padding-right: 10px;
-        margin-left: 43vw;
-        margin-top: 15px;
+        margin-left: 45vh;
+        margin-top: 10px;
       }
 
+      .url-container {
+        margin-top: 15px;
+        margin-bottom: 15px;
+      }
+      .edit-label {
+        margin-left: 5px;
+        font-size: 14px;
+        font-weight: bold;
+        margin-bottom: 2px;
+      }
+
+     .container {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+
+      .pagination {
+        margin-right: 20px;
+      }
+
+      .pagesize-container {
+        display: flex;
+        align-items: center;
+      }
+
+      /* animated saver loader */
       #saving {
         position: absolute;
         top: 45px;
@@ -55,16 +105,6 @@
         background-color: rgba(255, 255, 255, 0.5);
         display: none;
         z-index: 999;
-      }
-      .stream_item {
-        padding: 5px;
-        padding-left: 15px;
-        border: 2px solid lightgray;
-        border-radius: 8px;
-        margin-bottom: 5px;
-        max-width: 52vh;
-        padding-bottom: 24px;
-        cursor: move; /* Add cursor style */
       }
 
       .loader {
@@ -88,82 +128,21 @@
         }
       }
 
-      .top-menu {
-        background-color: #333;
-        overflow: hidden;
+      /* drag and Drop */
+      .drop-zone {
+        border: 2px dashed lightgray; /* Border style for drop zone */
+        border-radius: 8px;
       }
-      .top-menu a {
-        float: left;
-        display: block;
-        color: white;
-        text-align: center;
-        padding: 14px 16px;
-        text-decoration: none;
+      .drag-over {
+        background-color: rgba(
+          0,
+          0,
+          0,
+          0.1
+        ); /* Background color for drag-over */
       }
-      .top-menu a:hover {
-        background-color: #ddd;
-        color: black;
-      }
-
-      .edit-label {
-        margin-top: 5px;
-        margin-left: 7px;
-        font-size: 14px;
-        font-weight: bold;
-        margin-bottom: 2px;
-      }
-
-      .url-container {
-        margin-top: 15px;
-      }
-
-      @media screen and (max-width: 600px) {
-        .top-menu a {
-          float: none;
-          display: block;
-          width: 100%;
-          text-align: left;
-        }
-
-        .input_url {
-          width: 29vh;
-        }
-
-        .input_button {
-          margin-left: 25vh;
-        }
-      }
+    
     </style>
-    <script>
-      function saveStream() {
-        // Verzamel de gegevens van het formulier
-        document.getElementById("saving").style.display = "block";
-        var formData = {};
-        var streamNaam = document.getElementById("input_naam").value;
-        var streamUrl = document.getElementById("input_url").value;
-        var streamLogo = document.getElementById("input_logo").value;
-
-        formData["json_settings:"] = {
-          naam: streamNaam,
-          url: streamUrl,
-          logo: streamLogo,
-        };
-
-        // Converteer de gegevens naar JSON en geef deze een naam
-        var postData = JSON.stringify(formData);
- //       var postData = { json_settings: jsonData };
-
-        var xhr = new XMLHttpRequest();
-        xhr.open("POST", "/savestream", true);
-        xhr.setRequestHeader("Content-Type", "application/json");
-        xhr.onreadystatechange = function () {
-          if (xhr.readyState === 4 && xhr.status === 200) {
-            document.getElementById("saving").style.display = "none";
-          }
-        };
-        xhr.send(JSON.stringify(postData));
-      }
-    </script>
   </head>
   <body>
     <div class="top-menu">
@@ -172,50 +151,95 @@
       <a href="/addurl">Voeg toe</a>
       <a href="#">Contact</a>
     </div>
+    <div id="content-container" class="content"></div>
 
-    <div class="content">
-      <form method="post" id="updateForm">
-        <div id="saving"><div class="loader"></div></div>
-        <div class="stream_item">
-          <div id="naam" class="naam-container">
-            <div class="edit-label">Stream naam:</div>
-            <input
-              class="input_naam"
-              id="input_naam"
-              type="text"
-              name="naam"
-              value="NPO-Radio1"
-            />
-          </div>
-          <div id="url-0" class="url-container">
-            <div class="edit-label">Stream url:</div>
-            <input
-              class="input_url"
-              id="input_url"
-              type="text"
-              name="url"
-              value="https://icecast.omroep.nl/radio1-bb-mp3"
-            />
-          </div>
-          <div id="url-log-0" class="url-container">
-            <div class="edit-label">Logo url:</div>
-            <input
-              class="input_url"
-              id="input_logo"
-              type="text"
-              name="logo"
-              value="https://img.prio-ict.nl/api/images/webradio-default.jpg"
-            />
-          </div>
-          <input
-            id="url_button"
-            class="input_button"
-            type="button"
-            value="Opslaan"
-            onclick="saveStream()"
-          />
-        </div>
-      </form>
-    </div>
+    <script>
+      const streamContainer = document.getElementById("stream-container");
+      const contentContainer = document.getElementById("content-container");
+      async function saveStream() {
+        try {
+          // Verzamel de gegevens van het formulier
+          document.getElementById("saving").style.display = "block";
+          const formData = {};
+          const streamNaam = document.getElementById("input_naam").value;
+          const streamUrl = document.getElementById("input_url").value;
+          const streamLogo = document.getElementById("input_logo").value;
+
+          formData["json_settings"] = {
+            name: streamNaam,
+            url: streamUrl,
+            logo: streamLogo,
+          };
+
+          // Maak een POST-verzoek met fetch
+          const url = "/addstream";
+          const options = {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(formData),
+          };
+
+          const response = await fetch(url, options);
+          if (!response.ok) {
+            throw new Error("Network response was not ok");
+          }
+
+          document.getElementById("saving").style.display = "none";
+        } catch (error) {
+          console.error("Er is een fout opgetreden:", error);
+        }
+      }
+
+      function displayStream() {
+        contentContainer.innerHTML = "";
+        const spanSubmit = document.createElement("span");
+        spanSubmit.innerHTML = `<input
+                            class="input_button"
+                            type="button"
+                            value="Opslaan"
+                            onclick="saveStream()"
+                          />`;
+        const streamForm = document.createElement("form");
+        streamForm.setAttribute("method", "post");
+        streamForm.setAttribute("id", "updateForm");
+        streamForm.innerHTML = `
+                          <div id="saving"><div class="loader"></div></div>
+                          <div class="stream_item">
+                            <div id="naam" class="naam-container">
+                              <div class="edit-label">Stream naam:</div>
+                              <input
+                                class="input_naam"
+                                type="text"
+                                name="naam"
+                                value=""
+                              />
+                            </div>
+                            <div id="url" class="url-container">
+                              <div class="edit-label">Stream url:</div>
+                              <input
+                                class="input_url"
+                                type="text"
+                                name="newurl"
+                                value=""
+                              />
+                            </div>
+                            <div id="logo" class="url-container">
+                              <div class="edit-label">Logo url:</div>
+                              <input
+                                class="input_url"
+                                type="text"
+                                name="logo"
+                                value=""
+                              />
+                            </div>
+                        </div>
+                     `;
+        contentContainer.appendChild(streamForm);
+        contentContainer.appendChild(spanSubmit);
+      }
+      displayStream();
+    </script>
   </body>
 </html>

@@ -1,14 +1,22 @@
 #include "PrioWebcss.h"
 
-
 String getStyling()
 {
   String Style PROGMEM = R"(<style>
-      body {
+       body {
         margin: 0;
         font-family: Arial, sans-serif;
       }
+      .prio-mr5 {
+        margin-right: 5px;
+      }
+      .prio-ml5 {
+        margin-left: 5px;
+      }
 
+      .prio-p2{
+        padding: 2px;
+      }
       /* top menu */
       .top-menu {
         background-color: #333;
@@ -38,20 +46,20 @@ String getStyling()
         border: 2px solid lightgray;
         border-radius: 8px;
         margin-bottom: 5px;
-        max-width: 52vh;
+        max-width: 50vh;
         cursor: move; /* Add cursor style */
       }
       .content input {
         padding: 5px;
         font-family: Arial, sans-serif;
       }
-      .input_url {
+      .input_long {
         border-radius: 5px;
         border-width: thin;
         width: 48vh;
       }
 
-      .input_naam {
+      .input_short {
         border-radius: 5px;
         border-width: thin;
       }
@@ -60,7 +68,7 @@ String getStyling()
         border-width: thin;
         padding-left: 10px;
         padding-right: 10px;
-        margin-left: 45vh;
+        margin-left: 46vh;
         margin-top: 10px;
       }
 
@@ -75,12 +83,13 @@ String getStyling()
         margin-bottom: 2px;
       }
 
-     .container {
+      .container {
         display: flex;
         align-items: center;
         margin-bottom: 10px;
+        justify-content: space-between;
+        width: 31vw;
       }
-
       .pagination {
         margin-right: 20px;
       }
@@ -136,8 +145,58 @@ String getStyling()
           0.1
         ); /* Background color for drag-over */
       }
+            .delete-icon-container {
+        position: relative;
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+        float: inline-end;
+        margin-top: -21px;
+        margin-right: -4px;
+      }
+
+      .delete-icon {
+        position: relative;
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+        float: inline-end;
+        padding-left: 7px;
+      }
+
+      .delete-icon:before,
+      .delete-icon:after {
+        content: "";
+        position: absolute;
+        width: 2px;
+        height: 16px;
+        background-color: red;
+        top: 2px;
+        transform-origin: center;
+        margin-left: 5px;
+      }
+
+      .delete-icon:before {
+        transform: rotate(45deg);
+      }
+
+      .delete-icon:after {
+        transform: rotate(-45deg);
+      }
+
+      .delete-icon-container:hover .delete-icon {
+        background-color: rgba(255, 0, 0, 0.5); /* Oplichtend effect */
+      }
+
+      .delete-icon:hover::after,
+      .delete-icon:hover:before {
+        background-color: white;
+      }
+
+      #numberofStreams {
+        margin-left: auto;
+      }
     </style>
     )";
   return Style;
 }
-

@@ -4,37 +4,37 @@
 UrlManager::UrlManager(MyPreferences &prefs) : myPreferences(prefs)
 {
     // Laad URL's vanuit Preferences bij het initialiseren
-    urlCount = myPreferences.getUInt("url_count", 0);
+ //   urlCount = myPreferences.getUInt("url_count", 0);
     streamCount = myPreferences.getUInt("stream_count", 0);
     default_logo = "https://img.prio-ict.nl/api/images/webradio-default.jpg";
 }
 
 void UrlManager::begin()
 {
-    this->loadUrls();
+  //  this->loadUrls();
     this->loadStreams();
 }
 
-void UrlManager::loadUrls()
-{
-    urlCount = myPreferences.getUInt("url_count", 0);
-    if (urlCount < 1)
-    {
-        return;
-    }
-    urls.clear();
-    for (uint32_t i = 0; i < urlCount; ++i)
-    {
-        String key = "url" + String(i);
-        String logo_key = "logo_url" + String(i);
+// void UrlManager::loadUrls()
+// {
+//     urlCount = myPreferences.getUInt("url_count", 0);
+//     if (urlCount < 1)
+//     {
+//         return;
+//     }
+//     urls.clear();
+//     for (uint32_t i = 0; i < urlCount; ++i)
+//     {
+//         String key = "url" + String(i);
+//         String logo_key = "logo_url" + String(i);
 
-        String url = myPreferences.readString(key.c_str(), "");
-        String logo_url = myPreferences.readString(logo_key.c_str(), default_logo.c_str());
+//         String url = myPreferences.readString(key.c_str(), "");
+//         String logo_url = myPreferences.readString(logo_key.c_str(), default_logo.c_str());
 
-        urls.push_back(url);
-        logo_urls.push_back(logo_url);
-    }
-}
+//         urls.push_back(url);
+//         logo_urls.push_back(logo_url);
+//     }
+// }
 
 void UrlManager::loadStreams()
 {
@@ -56,71 +56,6 @@ void UrlManager::loadStreams()
     }
 }
 
-void UrlManager::saveStreams(uint8_t *data)
-{
-
-    int index = 0; // Teller voor de index
-    JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, data);
-
-    if (error)
-    {
-        Serial.print("deserializeJson() returned ");
-        Serial.println(error.c_str());
-        return ;
-    }
-
-    for (JsonPair item : doc.as<JsonObject>())
-    {
-        const char *item_key = item.key().c_str(); // "container-0", "container-1", "container-2", ...
-
-        Serial.println("saved:" + String(item_key));
-
-        index = atoi(item_key + strlen("container-"));
-
-        //    const char *value_stream_id = item.value()["stream_id"];   // "0", "1", "2", "3", "4", "5", "6"
-        const char *value_name = item.value()["name"]; // "https://icecast.omroep.nl/radio1-bb-mp3", ...
-        const char *value_url = item.value()["url"];
-        const char *value_logo = item.value()["logo"];
-
-        Streams[index].id = item.value()["id"];
-        Streams[index].name = value_name;
-        Streams[index].url = value_url;
-        Streams[index].logo = value_logo;
-
-        Serial.print("saved:");
-        Serial.println(String(Streams[index].id));
-        Serial.println(String(Streams[index].name));
-        Serial.println(String(Streams[index].url));
-        Serial.println(String(Streams[index].logo));
-   
-    }
-
-    this->saveToPreferences();
-}
-
-void UrlManager::deleteStream(int index)
-{
-
-    if (index < 0 || index > streamCount - 1)
-    {
-        Serial.println("Ongeldige index");
-        return;
-    }
-
-    // Schuif alle items na de verwijderde index één plaats naar links
-    for (int i = index; i < 39; i++)
-    {
-        Streams[i] = Streams[i + 1];
-    }
-
-    // Verwijder het laatste item door het te resetten naar de standaardwaarden
-    StreamItem defaultItem;
-    Streams[39] = defaultItem;
-
-    this->streamCount--;
-    this->saveToPreferences();
-}
 
 void UrlManager::addStream(uint8_t *data)
 {
@@ -163,6 +98,73 @@ void UrlManager::addStream(uint8_t *data)
     this->saveToPreferences();
 }
 
+void UrlManager::saveStreams(uint8_t *data)
+{
+
+    int index = 0; // Teller voor de index
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, data);
+
+    if (error)
+    {
+        Serial.print("deserializeJson() returned ");
+        Serial.println(error.c_str());
+        return ;
+    }
+
+    for (JsonPair item : doc.as<JsonObject>())
+    {
+        const char *item_key = item.key().c_str(); // "container-0", "container-1", "container-2", ...
+
+        Serial.println("saved:" + String(item_key));
+
+        index = atoi(item_key + strlen("container-"));
+
+
+        const char *value_name = item.value()["name"]; 
+        const char *value_url = item.value()["url"];
+        const char *value_logo = item.value()["logo"];
+
+        Streams[index].id = item.value()["id"];
+        Streams[index].name = value_name;
+        Streams[index].url = value_url;
+        Streams[index].logo = value_logo;
+
+        Serial.print("saved:");
+        Serial.println(String(Streams[index].id));
+        Serial.println(String(Streams[index].name));
+        Serial.println(String(Streams[index].url));
+        Serial.println(String(Streams[index].logo));
+   
+    }
+
+    this->saveToPreferences();
+}
+
+void UrlManager::deleteStream(int index)
+{
+
+    if (index < 0 || index > streamCount - 1)
+    {
+        Serial.println("Ongeldige index");
+        return;
+    }
+
+    // Schuif alle items na de verwijderde index één plaats naar links
+    for (int i = index; i < 39; i++)
+    {
+        Streams[i] = Streams[i + 1];
+    }
+
+    // Verwijder het laatste item door het te resetten naar de standaardwaarden
+    StreamItem defaultItem;
+    Streams[39] = defaultItem;
+
+    this->streamCount--;
+    this->saveToPreferences();
+}
+
+
 void UrlManager::saveToPreferences()
 {
 
@@ -191,23 +193,23 @@ void UrlManager::saveToPreferences()
     myPreferences.putUInt("stream_count", streamCount);
 }
 
-void UrlManager::saveUrls()
-{
-    urlCount = urls.size();
-    if (urlCount < 1)
-    {
-        return;
-    }
-    for (uint32_t i = 0; i < urlCount; ++i)
-    {
-        String key = "url" + String(i);
-        String logo_key = "logo_url" + String(i);
+// void UrlManager::saveUrls()
+// {
+//     urlCount = urls.size();
+//     if (urlCount < 1)
+//     {
+//         return;
+//     }
+//     for (uint32_t i = 0; i < urlCount; ++i)
+//     {
+//         String key = "url" + String(i);
+//         String logo_key = "logo_url" + String(i);
 
-        myPreferences.writeString(key.c_str(), urls[i].c_str());
-        myPreferences.writeString(logo_key.c_str(), logo_urls[i].c_str());
-    }
-    myPreferences.putUInt("url_count", urls.size());
-}
+//         myPreferences.writeString(key.c_str(), urls[i].c_str());
+//         myPreferences.writeString(logo_key.c_str(), logo_urls[i].c_str());
+//     }
+//     myPreferences.putUInt("url_count", urls.size());
+// }
 
 void UrlManager::readAndPrintValue(const char *key)
 {
@@ -215,30 +217,30 @@ void UrlManager::readAndPrintValue(const char *key)
     int value = myPreferences.readValue(key, 0);
     Serial.println("Waarde gelezen vanuit UrlManager: " + String(value));
 }
-void UrlManager::addUrl(const char *url)
-{
-    this->addUrl(url, default_logo.c_str());
-}
-void UrlManager::addUrl(const char *url, const char *logo_url)
-{
-    Serial.println("Toevogen url: " + String(url));
+// void UrlManager::addUrl(const char *url)
+// {
+//     this->addUrl(url, default_logo.c_str());
+// }
+// void UrlManager::addUrl(const char *url, const char *logo_url)
+// {
+//     Serial.println("Toevogen url: " + String(url));
 
-    // Controleer of de URL al bestaat
-    if (std::find(urls.begin(), urls.end(), url) != urls.end())
-    {
-        Serial.println("URL bestaat al, wordt niet toegevoegd: " + String(url));
-        return;
-    }
+//     // Controleer of de URL al bestaat
+//     if (std::find(urls.begin(), urls.end(), url) != urls.end())
+//     {
+//         Serial.println("URL bestaat al, wordt niet toegevoegd: " + String(url));
+//         return;
+//     }
 
-    // Voeg de URL toe aan de lijst en Preferences
-    urls.push_back(url);
-    String key = "url" + String(urls.size() - 1);
-    myPreferences.writeString(key.c_str(), url);
-    myPreferences.putUInt("url_count", urls.size());
-    Serial.println("URL toegevoegd: " + String(url));
+//     // Voeg de URL toe aan de lijst en Preferences
+//     urls.push_back(url);
+//     String key = "url" + String(urls.size() - 1);
+//     myPreferences.writeString(key.c_str(), url);
+//     myPreferences.putUInt("url_count", urls.size());
+//     Serial.println("URL toegevoegd: " + String(url));
 
-    this->loadUrls();
-}
+//     this->loadUrls();
+// }
 
 void UrlManager::printAllUrls()
 {
@@ -275,38 +277,38 @@ String UrlManager::CreateDivUrls()
     return result;
 }
 
-void UrlManager::PrinturlsFromPrev()
-{
-    urlCount = myPreferences.getUInt("url_count", 0);
-    Serial.print("url_count:");
-    Serial.println(urlCount);
+// void UrlManager::PrinturlsFromPrev()
+// {
+//     urlCount = myPreferences.getUInt("url_count", 0);
+//     Serial.print("url_count:");
+//     Serial.println(urlCount);
 
-    for (uint32_t i = 0; i < urlCount; ++i)
-    {
-        String key = "url" + String(i);
-        String url = myPreferences.readString(key.c_str(), "");
-        Serial.println(url);
-    }
-}
+//     for (uint32_t i = 0; i < urlCount; ++i)
+//     {
+//         String key = "url" + String(i);
+//         String url = myPreferences.readString(key.c_str(), "");
+//         Serial.println(url);
+//     }
+// }
 
-void UrlManager::deleteUrl(int index)
-{
+// void UrlManager::deleteUrl(int index)
+// {
 
-    if (index < urls.size())
-    {
-        Serial.println("Deleting: " + String(urls[index]));
-        urls.erase(urls.begin() + index);
+//     if (index < urls.size())
+//     {
+//         Serial.println("Deleting: " + String(urls[index]));
+//         urls.erase(urls.begin() + index);
 
-        String key = "url" + String(index);
-        if (myPreferences.remove(key.c_str()))
-        {
-            Serial.println(key + ": verwijdert.");
-        }
+//         String key = "url" + String(index);
+//         if (myPreferences.remove(key.c_str()))
+//         {
+//             Serial.println(key + ": verwijdert.");
+//         }
 
-        myPreferences.putUInt("url_count", urls.size());
-        Serial.println("kom ik hier");
-        Serial.println("URL verwijderd: " + String(urls[index]));
-        Serial.println("kom ik hier2");
-        this->loadUrls();
-    }
-}
+//         myPreferences.putUInt("url_count", urls.size());
+//         Serial.println("kom ik hier");
+//         Serial.println("URL verwijderd: " + String(urls[index]));
+//         Serial.println("kom ik hier2");
+//         this->loadUrls();
+//     }
+// }
