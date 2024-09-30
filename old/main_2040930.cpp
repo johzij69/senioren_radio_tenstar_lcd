@@ -10,7 +10,6 @@
 #include "SPI.h"
 #include <TFT_eSPI.h>
 #include "Free_Fonts.h"
-#include "middleFont.h"
 #include "vs1053_ext.h"
 #include <ezButton.h> // the library to use for SW pin
 #include "MyPreferences.h"
@@ -18,18 +17,12 @@
 #include "PrioRotary.h"
 #include "smallFont.h"  // bar
 #include "middleFont.h" // bar
-#include <SPIFFS.h>     // Include the SPIFFS library
+#include <SPIFFS.h>   // Include the SPIFFS library
 
 #include <HTTPClient.h> // Include the HTTPClient library
 #include "fetchImage.h"
-
-#include <ESP32Time.h>
 // Include the jpeg decoder library
 
-#include "arrow.h"
-#include "city.h"
-
-#include "PrioScrollText.h"
 
 /* touch */
 #define TOUCH_SDA 21
@@ -59,21 +52,11 @@
 /* Next Button */
 #define NEXT_BUTTON_PIN 33 // ESP32 pin GPIO33, which connected to button
 
-#define bck TFT_BLACK
-
-
-ESP32Time rtc(0);
-
 TFT_eSPI tft = TFT_eSPI();
-
-
-int x = 20;
 PRIO_GT911 touchp = PRIO_GT911(TOUCH_SDA, TOUCH_SCL, TOUCH_WIDTH, TOUCH_HEIGHT);
 
 int title_lenght;
 int station_lenght;
-int tcount = 0;
-int ani = 0;
 
 int stream_index = 0;
 int next_button_state = 0; // variable for reading the button status
@@ -99,7 +82,6 @@ PrioRotary rotaryInstance(CLK_PIN, DT_PIN);
 String default_url = "https://icecast.omroep.nl/radio1-bb-mp3:443";
 
 String last_url;
-String current_title;
 
 const char *current_url;
 
@@ -109,19 +91,20 @@ PrioBar pBar(&tft);
 
 StreamLogo strLogo(&tft);
 
-ScrollText *scrollText;
-
 // Interrupt routine just sets a flag when rotation is detected
 void IRAM_ATTR checkVolume()
 {
   rotaryInstance.rotaryEncoder = true;
 }
 
+
+
 void setup()
 {
   Serial.begin(115200);
   // while (!Serial)
   //   ;
+  
 
   SPI.begin(VS1053_SCK, VS1053_MISO, VS1053_MOSI);
 
@@ -153,7 +136,7 @@ void setup()
   WiFiManager wm;
   bool res;
   res = wm.autoConnect("espprio"); // password protected ap
-
+  Serial.println("Test3");
   if (!res)
   {
     Serial.println("Failed to connect");
@@ -172,9 +155,9 @@ void setup()
 
     myPrefs.begin();
     UrlManagerInstance.begin();
-    /* get last used stream*/
-    stream_index = myPrefs.getUInt("stream_index", 0);
-    last_url = UrlManagerInstance.Streams[stream_index].url;
+    UrlManagerInstance.addUrl("https://icecast.omroep.nl/radio1-bb-mp3");
+
+    last_url = myPrefs.readString("lasturl", default_url.c_str());
     current_url = last_url.c_str();
 
     Serial.print("Last url: ");
@@ -182,7 +165,7 @@ void setup()
     Serial.print("Huidige url: ");
     Serial.println(current_url);
     Serial.print("Aantal urls: ");
-    Serial.println(UrlManagerInstance.streamCount);
+    Serial.println(UrlManagerInstance.urlCount);
 
     Serial.println("mp3 begin");
     mp3.begin();
@@ -191,21 +174,13 @@ void setup()
     mp3.setVolumeSteps(VOLUME_STEPS);
     max_volume = mp3.maxVolume();
 
+
     last_volume = myPrefs.readValue("volume", DEF_VOLUME);
     if (last_volume > max_volume)
-    {
       last_volume = max_volume;
-    }
     mp3.setVolume(last_volume);
     Serial.println("conecting");
-    if (last_url != "")
-    {
- //     mp3.connecttohost(last_url.c_str());
-    }
-    else
-    {
-//      mp3.connecttohost("https://stream.100p.nl/100pctnl.mp3");
-    }
+    mp3.connecttohost("https://stream.100p.nl/100pctnl.mp3");
     Serial.println("conected");
 
     attachInterrupt(digitalPinToInterrupt(CLK_PIN), checkVolume, CHANGE);
@@ -213,102 +188,34 @@ void setup()
     rotaryInstance.begin(MIN_VOLUME, max_volume, DEF_VOLUME);
     rotaryInstance.current_value = last_volume;
 
+
+
     /* sceen output */
-    Serial.println("Initializing TFT...");
     tft.init();
-    tft.setRotation(1); // Landscape mode
+    tft.setRotation(1);
     tft.fillScreen(TFT_BLACK);
-    //tft.setSwapBytes(true);
-
-    Serial.println("TFT initialized");
-
-    // Optioneel: stel kleuren in
-    scrollText = new ScrollText(tft, "Dit is een lange tekst die zal scrollen op het tft screen", 0, 20, 480, 40, FSS12);
-    scrollText->setTextBetweenSpace(20);
-    scrollText->begin();
+    tft.setCursor(0, 0, 4);
+    tft.setTextColor(TFT_WHITE);
+    tft.println("PRIO-WEBRADIO");
+    tft.print("IP address: ");
+    tft.println(WiFi.localIP());
   }
 
-  // pBar.begin(450, 0, 30, 320, TFT_LIGHTGREY, TFT_BLACK, max_volume);
-  // pBar.draw(last_volume);
+  pBar.begin(450, 0, 30, 320, TFT_LIGHTGREY, TFT_BLACK, max_volume);
+  pBar.draw(last_volume);
 
-  // strLogo.begin();
-  // // Set default logo
-  // if (UrlManagerInstance.Streams[stream_index].logo != "")
-  // {
-  //   strLogo.Show(35, 100, UrlManagerInstance.Streams[stream_index].logo.c_str());
-  // }
-  // else
-  // {
-  //   strLogo.Show(35, 100, "https://img.prio-ict.nl/api/images/webradio-default.jpg");
-  // }
+  strLogo.begin();
+  // Set default logo
+  strLogo.Show(35,100,"https://img.prio-ict.nl/api/images/webradio-default.jpg");
 
   webServer.ip = WiFi.localIP().toString();
   webServer.begin();
+
 }
+
+
+
 void loop()
-{
-
-  // static unsigned long lastChangeTime = 0;
-  //     unsigned long currentTime = millis();
-
-  //     if (currentTime - lastChangeTime >= 5000) {  // Elke 5 seconden
-  //         lastChangeTime = currentTime;
-
-  //         // Wissel tussen verschillende teksten en lettertypen
-  //         static int state = 0;
-  //         switch(state) {
-  //             case 0:
-  //                 scrollText->setText("Dit is een nieuwe tekst!");
-  //                 break;
-  //             case 1:
-  //                 scrollText->setFont(&FreeSerif9pt7b);
-  //                 break;
-  //             case 2:
-  //                 scrollText->setFontSize(3);
-  //                 scrollText->setText("Grotere tekst!");
-  //                 break;
-  //             case 3:
-  //                 scrollText->setFont(nullptr);  // Terug naar standaard lettertype
-  //                 scrollText->setFontSize(2);
-  //                 scrollText->setText("Terug naar normaal");
-  //                 break;
-  //         }
-  //         state = (state + 1) % 4;
-  //     }
-
-  scrollText->update();
-
-
-  // mydraw();
-
-  /////scrollTitle("Hallo dit is een hele lange tekst die moet scrollen");
-  /////   getTouch(touchp);
-}
-
-void mydraw()
-{
-
-  //    ani--;
-  //   if (ani < -420)
-  //     ani = 10;
-
-  //   sBackground.fillSprite(TFT_BLACK);
-  //   sTitel_text.fillSprite(TFT_BLACK);
-  //   sTitel_text.drawString(String(x), 0, 0,4);
-  //  arrowSprite.pushImage(0,0,96,96,arrow);
-  //  arrowSprite.pushToSprite(&sBackground,x,5,TFT_BLACK);
-
-  //   sTitel_text.pushToSprite(&sBackground,ani,10,TFT_BLACK);
-
-  //   // sTitel_text.pushSprite(0,50);
-  //   sBackground.pushSprite(0, 0);
-  //    x++;
-
-  //  if(x>450)
-  //  x=-100;
-}
-
-void oldloop()
 {
   mp3.loop();
   rotaryInstance.loop();
@@ -327,7 +234,7 @@ void oldloop()
   {
     Serial.println("The button is pressed");
     next_button_isreleased = false;
-    if (stream_index == UrlManagerInstance.streamCount - 1)
+    if (stream_index == UrlManagerInstance.urlCount - 1)
     {
       stream_index = 0;
     }
@@ -335,22 +242,12 @@ void oldloop()
     {
       stream_index++;
     }
-    current_url = UrlManagerInstance.Streams[stream_index].url.c_str();
+    current_url = UrlManagerInstance.getUrlAtIndex(stream_index);
 
     myPrefs.writeString("lasturl", current_url);
-    myPrefs.putUInt("lastStreamIndex", stream_index);
-
-    Serial.print("stream count: ");
-    Serial.println(UrlManagerInstance.streamCount);
-    Serial.print("stream index: ");
-    Serial.println(stream_index);
     Serial.println("playing:");
     Serial.println(current_url);
-    Serial.print("stream logo: ");
-    Serial.println(UrlManagerInstance.Streams[stream_index].logo);
-
     mp3.connecttohost(current_url);
-    strLogo.Show(35, 100, UrlManagerInstance.Streams[stream_index].logo);
   }
 
   if (next_button.isReleased())
@@ -358,12 +255,7 @@ void oldloop()
     /* we only will listen to button input if it was released */
     next_button_isreleased = true;
     Serial.println("The button is released");
-    Serial.println(current_url);
-  }
-
-  if (current_title == "")
-  {
-    current_title = "Titel is onbekend.";
+        Serial.println(UrlManagerInstance.Streams[stream_index].url);
   }
 
   getTouch(touchp);
@@ -398,15 +290,6 @@ String readDefaultUrl()
   return result;
 }
 
-void setTitle(const char *title)
-{
-  Serial.print("before:");
-  Serial.println(title);
-  current_title = title;
-  // Serial.print("current_title:");
-  // Serial.println(current_title);
-}
-
 // next code is optional:
 void vs1053_info(const char *info)
 { // called from vs1053
@@ -417,11 +300,11 @@ void vs1053_showstation(const char *info)
 { // called from vs1053
   Serial.print("STATION:      ");
   Serial.println(info); // Show station name
-  // tft.fillRect(0, 50, 450, 17, TFT_BLACK);
-  // tft.setCursor(0, 50);
-  // tft.setFreeFont(FSB9);
-  // tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  // tft.drawString(info, 0, 50);
+  tft.fillRect(0, 50, 450, 17, TFT_BLACK);
+  tft.setCursor(0, 50);
+  tft.setFreeFont(FSB9);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.drawString(info, 0, 50);
 }
 void vs1053_showstreamtitle(const char *info)
 { // called from vs1053
@@ -436,7 +319,6 @@ void vs1053_showstreamtitle(const char *info)
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   // tft.println(info); // Show title
   tft.drawString(info, 0, 75);
-  setTitle(info);
 }
 void vs1053_showstreaminfo(const char *info)
 { // called from vs1053
