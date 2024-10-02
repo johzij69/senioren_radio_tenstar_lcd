@@ -110,6 +110,8 @@ PrioBar pBar(&tft);
 StreamLogo strLogo(&tft);
 
 ScrollText *scrollText;
+ScrollText *scrollText2;
+ScrollText *scrollText3;
 
 // Interrupt routine just sets a flag when rotation is detected
 void IRAM_ATTR checkVolume()
@@ -223,66 +225,58 @@ void setup()
     Serial.println("TFT initialized");
 
     // Optioneel: stel kleuren in
-    scrollText = new ScrollText(tft, "Dit is een lange tekst die zal scrollen op het tft screen", 0, 20, 480, 40, FSS12);
+    scrollText = new ScrollText(tft, "Hier is de nieuwe tekst die moet gaan scrollen op het tft scherm", 50, 20, 400, 40, FSS12);
     scrollText->setTextBetweenSpace(20);
+    scrollText->setScrollSpeed(5);
+    scrollText->setScrollDelay(5000);
+    scrollText->setScrollDirection(ScrollDirection::LEFT_TO_RIGHT_TO_LEFT);
     scrollText->begin();
+         scrollText->setText("Dit is de nieuwe tekst die is aangepast, geen idee of dit langgenoeg is.");
+
+
+    scrollText2 = new ScrollText(tft, "Dit is een lange tekst die zal scrollen op het tft scherm", 20, 50, 300, 40, FSS12);
+     scrollText2->setScrollSpeed(3);
+    scrollText2->setScrollDelay(2000);
+    scrollText2->setScrollDirection(ScrollDirection::RIGHT_TO_LEFT_ONCE);
+    scrollText2->begin();
+    
+
+    scrollText3 = new ScrollText(tft, "Dit is een lange tekst die zal scrollen op het tft scherm", 20, 80, 300, 40, FSS12);
+    scrollText3->setTextBetweenSpace(20);
+    scrollText3->setScrollDelay(5000);
+    scrollText3->setScrollDirection(ScrollDirection::RIGHT_TO_LEFT_CONT);
+    scrollText3->setScrollSpeed(2);
+    scrollText3->begin();
+
+
   }
 
-  // pBar.begin(450, 0, 30, 320, TFT_LIGHTGREY, TFT_BLACK, max_volume);
-  // pBar.draw(last_volume);
+  pBar.begin(450, 0, 30, 320, TFT_LIGHTGREY, TFT_BLACK, max_volume);
+  pBar.draw(last_volume);
 
-  // strLogo.begin();
-  // // Set default logo
-  // if (UrlManagerInstance.Streams[stream_index].logo != "")
-  // {
-  //   strLogo.Show(35, 100, UrlManagerInstance.Streams[stream_index].logo.c_str());
-  // }
-  // else
-  // {
-  //   strLogo.Show(35, 100, "https://img.prio-ict.nl/api/images/webradio-default.jpg");
-  // }
+  strLogo.begin();
+  // Set default logo
+  if (UrlManagerInstance.Streams[stream_index].logo != "")
+  {
+    strLogo.Show(35, 100, UrlManagerInstance.Streams[stream_index].logo.c_str());
+  }
+  else
+  {
+    strLogo.Show(35, 100, "https://img.prio-ict.nl/api/images/webradio-default.jpg");
+  }
 
   webServer.ip = WiFi.localIP().toString();
   webServer.begin();
 }
 void loop()
 {
-
-  // static unsigned long lastChangeTime = 0;
-  //     unsigned long currentTime = millis();
-
-  //     if (currentTime - lastChangeTime >= 5000) {  // Elke 5 seconden
-  //         lastChangeTime = currentTime;
-
-  //         // Wissel tussen verschillende teksten en lettertypen
-  //         static int state = 0;
-  //         switch(state) {
-  //             case 0:
-  //                 scrollText->setText("Dit is een nieuwe tekst!");
-  //                 break;
-  //             case 1:
-  //                 scrollText->setFont(&FreeSerif9pt7b);
-  //                 break;
-  //             case 2:
-  //                 scrollText->setFontSize(3);
-  //                 scrollText->setText("Grotere tekst!");
-  //                 break;
-  //             case 3:
-  //                 scrollText->setFont(nullptr);  // Terug naar standaard lettertype
-  //                 scrollText->setFontSize(2);
-  //                 scrollText->setText("Terug naar normaal");
-  //                 break;
-  //         }
-  //         state = (state + 1) % 4;
-  //     }
-
-  scrollText->update();
+   scrollText->update();
 
 
-  // mydraw();
 
-  /////scrollTitle("Hallo dit is een hele lange tekst die moet scrollen");
-  /////   getTouch(touchp);
+  // scrollText2->update();
+  //  scrollText3->update();
+//  getTouch(touchp);
 }
 
 void mydraw()
