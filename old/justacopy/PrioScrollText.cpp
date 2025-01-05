@@ -55,12 +55,12 @@ void ScrollText::createSprite()
     graph1->setColorDepth(1);
     graph1->createSprite(width, tft.fontHeight());
     graph1->setTextColor(TFT_WHITE, TFT_BLACK);
-    graph1->setTextSize(1); // Dit is de text vergrotingsfactor!
+    graph1->setTextSize(1); // Diit is de text vergrotingsfactor!
 
     sprite->setColorDepth(1);
     sprite->createSprite(textWidth + tft.width(), tft.fontHeight());
     sprite->setTextColor(TFT_WHITE, TFT_BLACK);
-    sprite->setTextSize(1); // Dit is de text vergrotingsfactor!
+    sprite->setTextSize(1); // Diit is de text vergrotingsfactor!
 }
 
 void ScrollText::destroySprite()
