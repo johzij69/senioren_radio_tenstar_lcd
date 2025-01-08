@@ -17,20 +17,16 @@ public:
     const char *getUrlAtIndex(int index);
     String CreateDivUrls();
     void begin();
-    // void loadUrls();
-    // void PrinturlsFromPrev();
-    // void deleteUrl(int index);
-    // void saveUrls();
+    void addDefaultStream();
     void loadStreams();
     void saveStreams(uint8_t *data);
     void addStream(uint8_t *data);
     void deleteStream(int index);
     void saveToPreferences();
 
-
-    //uint32_t urlCount;
+    // uint32_t urlCount;
     uint32_t streamCount;
-    
+
     std::vector<String> urls;
     std::vector<String> logo_urls;
     String default_logo;
@@ -47,4 +43,4 @@ private:
     MyPreferences &myPreferences;
 };
 
-#endif // ANOTHER_CLASS_H
+#endif // URLMANAGER_H

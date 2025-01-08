@@ -16,7 +16,7 @@ StreamLogo::StreamLogo(TFT_eSPI *tft)
 void StreamLogo::begin()
 {
 
-    //  only execute ones on new esp
+    // only execute ones on new esp
     // if(!LittleFS.begin(FORMAT_LITTLEFS_IF_FAILED)){
     //     Serial.println("LittleFS Mount Failed");
 
