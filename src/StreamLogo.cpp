@@ -7,8 +7,6 @@
 
 StreamLogo::StreamLogo(TFT_eSPI *tft)
 {
-    // TFT_eSPI tft = TFT_eSPI();
-
     this->tft = tft;
     image_folder = "/StreamLogos/";
 }
@@ -17,13 +15,14 @@ void StreamLogo::begin()
 {
 
     // only execute ones on new esp
-    // if(!LittleFS.begin(FORMAT_LITTLEFS_IF_FAILED)){
-    //     Serial.println("LittleFS Mount Failed");
+    if(!LittleFS.begin(FORMAT_LITTLEFS_IF_FAILED)){
+        Serial.println("LittleFS Mount Failed");
 
-    // }
+    }
 
     LittleFS.begin();
     // LittleFS.remove("/StreamLogosNPO-Radio1.jpg");
+  //  LittleFS.format();
 
     PrioLittleFS lFS;
     lFS.listLittleFS();

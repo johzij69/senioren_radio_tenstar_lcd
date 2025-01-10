@@ -25,6 +25,8 @@ private:
 
     const GFXfont *font;
 
+    bool scrollingIsActive;
+
     void drawCharacter();
     void scrollLogic();
 

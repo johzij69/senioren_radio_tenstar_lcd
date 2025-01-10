@@ -20,7 +20,8 @@ void PrioTft::begin()
     isInitialized = true; // Scherm is geïnitialiseerd
     cur_volume = last_volume;
     sTitle.begin();
-    sTitle.setScrollerText("Dit is een lange tekst die zal scrollen, zodat je de hele tekst kunt lezen.");
+  //  sTitle.setScrollerText("Dit is een lange tekst die zal scrollen, zodat je de hele tekst kunt lezen.");
+        sTitle.setScrollerText("Kort tekstje");
 }
 
 void PrioTft::loop()

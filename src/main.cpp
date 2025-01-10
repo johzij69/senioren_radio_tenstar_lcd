@@ -19,6 +19,8 @@
 // #include "middleFont.h" // bar
 // #include <SPIFFS.h> // Include the SPIFFS library
 // #include <PRIO_GT911.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #define WM_ERASE_NVS
 
@@ -144,11 +146,44 @@ void AudioTask(void *parameter)
         int streamIndex;
         if (xQueueReceive(streamQueue, &streamIndex, 0) == pdTRUE)
         {
+
+            Serial.println("Switching stream! ");
+
             const String streamUrl = UrlManagerInstance.Streams[streamIndex].url;
-            audio.connecttohost(streamUrl.c_str());
+            if (streamUrl != "")
+            {
+                Serial.println("Switching to stream: " + streamUrl);
+                Serial.print("stream count: ");
+                Serial.println(UrlManagerInstance.streamCount);
+                Serial.print("stream index: ");
+                Serial.println(streamIndex);
+                Serial.println("playing:");
+                Serial.println(current_url);
+                Serial.print("stream logo: ");
+                Serial.println(UrlManagerInstance.Streams[streamIndex].logo);
+
+                audio.connecttohost(streamUrl.c_str());
+                current_url = streamUrl.c_str();
+                myPrefs.writeString("lasturl", streamUrl.c_str());
+                myPrefs.putUInt("stream_index", streamIndex);
+            }
         }
 
         audio.loop();
+    }
+}
+
+// Functie om de core van een taak te printen
+void printTaskCore(TaskHandle_t taskHandle, const char *taskName)
+{
+    BaseType_t coreID = xTaskGetAffinity(taskHandle);
+    if (coreID == tskNO_AFFINITY)
+    {
+        Serial.printf("Task %s is not pinned to any core.\n", taskName);
+    }
+    else
+    {
+        Serial.printf("Task %s is running on core %d.\n", taskName, coreID);
     }
 }
 
@@ -195,7 +230,7 @@ void setup()
             stream_index = 0;
         }
         xQueueSend(streamQueue, &stream_index, portMAX_DELAY);
-  
+
         audio.setVolume(last_volume);
         audio.setVolumeSteps(VOLUME_STEPS);
         max_volume = audio.maxVolume();
@@ -251,7 +286,7 @@ void setup()
             xTaskCreate(
                 AudioTask,         // Task function
                 "AudioTask",       // Name of the task
-                4096,              // Stack size in words
+                8192,              // Stack size in words
                 NULL,              // Task parameter
                 1,                 // Priority of the task
                 &audioTaskHandle); // Task handle
@@ -269,7 +304,7 @@ void setup()
             xTaskCreate(
                 PrioTftTask,         // Task function
                 "PrioTftTask",       // Name of the task
-                4096,                // Stack size in words
+                8192,                // Stack size in words
                 NULL,                // Task parameter
                 4,                   // Priority of the task
                 &priotftTaskHandle); // Task handle
@@ -286,30 +321,23 @@ void loop()
     {
         Serial.println("The button is pressed");
         next_button_isreleased = false;
-        // if (stream_index == UrlManagerInstance.streamCount - 1)
-        // {
-        //     stream_index = 0;
-        // }
-        // else
-        // {
-        //     stream_index++;
-        // }
-        current_url = UrlManagerInstance.Streams[stream_index].url.c_str();
 
-        myPrefs.writeString("lasturl", current_url);
-        myPrefs.putUInt("lastStreamIndex", stream_index);
+        if (stream_index == UrlManagerInstance.streamCount - 1)
+        {
+            stream_index = 0;
+        }
+        else
+        {
+            stream_index++;
+        }
 
-        Serial.print("stream count: ");
-        Serial.println(UrlManagerInstance.streamCount);
-        Serial.print("stream index: ");
-        Serial.println(stream_index);
-        Serial.println("playing:");
-        Serial.println(current_url);
-        Serial.print("stream logo: ");
-        Serial.println(UrlManagerInstance.Streams[stream_index].logo);
-        //       audio.connecttohost(current_url);
         xQueueSend(streamQueue, &stream_index, portMAX_DELAY);
         xQueueSend(logoQueue, &stream_index, portMAX_DELAY);
+
+        // Print the core on which each task is running
+        printTaskCore(audioTaskHandle, "AudioTask");
+        printTaskCore(scrollerTaskHandle, "VolumeTask");
+        printTaskCore(priotftTaskHandle, "PrioTftTask");
     }
 
     if (next_button.isReleased())
@@ -346,8 +374,8 @@ void audio_showstreamtitle(const char *info)
 {
     Serial.print("streamtitle ");
     Serial.println(info);
-    prioTft.setTitle(info);
-    streamSwitched = true;
+  //  prioTft.setTitle(info);
+  // streamSwitched = true;
 }
 void audio_bitrate(const char *info)
 {

@@ -22,6 +22,16 @@ void TFTScroller::setScrollerText(const String &text)
 {
     scrollerText = text;
     arrayPos = 0;
+
+    // check if we need to scroll
+    if (sprite.textWidth(scrollerText) > viewportWidth)
+    {
+        scrollingIsActive = true;
+    }
+    else
+    {
+        scrollingIsActive = false;
+    }
 }
 
 void TFTScroller::setFont(const GFXfont *_font)
@@ -32,6 +42,12 @@ void TFTScroller::setFont(const GFXfont *_font)
 
 void TFTScroller::loop()
 {
+    if(!scrollingIsActive)
+    {
+        sprite.drawString(scrollerText, xPos, yPos);
+        return;
+    }
+    
     if (millis() - startMillis >= scrollDelay)
     {
         scrollLogic();
