@@ -21,6 +21,8 @@
 // #include <PRIO_GT911.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "task_webServer.h"
+#include "task_audio.h"
 
 #define WM_ERASE_NVS
 
@@ -63,6 +65,7 @@ String default_url = "https://icecast.omroep.nl/radio1-bb-mp3:443";
 String last_url;
 
 Audio audio;
+AudioQueues audioQueue; // Definitie van de externe variabelen
 PrioRotary rotaryInstance(ROT_CLK_PIN, ROT_DT_PIN);
 ezButton rotary_button(ROT_SW_PIN);
 ezButton next_button(NEXT_BUTTON_PIN);
@@ -83,9 +86,10 @@ void IRAM_ATTR checkVolume()
     rotaryInstance.rotaryEncoder = true;
 }
 
-TaskHandle_t scrollerTaskHandle; // Task handle for the scroller task
-TaskHandle_t priotftTaskHandle;  // Task handle for the TFT task
-TaskHandle_t audioTaskHandle;    // Task handle for the audio task
+TaskHandle_t scrollerTaskHandle;  // Task handle for the scroller task
+TaskHandle_t priotftTaskHandle;   // Task handle for the TFT task
+TaskHandle_t audioTaskHandle;     // Task handle for the audio task
+TaskHandle_t webServerTaskHandle; // Task handle for the webserver task
 
 void PrioTftTask(void *parameter)
 {
@@ -231,6 +235,9 @@ void setup()
         }
         xQueueSend(streamQueue, &stream_index, portMAX_DELAY);
 
+        audioQueue.VolumeQ = xQueueCreate(3, sizeof(int));
+        audioQueue.StreamQ = xQueueCreate(3, sizeof(String));
+
         audio.setVolume(last_volume);
         audio.setVolumeSteps(VOLUME_STEPS);
         max_volume = audio.maxVolume();
@@ -250,8 +257,8 @@ void setup()
         next_button_state = next_button.getState();
 
         /* Start webserver */
-        webServer.ip = WiFi.localIP().toString();
-        webServer.begin();
+        // webServer.ip = WiFi.localIP().toString();
+        // webServer.begin();
         Serial.println("ESP32 TFT start...");
         prioTft.begin(); // Initialiseer het TFT scherm
         if (!prioTft.isInitialized)
@@ -271,7 +278,7 @@ void setup()
                 xQueueSend(logoQueue, &stream_index, portMAX_DELAY);
             }
 
-            webServer.ip = WiFi.localIP().toString();
+            // webServer.ip = WiFi.localIP().toString();
 
             // st_streamTitle = new ScrollText(tft, "", 20, 80, 420, 40, FMBO12);
             // st_streamTitle->setTextBetweenSpace(20);
@@ -290,6 +297,15 @@ void setup()
                 NULL,              // Task parameter
                 1,                 // Priority of the task
                 &audioTaskHandle); // Task handle
+
+            xTaskCreate(
+                _AudioTask,   // Task function
+                "_AudioTask", // Name of the task
+                8192,         // Stack size in words
+                NULL,         // Task parameter
+                1,            // Priority of the task
+                NULL);        // Task handle
+
             // Create the FreeRTOS task for the VolumeTask
             xTaskCreatePinnedToCore(
                 VolumeTask,   // Task function
@@ -301,13 +317,22 @@ void setup()
                 1); // Task handle
 
             // Create the FreeRTOS task for the VolumeTask
-            xTaskCreate(
-                PrioTftTask,         // Task function
-                "PrioTftTask",       // Name of the task
-                8192,                // Stack size in words
-                NULL,                // Task parameter
-                4,                   // Priority of the task
-                &priotftTaskHandle); // Task handle
+            // xTaskCreate(
+            //     PrioTftTask,         // Task function
+            //     "PrioTftTask",       // Name of the task
+            //     8192,                // Stack size in words
+            //     NULL,                // Task parameter
+            //     4,                   // Priority of the task
+            //     &priotftTaskHandle); // Task handle
+
+            xTaskCreatePinnedToCore(
+                webServerTask,      // Task function
+                "webServerTask",    // Name of the task
+                4096,               // Stack size in words
+                (void *)&webServer, // Task parameter
+                5,                  // Priority of the task
+                &webServerTaskHandle,
+                1); // Task handle
         }
     }
 }
@@ -332,7 +357,10 @@ void loop()
         }
 
         xQueueSend(streamQueue, &stream_index, portMAX_DELAY);
-        xQueueSend(logoQueue, &stream_index, portMAX_DELAY);
+        //       xQueueSend(logoQueue, &stream_index, portMAX_DELAY);
+
+        Serial.println("SendVolume to _AudioTask:" + String(last_volume));
+        xQueueSend(audioQueue.VolumeQ, &last_volume, portMAX_DELAY);
 
         // Print the core on which each task is running
         printTaskCore(audioTaskHandle, "AudioTask");
@@ -374,8 +402,8 @@ void audio_showstreamtitle(const char *info)
 {
     Serial.print("streamtitle ");
     Serial.println(info);
-  //  prioTft.setTitle(info);
-  // streamSwitched = true;
+    //  prioTft.setTitle(info);
+    // streamSwitched = true;
 }
 void audio_bitrate(const char *info)
 {
