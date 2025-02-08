@@ -2,7 +2,7 @@
 
 #include "main.h"
 #include <WiFiManager.h>
-#include "Audio.h"
+// #include "Audio.h"
 #include "PrioRotary.h"
 #include <ezButton.h> // the library to use for SW pin
 #include "MyPreferences.h"
@@ -22,14 +22,10 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "task_webServer.h"
-#include "task_audio.h"
+#include "Task_Audio.h"
+#include "Task_Display.h"
 
 #define WM_ERASE_NVS
-
-// DAC I2S
-#define I2S_DOUT 7
-#define I2S_BCLK 5
-#define I2S_LRC 6
 
 // Rotary Enocder used for Volume control
 #define ROT_CLK_PIN 17  // ESP32 pin GPIO17 connected to the rotary encoder's CLK pin
@@ -64,19 +60,24 @@ bool streamSwitched = false;
 String default_url = "https://icecast.omroep.nl/radio1-bb-mp3:443";
 String last_url;
 
-Audio audio;
-AudioQueues audioQueue; // Definitie van de externe variabelen
+
 PrioRotary rotaryInstance(ROT_CLK_PIN, ROT_DT_PIN);
 ezButton rotary_button(ROT_SW_PIN);
 ezButton next_button(NEXT_BUTTON_PIN);
 MyPreferences myPrefs("myRadio");
 UrlManager UrlManagerInstance(myPrefs);
 PrioWebServer webServer(UrlManagerInstance, 80);
-PrioTft prioTft;
+// PrioTft prioTft;
+
+DisplayData displayData;
+AudioData audioData;
 
 // Queues
 QueueHandle_t logoQueue = xQueueCreate(3, sizeof(int));
 QueueHandle_t streamQueue = xQueueCreate(3, sizeof(int));
+QueueHandle_t volumeQueue = xQueueCreate(3, sizeof(int));
+QueueHandle_t DisplayQueue = xQueueCreate(3, sizeof(DisplayData));
+QueueHandle_t AudioQueue = xQueueCreate(3, sizeof(AudioData));
 
 // PRIO_GT911 touchp = PRIO_GT911(TOUCH_SDA, TOUCH_SCL, TOUCH_WIDTH, TOUCH_HEIGHT);
 
@@ -87,95 +88,85 @@ void IRAM_ATTR checkVolume()
 }
 
 TaskHandle_t scrollerTaskHandle;  // Task handle for the scroller task
-TaskHandle_t priotftTaskHandle;   // Task handle for the TFT task
+TaskHandle_t displayTaskHandle;   // Task handle for the TFT task
 TaskHandle_t audioTaskHandle;     // Task handle for the audio task
 TaskHandle_t webServerTaskHandle; // Task handle for the webserver task
 
-void PrioTftTask(void *parameter)
-{
-    while (true)
-    {
-        if (rotaryInstance.current_value_changed)
-        {
-            Serial.println("Volume changed to: " + String(rotaryInstance.current_value));
-            prioTft.setVolume(rotaryInstance.current_value);
-            myPrefs.writeValue("volume", rotaryInstance.current_value);
-            audio.setVolume(rotaryInstance.ReadRotaryValue());
-        }
+// void PrioTftTask(void *parameter)
+// {
+//     while (true)
+//     {
+//         if (rotaryInstance.current_value_changed)
+//         {
+//             Serial.println("Volume changed to: " + String(rotaryInstance.current_value));
+//             prioTft.setVolume(rotaryInstance.current_value);
+//             myPrefs.writeValue("volume", rotaryInstance.current_value);
+//             audio.setVolume(rotaryInstance.ReadRotaryValue());
+//         }
 
-        int logoIndex;
-        if (xQueueReceive(logoQueue, &logoIndex, 0) == pdTRUE)
-        {
-            const String logo = UrlManagerInstance.Streams[logoIndex].logo;
-            prioTft.setLogo(logo);
-        }
+//         int logoIndex;
+//         if (xQueueReceive(logoQueue, &logoIndex, 0) == pdTRUE)
+//         {
+//             const String logo = UrlManagerInstance.Streams[logoIndex].logo;
+//             prioTft.setLogo(logo);
+//         }
+//         vTaskDelay(10 / portTICK_PERIOD_MS); // Adjust the delay as needed (e.g., 10ms)
+//     }
+// }
 
-        // if (next_button.getState() == LOW && next_button_isreleased)
-        // {
-        //     next_button_isreleased = false;
-        //     stream_index++;
-        //     if (stream_index >= UrlManagerInstance.Streams.size())
-        //     {
-        //         stream_index = 0;
-        //     }
-        //     current_url = UrlManagerInstance.Streams[stream_index].url.c_str();
-        //     audio.connecttohost(current_url);
-        //     myPrefs.putUInt("stream_index", stream_index);
-        //     streamSwitched = true;
-        // }
-        // else if (next_button.getState() == HIGH)
-        // {
-        //     next_button_isreleased = true;
-        // }
+// void VolumeTask(void *parameter)
+// {
+//     while (true)
+//     {
+//         rotaryInstance.loop();
+//         if (rotaryInstance.current_value_changed)
+//         {
+//             Serial.println("Volume changed to: " + String(rotaryInstance.current_value));
+//             myPrefs.writeValue("volume", rotaryInstance.current_value);
+//             audio.setVolume(rotaryInstance.ReadRotaryValue());
+//             displayData.volume = rotaryInstance.current_value;
+//             audioData.volume = rotaryInstance.current_value;
+//             xQueueSend(AudioQueue, &rotaryInstance.current_value, portMAX_DELAY);
+//             xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
+//         }
+//         vTaskDelay(10 / portTICK_PERIOD_MS); // Adjust the delay as needed (e.g., 10ms)
+//     }
+// }
 
-        prioTft.loop();
-        vTaskDelay(10 / portTICK_PERIOD_MS); // Adjust the delay as needed (e.g., 10ms)
-    }
-}
+// void AudioTask(void *parameter)
+// {
+//     while (true)
+//     {
 
-void VolumeTask(void *parameter)
-{
-    while (true)
-    {
-        rotaryInstance.loop();
-        vTaskDelay(10 / portTICK_PERIOD_MS); // Adjust the delay as needed (e.g., 10ms)
-    }
-}
+//         int streamIndex;
+//         if (xQueueReceive(streamQueue, &streamIndex, 0) == pdTRUE)
+//         {
 
-void AudioTask(void *parameter)
-{
-    while (true)
-    {
+//             Serial.println("Switching stream! ");
 
-        int streamIndex;
-        if (xQueueReceive(streamQueue, &streamIndex, 0) == pdTRUE)
-        {
+//             const String streamUrl = UrlManagerInstance.Streams[streamIndex].url;
+//             if (streamUrl != "")
+//             {
+//                 Serial.println("Switching to stream: " + streamUrl);
+//                 Serial.print("stream count: ");
+//                 Serial.println(UrlManagerInstance.streamCount);
+//                 Serial.print("stream index: ");
+//                 Serial.println(streamIndex);
+//                 Serial.println("playing:");
+//                 Serial.println(current_url);
+//                 Serial.print("stream logo: ");
+//                 Serial.println(UrlManagerInstance.Streams[streamIndex].logo);
 
-            Serial.println("Switching stream! ");
+//                 audio.connecttohost(streamUrl.c_str());
+//                 current_url = streamUrl.c_str();
+//                 myPrefs.writeString("lasturl", streamUrl.c_str());
+//                 myPrefs.putUInt("stream_index", streamIndex);
+//             }
+//         }
 
-            const String streamUrl = UrlManagerInstance.Streams[streamIndex].url;
-            if (streamUrl != "")
-            {
-                Serial.println("Switching to stream: " + streamUrl);
-                Serial.print("stream count: ");
-                Serial.println(UrlManagerInstance.streamCount);
-                Serial.print("stream index: ");
-                Serial.println(streamIndex);
-                Serial.println("playing:");
-                Serial.println(current_url);
-                Serial.print("stream logo: ");
-                Serial.println(UrlManagerInstance.Streams[streamIndex].logo);
-
-                audio.connecttohost(streamUrl.c_str());
-                current_url = streamUrl.c_str();
-                myPrefs.writeString("lasturl", streamUrl.c_str());
-                myPrefs.putUInt("stream_index", streamIndex);
-            }
-        }
-
-        audio.loop();
-    }
-}
+//         audio.loop();
+//     }
+// }
 
 // Functie om de core van een taak te printen
 void printTaskCore(TaskHandle_t taskHandle, const char *taskName)
@@ -216,7 +207,7 @@ void setup()
         /* start touch */
         // touchp.begin();
         // touchp.setRotation(ROTATION_LEFT);
-        audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
+        //        audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
 
         myPrefs.begin();
         last_volume = myPrefs.readValue("volume", DEF_VOLUME);
@@ -233,14 +224,18 @@ void setup()
         {
             stream_index = 0;
         }
-        xQueueSend(streamQueue, &stream_index, portMAX_DELAY);
+        //  xQueueSend(streamQueue, &stream_index, portMAX_DELAY);
 
-        audioQueue.VolumeQ = xQueueCreate(3, sizeof(int));
-        audioQueue.StreamQ = xQueueCreate(3, sizeof(String));
+        // audioQueue.VolumeQ = xQueueCreate(3, sizeof(int));
+        // audioQueue.StreamQ = xQueueCreate(3, sizeof(String));
 
-        audio.setVolume(last_volume);
-        audio.setVolumeSteps(VOLUME_STEPS);
-        max_volume = audio.maxVolume();
+        //       audio.setVolume(last_volume);
+        //       audio.setVolumeSteps(VOLUME_STEPS);
+        max_volume = 30; // todo
+
+        audioData.volume = last_volume;
+        strncpy(audioData.url, UrlManagerInstance.Streams[stream_index].url.c_str(), sizeof(audioData.url));
+        xQueueSend(AudioQueue, &audioData, portMAX_DELAY);
 
         /* Rotary button */
         pinMode(ROT_CLK_PIN, INPUT);
@@ -260,80 +255,72 @@ void setup()
         // webServer.ip = WiFi.localIP().toString();
         // webServer.begin();
         Serial.println("ESP32 TFT start...");
-        prioTft.begin(); // Initialiseer het TFT scherm
-        if (!prioTft.isInitialized)
-        {
-            Serial.println("TFT-initialisatie mislukt. Controleer hardwareverbindingen.");
-        }
-        else
-        {
-            prioTft.last_volume = last_volume;
-            prioTft.cur_volume = last_volume;
-            prioTft.showLocalIp(WiFi.localIP().toString());
 
-            Serial.println("TFT succesvol geïnitialiseerd!");
-            if (UrlManagerInstance.Streams[stream_index].logo != "")
-            {
-                //   prioTft.setLogo(UrlManagerInstance.Streams[stream_index].logo.c_str());
-                xQueueSend(logoQueue, &stream_index, portMAX_DELAY);
-            }
+        Serial.println(WiFi.localIP());
+        strncpy(displayData.ip, WiFi.localIP().toString().c_str(), sizeof(displayData.ip));
+        displayData.volume = last_volume;
+        strncpy(displayData.title, "Prio-WebRadio", sizeof(displayData.title));
+        strncpy(displayData.logo, UrlManagerInstance.Streams[stream_index].logo.c_str(), sizeof(displayData.logo));
 
-            // webServer.ip = WiFi.localIP().toString();
+        // xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
 
-            // st_streamTitle = new ScrollText(tft, "", 20, 80, 420, 40, FMBO12);
-            // st_streamTitle->setTextBetweenSpace(20);
-            // st_streamTitle->setScrollDelay(5000);
-            // st_streamTitle->setScrollType(ScrollType::RIGHT_TO_LEFT_CONT);
-            // st_streamTitle->setScrollSpeed(10);
-            // st_streamTitle->begin();
-            // st_streamTitle->setText("initializing...");
-            // st_streamTitle->setText("Dit is een lange tekst die zal scrollen, zodat je de hele tekst kunt lezen.");
+        Serial.println("Starting tasks");
+        Serial.println(displayData.logo);
 
-            // Create the FreeRTOS task for the VolumeTask
-            xTaskCreate(
-                AudioTask,         // Task function
-                "AudioTask",       // Name of the task
-                8192,              // Stack size in words
-                NULL,              // Task parameter
-                1,                 // Priority of the task
-                &audioTaskHandle); // Task handle
+        // Create the FreeRTOS task for the VolumeTask
+        // xTaskCreatePinnedToCore(
+        //     AudioTask,            // Task function
+        //     "AudioTask",          // Name of the task
+        //     8192,                 // Stack size in words
+        //     NULL,                 // Task parameter
+        //     2,                    // Priority of the task
+        //     &audioTaskHandle, 1); // Task handle
 
-            xTaskCreate(
-                _AudioTask,   // Task function
-                "_AudioTask", // Name of the task
-                8192,         // Stack size in words
-                NULL,         // Task parameter
-                1,            // Priority of the task
-                NULL);        // Task handle
+        // xTaskCreate(
+        //     _AudioTask,   // Task function
+        //     "_AudioTask", // Name of the task
+        //     8192,         // Stack size in words
+        //     NULL,         // Task parameter
+        //     1,            // Priority of the task
+        //     NULL);        // Task handle
 
-            // Create the FreeRTOS task for the VolumeTask
-            xTaskCreatePinnedToCore(
-                VolumeTask,   // Task function
-                "VolumeTask", // Name of the task
-                4096,         // Stack size in words
-                NULL,         // Task parameter
-                5,            // Priority of the task
-                &scrollerTaskHandle,
-                1); // Task handle
+        // // Create the FreeRTOS task for the VolumeTask
+        // xTaskCreatePinnedToCore(
+        //     VolumeTask,          // Task function
+        //     "VolumeTask",        // Name of the task
+        //     4096,                // Stack size in words
+        //     NULL,                // Task parameter
+        //     5,                   // Priority of the task
+        //     &scrollerTaskHandle, // Task handle
+        //     0);
 
-            // Create the FreeRTOS task for the VolumeTask
-            // xTaskCreate(
-            //     PrioTftTask,         // Task function
-            //     "PrioTftTask",       // Name of the task
-            //     8192,                // Stack size in words
-            //     NULL,                // Task parameter
-            //     4,                   // Priority of the task
-            //     &priotftTaskHandle); // Task handle
+        //   Create the FreeRTOS task for the VolumeTask
+        xTaskCreate(
+            DisplayTask,          // Task function
+            "DisplayTask",        // Name of the task
+            8192,                 // Stack size in words
+            (void *)DisplayQueue, // Task parameter
+            5,                    // Priority of the task
+            &displayTaskHandle);  // Task handle
 
-            xTaskCreatePinnedToCore(
-                webServerTask,      // Task function
-                "webServerTask",    // Name of the task
-                4096,               // Stack size in words
-                (void *)&webServer, // Task parameter
-                5,                  // Priority of the task
-                &webServerTaskHandle,
-                1); // Task handle
-        }
+        // xTaskCreatePinnedToCore(
+        //     webServerTask,      // Task function
+        //     "webServerTask",    // Name of the task
+        //     4096,               // Stack size in words
+        //     (void *)&webServer, // Task parameter
+        //     5,                  // Priority of the task
+        //     &webServerTaskHandle,
+        //     1); // Task handle
+        //   }
+
+        // Create the FreeRTOS task for the VolumeTask
+        xTaskCreatePinnedToCore(
+            AudioTask,          // Task function
+            "AudioTask",        // Name of the task
+            8192,               // Stack size in words
+            (void *)AudioQueue, // Task parameter
+            1,                  // Priority of the task
+            &audioTaskHandle,1);  // Task handle
     }
 }
 
@@ -345,6 +332,8 @@ void loop()
     if (next_button.isPressed() && next_button_isreleased == true)
     {
         Serial.println("The button is pressed");
+        Serial.println(displayData.logo);
+        Serial.println(displayData.ip);
         next_button_isreleased = false;
 
         if (stream_index == UrlManagerInstance.streamCount - 1)
@@ -355,17 +344,19 @@ void loop()
         {
             stream_index++;
         }
+        Serial.println("Switching stream! ");
+        CreateAndSendAudioData(stream_index,rotaryInstance.current_value);
+        CreateAndSendDisplayData(stream_index);
 
-        xQueueSend(streamQueue, &stream_index, portMAX_DELAY);
-        //       xQueueSend(logoQueue, &stream_index, portMAX_DELAY);
 
-        Serial.println("SendVolume to _AudioTask:" + String(last_volume));
-        xQueueSend(audioQueue.VolumeQ, &last_volume, portMAX_DELAY);
+        // xQueueSend(streamQueue, &stream_index, portMAX_DELAY);
+        // xQueueSend(logoQueue, &stream_index, portMAX_DELAY);
 
         // Print the core on which each task is running
-        printTaskCore(audioTaskHandle, "AudioTask");
-        printTaskCore(scrollerTaskHandle, "VolumeTask");
-        printTaskCore(priotftTaskHandle, "PrioTftTask");
+        // printTaskCore(audioTaskHandle, "AudioTask");
+        // printTaskCore(scrollerTaskHandle, "VolumeTask");
+        // printTaskCore(displayTaskHandle, "DisplayTask");
+        // printTaskCore(webServerTaskHandle, "Webserver task");
     }
 
     if (next_button.isReleased())
@@ -375,58 +366,89 @@ void loop()
         Serial.println("The button is released");
         Serial.println(current_url);
     }
+
+    rotaryInstance.loop();
+    if (rotaryInstance.current_value_changed)
+    {
+        Serial.println("Volume changed to: " + String(rotaryInstance.current_value));
+        myPrefs.writeValue("volume", rotaryInstance.current_value);
+        displayData.volume = rotaryInstance.current_value;
+        audioData.volume = rotaryInstance.current_value;
+        xQueueSend(AudioQueue, &audioData, portMAX_DELAY);
+        xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
+        rotaryInstance.current_value_changed = false;
+    }
+} // end loop
+
+void CreateAndSendDisplayData(int streamIndex)
+{
+    displayData.volume = last_volume;
+    strncpy(displayData.ip, WiFi.localIP().toString().c_str(), sizeof(displayData.ip));
+    strncpy(displayData.title, UrlManagerInstance.Streams[streamIndex].name.c_str(), sizeof(displayData.title) - 1); // -1 voor mogelijke \0
+    strncpy(displayData.logo, UrlManagerInstance.Streams[streamIndex].logo.c_str(), sizeof(displayData.logo));
+    xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
 }
 
-// optional
-void audio_info(const char *info)
+void CreateAndSendAudioData(int streamIndex, int last_volume)
 {
-    Serial.print("info        ");
-    Serial.println(info);
+    audioData.volume = last_volume;
+    strncpy(audioData.url, UrlManagerInstance.Streams[streamIndex].url.c_str(), sizeof(audioData.url));
+    xQueueSend(AudioQueue, &audioData, portMAX_DELAY);
 }
-void audio_id3data(const char *info)
-{ // id3 metadata
-    Serial.print("id3data     ");
-    Serial.println(info);
-}
-void audio_eof_mp3(const char *info)
-{ // end of file
-    Serial.print("eof_mp3     ");
-    Serial.println(info);
-}
-void audio_showstation(const char *info)
-{
-    Serial.print("station     ");
-    Serial.println(info);
-}
-void audio_showstreamtitle(const char *info)
-{
-    Serial.print("streamtitle ");
-    Serial.println(info);
-    //  prioTft.setTitle(info);
-    // streamSwitched = true;
-}
-void audio_bitrate(const char *info)
-{
-    Serial.print("bitrate     ");
-    Serial.println(info);
-}
-void audio_commercial(const char *info)
-{ // duration in sec
-    Serial.print("commercial  ");
-    Serial.println(info);
-}
-void audio_icyurl(const char *info)
-{ // homepage
-    Serial.print("icyurl      ");
-    Serial.println(info);
-}
-void audio_lasthost(const char *info)
-{ // stream URL played
-    Serial.print("lasthost    ");
-    Serial.println(info);
-}
-void audio_eof_speech(const char *info)
-{
-    Serial.print("eof_speech  ");
-    Serial.println(info);
-}
+
+
+
+// // optional
+// void audio_info(const char *info)
+// {
+//     Serial.print("info        ");
+//     Serial.println(info);
+// }
+// void audio_id3data(const char *info)
+// { // id3 metadata
+//     Serial.print("id3data     ");
+//     Serial.println(info);
+// }
+// void audio_eof_mp3(const char *info)
+// { // end of file
+//     Serial.print("eof_mp3     ");
+//     Serial.println(info);
+// }
+// void audio_showstation(const char *info)
+// {
+//     Serial.print("station     ");
+//     Serial.println(info);
+// }
+// void audio_showstreamtitle(const char *info)
+// {
+//     Serial.print("streamtitle ");
+//     Serial.println(info);
+
+//     strncpy(displayData.title, info, sizeof(displayData.title - 1)); // -1 voor mogelijke \0
+//     xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
+// }
+// void audio_bitrate(const char *info)
+// {
+//     Serial.print("bitrate     ");
+//     Serial.println(info);
+// }
+// void audio_commercial(const char *info)
+// { // duration in sec
+//     Serial.print("commercial  ");
+//     Serial.println(info);
+// }
+// void audio_icyurl(const char *info)
+// { // homepage
+//     Serial.print("icyurl      ");
+//     Serial.println(info);
+// }
+// void audio_lasthost(const char *info)
+// { // stream URL played
+//     Serial.print("lasthost    ");
+//     Serial.println(info);
+// }
+// void audio_eof_speech(const char *info)
+// {
+//     Serial.print("eof_speech  ");
+//     Serial.println(info);
+// }

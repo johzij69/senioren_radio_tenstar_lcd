@@ -4,8 +4,8 @@
  *
  *  Created on: Oct 28,2018
  *
- *  Version 3.1.0d
- *  Updated on: Feb 01.2025
+ *  Version 3.0.13z
+ *  Updated on: Dec 16.2024
  *      Author: Wolle (schreibfaul1)
  */
 
@@ -96,6 +96,7 @@ public:
     ~AudioBuffer();                             // frees the buffer
     size_t   init();                            // set default values
     bool     isInitialized() { return m_f_init; };
+    void     setBufsize(int ram, int psram);
     int32_t  getBufsize();
     void     changeMaxBlockSize(uint16_t mbs);  // is default 1600 for mp3 and aac, set 16384 for FLAC
     uint16_t getMaxBlockSize();                 // returns maxBlockSize
@@ -141,8 +142,9 @@ class Audio : private AudioBuffer{
     AudioBuffer InBuff; // instance of input buffer
 
 public:
-    Audio(uint8_t i2sPort = I2S_NUM_0);
+    Audio(bool internalDAC = false, uint8_t channelEnabled = 3, uint8_t i2sPort = I2S_NUM_0); // #99
     ~Audio();
+    void setBufsize(int rambuf_sz, int psrambuf_sz);
     bool openai_speech(const String& api_key, const String& model, const String& input, const String& voice, const String& response_format, const String& speed);
     bool connecttohost(const char* host, const char* user = "", const char* pwd = "");
     bool connecttospeech(const char* speech, const char* lang);
@@ -151,6 +153,7 @@ public:
     void setConnectionTimeout(uint16_t timeout_ms, uint16_t timeout_ms_ssl);
     bool setAudioPlayPosition(uint16_t sec);
     bool setFilePos(uint32_t pos);
+    bool audioFileSeek(const float speed);
     bool setTimeOffset(int sec);
     bool setPinout(uint8_t BCLK, uint8_t LRC, uint8_t DOUT, int8_t MCLK = I2S_GPIO_UNUSED);
     bool pauseResume();
@@ -379,13 +382,6 @@ void trim(char *str) {
         }
         return result;
     }
-
-    int32_t min3(int32_t a, int32_t b, int32_t c){
-        uint32_t min_val = a;
-        if (b < min_val) min_val = b;
-        if (c < min_val) min_val = c;
-        return min_val;
-    }
 //——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
     // some other functions
 uint64_t bigEndian(uint8_t* base, uint8_t numBytes, uint8_t shiftLeft = 8) {
@@ -417,6 +413,32 @@ uint64_t bigEndian(uint8_t* base, uint8_t numBytes, uint8_t shiftLeft = 8) {
         return false;
     }
 //——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+    char* urlencode(const char* str, bool spacesOnly){
+        // Reserve memory for the result (3x the length of the input string, worst-case)
+        char *encoded = x_ps_malloc(strlen(str) * 3 + 1);
+        char *p_encoded = encoded;
+
+        if (encoded == NULL) {
+            return NULL;  // Memory allocation failed
+        }
+
+        while (*str) {
+            // Adopt alphanumeric characters and secure characters directly
+            if (isalnum((unsigned char)*str)) {
+                *p_encoded++ = *str;
+            }
+            else if(spacesOnly && *str != 0x20) {
+                *p_encoded++ = *str;
+            }
+            else {
+                p_encoded += sprintf(p_encoded, "%%%02X", (unsigned char)*str);
+            }
+            str++;
+        }
+        *p_encoded = '\0';  // Null-terminieren
+        return encoded;
+    }
+//——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
     void vector_clear_and_shrink(vector<char*>&vec){
         uint size = vec.size();
         for (int i = 0; i < size; i++) {
@@ -442,108 +464,28 @@ uint64_t bigEndian(uint8_t* base, uint8_t numBytes, uint8_t shiftLeft = 8) {
     char* x_ps_malloc(uint16_t len) {
         char* ps_str = NULL;
         if(psramFound()){ps_str = (char*) ps_malloc(len);}
-        else            {ps_str = (char*)    malloc(len);}
-        if(!ps_str) log_e("oom");
+        else             {ps_str = (char*)    malloc(len);}
         return ps_str;
     }
 //——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
     char* x_ps_calloc(uint16_t len, uint8_t size) {
         char* ps_str = NULL;
         if(psramFound()){ps_str = (char*) ps_calloc(len, size);}
-        else            {ps_str = (char*)    calloc(len, size);}
-        if(!ps_str) log_e("oom");
+        else             {ps_str = (char*)    calloc(len, size);}
         return ps_str;
     }
 //——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
     char* x_ps_strdup(const char* str) {
-        if(!str) {log_e("Input str is NULL"); return NULL;};
+        if(!str) return strdup(""); // better not to return NULL
         char* ps_str = NULL;
         if(psramFound()) { ps_str = (char*)ps_malloc(strlen(str) + 1); }
         else { ps_str = (char*)malloc(strlen(str) + 1); }
-        if(!ps_str){log_e("oom"); return NULL;}
         strcpy(ps_str, str);
         return ps_str;
     }
 //——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
-    void x_ps_free(char** b){
-        if(*b){free(*b); *b = NULL;}
-    }
-    void x_ps_free_const(const char** b) {
-        if (b && *b) {
-            free((void*)*b); // remove const
-            *b = NULL;
-        }
-    }
-    void x_ps_free(int16_t** b){
-        if(*b){free(*b); *b = NULL;}
-    }
-    void x_ps_free(uint8_t** b){
-        if(*b){free(*b); *b = NULL;}
-    }
-//——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
-    char* urlencode(const char* str, bool spacesOnly) {
-        if (str == NULL) {
-            return NULL;  // Eingabe ist NULL
-        }
-
-        // Reserve memory for the result (3x the length of the input string, worst-case)
-        size_t inputLength = strlen(str);
-        size_t bufferSize = inputLength * 3 + 1; // Worst-case-Szenario
-        char *encoded = (char *)x_ps_malloc(bufferSize);
-        if (encoded == NULL) {
-            return NULL;  // memory allocation failed
-        }
-
-        const char *p_input = str;  // Copy of the input pointer
-        char *p_encoded = encoded;  // pointer of the output buffer
-        size_t remainingSpace = bufferSize; // remaining space in the output buffer
-
-        while (*p_input) {
-            if (isalnum((unsigned char)*p_input)) {
-                // adopt alphanumeric characters directly
-                if (remainingSpace > 1) {
-                    *p_encoded++ = *p_input;
-                    remainingSpace--;
-                } else {
-                    free(encoded);
-                    return NULL; // security check failed
-                }
-            } else if (spacesOnly && *p_input != 0x20) {
-                // Nur Leerzeichen nicht kodieren
-                if (remainingSpace > 1) {
-                    *p_encoded++ = *p_input;
-                    remainingSpace--;
-                } else {
-                    free(encoded);
-                    return NULL; // security check failed
-                }
-            } else {
-                // encode unsafe characters as '%XX'
-                if (remainingSpace > 3) {
-                    int written = snprintf(p_encoded, remainingSpace, "%%%02X", (unsigned char)*p_input);
-                    if (written < 0 || written >= (int)remainingSpace) {
-                        free(encoded);
-                        return NULL; // error writing to buffer
-                    }
-                    p_encoded += written;
-                    remainingSpace -= written;
-                } else {
-                    free(encoded);
-                    return NULL; // security check failed
-                }
-            }
-            p_input++;
-        }
-
-        // Null-terminieren
-        if (remainingSpace > 0) {
-            *p_encoded = '\0';
-        } else {
-            free(encoded);
-            return NULL; // security check failed
-        }
-
-        return encoded;
+    void x_ps_free(void* b){
+        if(b){free(b); b = NULL;}
     }
 //——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 // Function to reverse the byte order of a 32-bit value (big-endian to little-endian)
@@ -647,7 +589,6 @@ private:
     char*           m_lastHost = NULL;              // Store the last URL to a webstream
     char*           m_lastM3U8host = NULL;
     char*           m_playlistBuff = NULL;          // stores playlistdata
-    char*           m_speechtxt = NULL;             // stores tts text
     const uint16_t  m_plsBuffEntryLen = 256;        // length of each entry in playlistBuff
     filter_t        m_filter[3];                    // digital filters
     int             m_LFcount = 0;                  // Detection of end of header
@@ -659,7 +600,7 @@ private:
     int             m_controlCounter = 0;           // Status within readID3data() and readWaveHeader()
     int8_t          m_balance = 0;                  // -16 (mute left) ... +16 (mute right)
     uint16_t        m_vol = 21;                     // volume
-    uint16_t        m_vol_steps = 21;               // default
+    uint8_t         m_vol_steps = 21;               // default
     double          m_limit_left = 0;               // limiter 0 ... 1, left channel
     double          m_limit_right = 0;              // limiter 0 ... 1, right channel
     uint8_t         m_timeoutCounter = 0;           // timeout counter
@@ -724,6 +665,7 @@ private:
     bool            m_f_tts = false;                // text to speech
     bool            m_f_loop = false;               // Set if audio file should loop
     bool            m_f_forceMono = false;          // if true stereo -> mono
+    bool            m_f_internalDAC = false;        // false: output vis I2S, true output via internal DAC
     bool            m_f_rtsp = false;               // set if RTSP is used (m3u8 stream)
     bool            m_f_m3u8data = false;           // used in processM3U8entries
     bool            m_f_Log = false;                // set in platformio.ini  -DAUDIO_LOG and -DCORE_DEBUG_LEVEL=3 or 4
@@ -740,7 +682,7 @@ private:
     bool            m_f_lockInBuffer = false;       // lock inBuffer for manipulation
     bool            m_f_audioTaskIsDecoding = false;
     bool            m_f_acceptRanges = false;
-    uint8_t         m_f_channelEnabled = 3;         //
+    uint8_t         m_f_channelEnabled = 3;         // internal DAC, both channels
     uint32_t        m_audioFileDuration = 0;
     float           m_audioCurrentTime = 0;
     uint32_t        m_audioDataStart = 0;           // in bytes

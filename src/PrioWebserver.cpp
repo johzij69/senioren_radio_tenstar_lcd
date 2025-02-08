@@ -22,7 +22,7 @@ void PrioWebServer::begin()
     } });
 
   server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request)
-            { request->send_P(200, "image/x-icon", favicon, sizeof(favicon)); });
+            { request->send(200, "image/x-icon",  (const unsigned char*)favicon, sizeof(favicon)); });
 
   /* root page , which handles overzicht */
   server.on("/", HTTP_GET, std::bind(&PrioWebServer::handleRoot, this, std::placeholders::_1));
@@ -65,7 +65,7 @@ void PrioWebServer::handleApi(AsyncWebServerRequest *request)
 
   for (int i = 0; i < paramsNr; i++)
   {
-    AsyncWebParameter *p = request->getParam(i);
+    const AsyncWebParameter *p = request->getParam(i);
 
     if (p->name() == "size")
     {
@@ -143,7 +143,7 @@ void PrioWebServer::handleDeleteStream(AsyncWebServerRequest *request)
 
   for (int i = 0; i < paramsNr; i++)
   {
-    AsyncWebParameter *p = request->getParam(i);
+    const AsyncWebParameter *p = request->getParam(i);
 
     if (p->name() == "id")
     {
@@ -167,7 +167,7 @@ void PrioWebServer::handleRoot(AsyncWebServerRequest *request)
   mybigString.concat(h_body);
   mybigString.concat(h_end);
 
-  request->send_P(200, "text/html", mybigString.c_str());
+  request->send(200, "text/html", mybigString.c_str());
   mybigString = "";
 }
 
@@ -190,7 +190,7 @@ void PrioWebServer::handleInputStream(AsyncWebServerRequest *request)
   mybigString.concat(h_body);
   mybigString.concat(h_end);
 
-  request->send_P(200, "text/html", mybigString.c_str());
+  request->send(200, "text/html", mybigString.c_str());
   mybigString = "";
 }
 

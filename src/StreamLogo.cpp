@@ -72,18 +72,8 @@ bool StreamLogo::LoadImage(String url, String filename)
 
 void StreamLogo::drawJpeg(const char *filename, int xpos, int ypos)
 {
-
-    // Open the named file (the Jpeg decoder library will close it)
-
+    // Open het bestand
     File jpegFile = LittleFS.open(filename, "r");
-
-    if (jpegFile.size() == 0)
-    {
-        Serial.print("ERROR: File \"");
-        Serial.print(filename);
-        Serial.println("file size is 0!");
-        return;
-    }
 
     if (!jpegFile)
     {
@@ -93,22 +83,26 @@ void StreamLogo::drawJpeg(const char *filename, int xpos, int ypos)
         return;
     }
 
-    Serial.println(String(jpegFile.size()));
+    if (jpegFile.size() == 0)
+    {
+        Serial.print("ERROR: File \"");
+        Serial.print(filename);
+        Serial.println("\" file size is 0!");
+        jpegFile.close();  // Sluit bestand om LittleFS fouten te voorkomen
+        return;
+    }
 
+    Serial.println(String(jpegFile.size()));
     Serial.println("===========================");
     Serial.print("Drawing file: ");
     Serial.println(filename);
     Serial.println("===========================");
 
-    // Use one of the following methods to initialise the decoder:
-    // boolean decoded = JpegDec.decodeSdFile(jpegFile); // Pass the SD file handle to the decoder,
-    bool decoded = JpegDec.decodeFsFile(filename); // or pass the filename (String or character array)
+    // Gebruik bestandshandle in plaats van bestandsnaam
+    bool decoded = JpegDec.decodeFsFile(jpegFile);
 
     if (decoded)
     {
-        // print information about the image to the serial port
-        //   jpegInfo();
-        // render the image onto the screen at given coordinates
         Serial.println("rendering image");
         renderJPEG(xpos, ypos);
     }
@@ -116,7 +110,10 @@ void StreamLogo::drawJpeg(const char *filename, int xpos, int ypos)
     {
         Serial.println("Jpeg file format not supported!");
     }
+
+    jpegFile.close();  // Zorg ervoor dat het bestand correct wordt gesloten
 }
+
 
 bool StreamLogo::fileExists(String path)
 {

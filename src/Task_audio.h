@@ -2,15 +2,15 @@
 #define TaskAudio_H
 #include <Arduino.h>
 
-void _AudioTask(void *parameter);
+void AudioTask(void *parameter);
 
 
-struct AudioQueues {
-    QueueHandle_t VolumeQ;
-    QueueHandle_t StreamQ;
+
+struct AudioData {
+    char url[255];
+    int volume;
 };
 
-extern AudioQueues audioQueue;
 
 #endif // TaskAudio_H
 
