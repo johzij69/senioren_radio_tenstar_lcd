@@ -12,6 +12,6 @@ void webServerTask(void *parameter)
     // Infinite loop for the task
     while (true)
     {
-        vTaskDelay(10 / portTICK_PERIOD_MS); // Adjust the delay as needed
+        vTaskDelay(100 / portTICK_PERIOD_MS); // Adjust the delay as needed
     }
 }

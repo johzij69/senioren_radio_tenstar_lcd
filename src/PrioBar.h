@@ -9,6 +9,8 @@ class PrioBar
 {
 
 public:
+    int32_t width_set;
+
     PrioBar(TFT_eSPI *tft);
     void begin(int32_t x, int32_t y, int32_t width, int32_t height, uint16_t fgcolor, uint16_t bgcolor, int max_value);
     void draw(int value);

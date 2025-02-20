@@ -14,21 +14,11 @@ void AudioTask(void *parameter)
 {
 
     Audio audio;
-
-    QueueHandle_t AudioQueue = static_cast<QueueHandle_t>(parameter);
-    int current_volume = MIN_VOLUME;
     String current_url = "";
+    int current_volume = MIN_VOLUME;
+    QueueHandle_t AudioQueue = static_cast<QueueHandle_t>(parameter);
 
     audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
-    // audio.setAudioInfoCallback(audio_info);
-    // audio.setAudioId3MetadataCallback(audio_id3data);
-    // audio.setAudioEOFCallback(audio_eof_mp3);
-    // audio.setAudioShowStationCallback(audio_showstation);
-    // audio.setAudioShowStreamTitleCallback(audio_showstreamtitle);
-    // audio.setAudioBitrateCallback(audio_bitrate);
-    // audio.setAudioCommercialCallback(audio_commercial);
-    // audio.setAudioIcyUrlCallback(audio_icyurl);
-
     audio.setVolume(DEF_VOLUME);
     audio.setVolumeSteps(VOLUME_STEPS);
 
@@ -51,16 +41,14 @@ void AudioTask(void *parameter)
             {
                 Serial.println("Switching to stream: " + streamUrl);
                 Serial.println("playing:" + streamUrl);
-                audio.stopSong(); // Zorgt ervoor dat de vorige stream netjes wordt gesloten
-//                delay(100);       // Eventueel kleine vertraging om resource vrij te geven
-                vTaskDelay(1);
                 audio.connecttohost(_audioData.url);
                 current_url = streamUrl;
                 //                myPrefs.writeString("lasturl", _audioData.url);
                 //                myPrefs.putUInt("stream_index", streamIndex);
             }
         }
+//        Serial.println("playing audio");
         audio.loop();
-        vTaskDelay(1);
+        vTaskDelay(10);
     }
 }

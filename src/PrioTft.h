@@ -28,6 +28,9 @@ public:
     void setVolume(int _cur_volume);
     void setTitle(const String &title);
     void setLogo(const String &url);
+    void setStreamTitle(const String &streamName);
+    void clearLine(int lineNumber);
+    void prepLine(int lineNumber);
 };
 
 #endif // PRIOTFT_H

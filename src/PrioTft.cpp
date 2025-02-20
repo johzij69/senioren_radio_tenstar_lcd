@@ -32,8 +32,7 @@ void PrioTft::loop()
 
 void PrioTft::showLocalIp(const String &ip)
 {
-    tft.setCursor(0, 20); // Set cursor a top left of screen
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    prepLine(2);
     tft.println("IP address: " + ip);
 }
 
@@ -45,17 +44,44 @@ void PrioTft::setVolume(int _cur_volume)
 
 void PrioTft::setTitle(const String &title)
 {
-
-    tft.setCursor(0, 45); // Set cursor a top left of screen
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    if(title.length() < 40) {
- //       sTitle.setScrollerText(title);
+    prepLine(3);
+    if (title.length() < 32)
+    {
         tft.println(title);
-    } else {
-        tft.println(title.substring(0, 40));
-//        sTitle.setScrollerText(title.substring(0, 40));
     }
-   // sTitle.setScrollerText(title);
+    else
+    {
+        tft.println(title.substring(0, 32));
+    }
+     // When chneg streamTitle, we need to wipe the streamTitle name
+     clearLine(4);
+}
+
+void PrioTft::setStreamTitle(const String &streamTitle)
+{
+    prepLine(4);
+    if (streamTitle.length() < 32)
+    {
+        tft.println(streamTitle);
+    }
+    else
+    {
+        tft.println(streamTitle.substring(0, 32));
+    }
+   
+}
+
+void PrioTft::prepLine(int lineNumber)
+{
+    int line = 25 * (lineNumber-1); // We will start counting at 1
+    clearLine(lineNumber);
+    tft.setCursor(0, line);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+}
+void PrioTft::clearLine(int lineNumber)
+{
+    int line = 25 * (lineNumber-1);
+    tft.fillRect(0, line, tft.width() - pBar.width_set, tft.fontHeight(), TFT_BLACK);
 }
 
 void PrioTft::setLogo(const String &url)
