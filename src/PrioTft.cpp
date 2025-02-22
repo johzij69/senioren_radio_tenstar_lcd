@@ -16,12 +16,12 @@ void PrioTft::begin()
     pBar.begin(450, 0, 30, 320, TFT_LIGHTGREY, TFT_BLACK, max_volume);
     pBar.draw(last_volume);
     sLogo.begin();
-    sLogo.Show(35, 100, "https://img.prio-ict.nl/api/images/webradio-default.jpg");
+    sLogo.Show(kantline, 100, "https://img.prio-ict.nl/api/images/webradio-default.jpg");
     isInitialized = true; // Scherm is geïnitialiseerd
     cur_volume = last_volume;
     sTitle.begin();
     //  sTitle.setScrollerText("Dit is een lange tekst die zal scrollen, zodat je de hele tekst kunt lezen.");
-    sTitle.setScrollerText("Kort tekstje");
+    // sTitle.setScrollerText("Kort tekstje");
 }
 
 void PrioTft::loop()
@@ -32,8 +32,10 @@ void PrioTft::loop()
 
 void PrioTft::showLocalIp(const String &ip)
 {
-    prepLine(2);
-    tft.println("IP address: " + ip);
+    clearGreenLine(1);
+    tft.setCursor(0, 0, 4);
+    tft.setTextColor(TFT_WHITE,TFT_DARKGREEN);
+    tft.println("PRIO-WEBRADIO: " + ip);
 }
 
 void PrioTft::setVolume(int _cur_volume)
@@ -44,7 +46,7 @@ void PrioTft::setVolume(int _cur_volume)
 
 void PrioTft::setTitle(const String &title)
 {
-    prepLine(3);
+    prepLogoLine(3);
     if (title.length() < 32)
     {
         tft.println(title);
@@ -54,12 +56,12 @@ void PrioTft::setTitle(const String &title)
         tft.println(title.substring(0, 32));
     }
      // When chneg streamTitle, we need to wipe the streamTitle name
-     clearLine(4);
+     clearLogoLine(4);
 }
 
 void PrioTft::setStreamTitle(const String &streamTitle)
 {
-    prepLine(4);
+    prepLine(10);
     if (streamTitle.length() < 32)
     {
         tft.println(streamTitle);
@@ -75,16 +77,37 @@ void PrioTft::prepLine(int lineNumber)
 {
     int line = 25 * (lineNumber-1); // We will start counting at 1
     clearLine(lineNumber);
-    tft.setCursor(0, line);
+    tft.setCursor(kantline, line);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
 }
+
+void PrioTft::prepLogoLine(int lineNumber)
+{
+    int line = 25 * (lineNumber-1); // We will start counting at 1
+    clearLine(lineNumber);
+    tft.setCursor(200, line);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+}
+
+
 void PrioTft::clearLine(int lineNumber)
 {
     int line = 25 * (lineNumber-1);
-    tft.fillRect(0, line, tft.width() - pBar.width_set, tft.fontHeight(), TFT_BLACK);
+    tft.fillRect(kantline, line, tft.width() - (pBar.width_set + kantline ), tft.fontHeight(), TFT_BLACK);
+}
+
+void PrioTft::clearLogoLine(int lineNumber)
+{
+    int line = 25 * (lineNumber-1);
+    tft.fillRect(200, line, tft.width() - (pBar.width_set + 200), tft.fontHeight(), TFT_BLACK);
+}
+void PrioTft::clearGreenLine(int lineNumber)
+{
+    int line = 25 * (lineNumber-1);
+    tft.fillRect(0, line, tft.width() - pBar.width_set, tft.fontHeight(), TFT_DARKGREEN);
 }
 
 void PrioTft::setLogo(const String &url)
 {
-    sLogo.Show(35, 100, url);
+    sLogo.Show(35, 50, url);
 }

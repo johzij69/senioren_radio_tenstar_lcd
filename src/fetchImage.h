@@ -7,3 +7,4 @@
 
 bool getFileOld(String url, String filename);
 bool getFile(String url, String filename);
+void listDir(fs::FS &fs, const char *dirname, uint8_t levels);

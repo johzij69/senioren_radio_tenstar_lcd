@@ -49,11 +49,13 @@ void StreamLogo::Show(int16_t x, int16_t y, String url)
     {
         LoadImage(url, filename);
     }
+
+ //   LoadImage(url, filename);
     if (fileExists(filename))
     {
         if (filename.endsWith(".png"))
         {
-   //         drawPng(filename.c_str(), x, y);
+   //         drawPng(filename.c_str(), x, y); not supported yet
         }
         else
         {

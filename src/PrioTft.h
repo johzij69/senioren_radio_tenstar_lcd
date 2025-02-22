@@ -20,6 +20,7 @@ public:
     int max_volume = 30; // Maximale volume waarde
     int last_volume = 10; // Laatst ingestelde volume waarde
     int cur_volume = 0; // Huidige volume waarde
+    int kantline = 35 ;
     
     PrioTft();
     void begin(); // Initialiseer het scherm
@@ -30,7 +31,10 @@ public:
     void setLogo(const String &url);
     void setStreamTitle(const String &streamName);
     void clearLine(int lineNumber);
+    void clearLogoLine(int lineNumber);
     void prepLine(int lineNumber);
+    void prepLogoLine(int lineNumber);
+    void clearGreenLine(int lineNumber);
 };
 
 #endif // PRIOTFT_H
