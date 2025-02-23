@@ -4,4 +4,3 @@
 
 void CreateAndSendDisplayData(int streamIndex);
 void CreateAndSendAudioData(int streamIndex, int last_volume);
-void oldloop();

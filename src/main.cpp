@@ -2,28 +2,21 @@
 
 #include "main.h"
 #include <WiFiManager.h>
-// #include "Audio.h"
 #include "PrioRotary.h"
 #include <ezButton.h> // the library to use for SW pin
 #include "MyPreferences.h"
 #include "PrioWebserver.h"
 #include "UrlManager.h"
 #include "PrioTft.h"
-// #include <TFT_eSPI.h>
-// #include "PrioBar.h"
-// #include "StreamLogo.h"
-// #include "PrioScrollText.h"
+
 #include "Free_Fonts.h"
-// #include "TFTScroller.h"
-// #include "smallFont.h"  // bar
-// #include "middleFont.h" // bar
-// #include <SPIFFS.h> // Include the SPIFFS library
 // #include <PRIO_GT911.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "task_webServer.h"
 #include "Task_Audio.h"
 #include "Task_Display.h"
+
 
 #define WM_ERASE_NVS
 
@@ -66,11 +59,9 @@ ezButton next_button(NEXT_BUTTON_PIN);
 MyPreferences myPrefs("myRadio");
 UrlManager UrlManagerInstance(myPrefs);
 PrioWebServer webServer(UrlManagerInstance, 80);
-
-
-
 DisplayData displayData;
 AudioData audioData;
+
 
 // Queues
 QueueHandle_t logoQueue = xQueueCreate(3, sizeof(int));
@@ -91,48 +82,6 @@ TaskHandle_t scrollerTaskHandle;  // Task handle for the scroller task
 TaskHandle_t displayTaskHandle;   // Task handle for the TFT task
 TaskHandle_t audioTaskHandle;     // Task handle for the audio task
 TaskHandle_t webServerTaskHandle; // Task handle for the webserver task
-
-// void PrioTftTask(void *parameter)
-// {
-//     while (true)
-//     {
-//         if (rotaryInstance.current_value_changed)
-//         {
-//             Serial.println("Volume changed to: " + String(rotaryInstance.current_value));
-//             prioTft.setVolume(rotaryInstance.current_value);
-//             myPrefs.writeValue("volume", rotaryInstance.current_value);
-//             audio.setVolume(rotaryInstance.ReadRotaryValue());
-//         }
-
-//         int logoIndex;
-//         if (xQueueReceive(logoQueue, &logoIndex, 0) == pdTRUE)
-//         {
-//             const String logo = UrlManagerInstance.Streams[logoIndex].logo;
-//             prioTft.setLogo(logo);
-//         }
-//         vTaskDelay(10 / portTICK_PERIOD_MS); // Adjust the delay as needed (e.g., 10ms)
-//     }
-// }
-
-// void VolumeTask(void *parameter)
-// {
-//     while (true)
-//     {
-//         rotaryInstance.loop();
-//         if (rotaryInstance.current_value_changed)
-//         {
-//             Serial.println("Volume changed to: " + String(rotaryInstance.current_value));
-//             myPrefs.writeValue("volume", rotaryInstance.current_value);
-//             audio.setVolume(rotaryInstance.ReadRotaryValue());
-//             displayData.volume = rotaryInstance.current_value;
-//             audioData.volume = rotaryInstance.current_value;
-//             xQueueSend(AudioQueue, &rotaryInstance.current_value, portMAX_DELAY);
-//             xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
-//         }
-//         vTaskDelay(10 / portTICK_PERIOD_MS); // Adjust the delay as needed (e.g., 10ms)
-//     }
-// }
-
 
 
 // Functie om de core van een taak te printen
@@ -170,6 +119,8 @@ void setup()
         Serial.println(WiFi.dnsIP());
         Serial.print("Gateway address: ");
         Serial.println(WiFi.gatewayIP());
+
+
 
         /* start touch */
         // touchp.begin();
@@ -220,49 +171,13 @@ void setup()
 
         Serial.println("ESP32 TFT start...");
 
-        // Set default display data
+        // Set default display data and put it queue
         strncpy(displayData.ip, WiFi.localIP().toString().c_str(), sizeof(displayData.ip));
         displayData.volume = last_volume;
-        strncpy(displayData.title, "Prio-WebRadio", sizeof(displayData.title));
-        strncpy(displayData.logo, UrlManagerInstance.Streams[stream_index].logo.c_str(), sizeof(displayData.logo));
-        strncpy(displayData.bitrate, "unknown", sizeof(displayData.bitrate));
-        strncpy(displayData.station, "unknown", sizeof(displayData.station));
-        strncpy(displayData.icyurl, "unknown", sizeof(displayData.icyurl));
-        strncpy(displayData.lasthost, "unknown", sizeof(displayData.lasthost));
-        strncpy(displayData.streamtitle, "unknown", sizeof(displayData.streamtitle));
-
-        xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
+        CreateAndSendDisplayData(stream_index);
 
         Serial.println("Starting tasks");
-
-        // Create the FreeRTOS task for the VolumeTask
-        // xTaskCreatePinnedToCore(
-        //     AudioTask,            // Task function
-        //     "AudioTask",          // Name of the task
-        //     8192,                 // Stack size in words
-        //     NULL,                 // Task parameter
-        //     2,                    // Priority of the task
-        //     &audioTaskHandle, 1); // Task handle
-
-        // xTaskCreate(
-        //     _AudioTask,   // Task function
-        //     "_AudioTask", // Name of the task
-        //     8192,         // Stack size in words
-        //     NULL,         // Task parameter
-        //     1,            // Priority of the task
-        //     NULL);        // Task handle
-
-        // // Create the FreeRTOS task for the VolumeTask
-        // xTaskCreatePinnedToCore(
-        //     VolumeTask,          // Task function
-        //     "VolumeTask",        // Name of the task
-        //     4096,                // Stack size in words
-        //     NULL,                // Task parameter
-        //     5,                   // Priority of the task
-        //     &scrollerTaskHandle, // Task handle
-        //     0);
-
-        //   Create the FreeRTOS task for the VolumeTask
+        //   Create the FreeRTOS task for the Display
         xTaskCreate(
             DisplayTask,          // Task function
             "DisplayTask",        // Name of the task
@@ -281,7 +196,7 @@ void setup()
             1); // Task handle
           
 
-        // Create the FreeRTOS task for the VolumeTask
+        // Create the FreeRTOS task for the AudioTask
         xTaskCreatePinnedToCore(
             AudioTask,            // Task function
             "AudioTask",          // Name of the task
@@ -292,13 +207,9 @@ void setup()
      }
 }
 
-void oldloop() {
-    Serial.println("ESP draait...");
-    delay(1000);
-}
-
 void loop()
 {
+
 
     next_button.loop();
     next_button_state = next_button.getState();
@@ -337,6 +248,7 @@ void loop()
         myPrefs.writeValue("volume", rotaryInstance.current_value);
         displayData.volume = rotaryInstance.current_value;
         audioData.volume = rotaryInstance.current_value;
+        last_volume = rotaryInstance.current_value;
         xQueueSend(AudioQueue, &audioData, portMAX_DELAY);
         xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
         rotaryInstance.current_value_changed = false;
@@ -350,6 +262,11 @@ void CreateAndSendDisplayData(int streamIndex)
     strncpy(displayData.ip, WiFi.localIP().toString().c_str(), sizeof(displayData.ip));
     strncpy(displayData.title, UrlManagerInstance.Streams[streamIndex].name.c_str(), sizeof(displayData.title)); // -1 voor mogelijke \0
     strncpy(displayData.logo, UrlManagerInstance.Streams[streamIndex].logo.c_str(), sizeof(displayData.logo));
+    strncpy(displayData.bitrate, "Loading...", sizeof(displayData.bitrate));
+    strncpy(displayData.station, "Loading...", sizeof(displayData.station));
+    strncpy(displayData.icyurl, "Loading...", sizeof(displayData.icyurl));
+    strncpy(displayData.lasthost, "Loading...", sizeof(displayData.lasthost));
+    strncpy(displayData.streamtitle, "Loading...", sizeof(displayData.streamtitle));
     xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
 }
 
@@ -368,23 +285,17 @@ void CreateAndSendAudioData(int streamIndex, int last_volume)
 // }
 void audio_showstation(const char *info)
 {
-    Serial.print("station:        ");
-    Serial.println(info);
-    strncpy(displayData.station, info, sizeof(info)); // -1 voor mogelijke \0
+    strncpy(displayData.station, info, sizeof(displayData.station));
     xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
 }
 void audio_showstreamtitle(const char *info)
 {
-    strncpy(displayData.streamtitle, info, sizeof(displayData.streamtitle) - 1);
-    displayData.streamtitle[sizeof(displayData.streamtitle) - 1] = '\0'; // Zorg ervoor dat de string null-terminated is
+    strncpy(displayData.streamtitle, info, sizeof(displayData.streamtitle));
     xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
 }
 void audio_bitrate(const char *info)
 {
-    Serial.print("bitrate:        ");
-    Serial.println(info);
-    strncpy(displayData.bitrate, info, sizeof(displayData.bitrate)-1);
-    displayData.bitrate[sizeof(displayData.bitrate) - 1] = '\0'; // Zorg ervoor dat de string null-terminated is
+    strncpy(displayData.bitrate, info, sizeof(displayData.bitrate));
     xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
 }
 // void audio_icyurl(const char *info)

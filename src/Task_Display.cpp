@@ -1,5 +1,6 @@
 #include "Task_Display.h"
 #include "PrioTft.h"
+#include "PrioDateTime.h"
 
 void DisplayTask(void *parameter)
 {
@@ -12,6 +13,11 @@ void DisplayTask(void *parameter)
         Serial.println("TFT-initialisatie mislukt. Controleer hardwareverbindingen.");
     }
 
+    // Start de tijdservice
+    Serial.println("Starting time service");
+    PrioDateTime pDateTime;
+
+
     QueueHandle_t DisplayQueue = static_cast<QueueHandle_t>(parameter);
 
     // Variabelen om de vorige waarden op te slaan
@@ -20,6 +26,8 @@ void DisplayTask(void *parameter)
     String prevTitle = "";
     String prevLogo = "";
     String prevStreamTitle = "";
+    String prevTime="";
+
 
     while (true)
     {
@@ -53,10 +61,12 @@ void DisplayTask(void *parameter)
             }
             if (prevStreamTitle != _displayData.streamtitle)
             {
-                cleanStreamTitle(&_displayData); 
+                cleanStreamTitle(&_displayData);
                 prioTft.setStreamTitle(_displayData.streamtitle);
                 prevStreamTitle = _displayData.streamtitle;
             }
+
+            Serial.println("Wat als leeg. Display: streamtitle" + String(_displayData.streamtitle));
 
             if (prevVolume != _displayData.volume)
             {
@@ -69,6 +79,18 @@ void DisplayTask(void *parameter)
                 prevLogo = _displayData.logo;
             }
         }
+        
+        if(!pDateTime.timeSynced){
+            pDateTime.begin();
+        }
+        strncpy(_displayData.currenTime, pDateTime.getTime(), sizeof(_displayData.currenTime));
+        if(prevTime != _displayData.currenTime){
+            prioTft.showTime(_displayData.currenTime);
+            prevTime = _displayData.currenTime;
+        }
+        
+
+
         vTaskDelay(100 / portTICK_PERIOD_MS); // Adjust the delay as needed (e.g., 10ms)
     }
 }
@@ -84,13 +106,13 @@ We will remove this part from the streamtitle.
 */
 void cleanStreamTitle(struct DisplayData *data)
 {
-    
+
     Serial.println("Display: stream title" + String(data->streamtitle));
     Serial.println("Display: title" + String(data->title));
     // Controleer of streamtitle begint met title
     if (strncmp(data->streamtitle, data->title, strlen(data->title)) == 0)
     {
-       
+
         Serial.println("Kom i khier wel");
         // Als dat zo is, verschuif alle karakters naar links
         size_t title_len = strlen(data->title);

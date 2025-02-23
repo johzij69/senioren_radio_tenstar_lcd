@@ -35,6 +35,8 @@ public:
     void prepLine(int lineNumber);
     void prepLogoLine(int lineNumber);
     void clearGreenLine(int lineNumber);
+    void showTime(const String &time);
+    void drawParaLine(const String &text, int startY);
 };
 
 #endif // PRIOTFT_H
