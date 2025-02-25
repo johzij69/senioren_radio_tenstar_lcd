@@ -33,6 +33,8 @@ void PrioBar::draw(int value)
 
     barSpr.fillSprite(_bgcolor);
     barSpr.drawRect(0, 0, _width, _height, grays[8]);
+    //barSpr.drawRect(0, 0, _width, _height, blue);
+    
     barSpr.loadFont(middleFont);
     barSpr.setTextColor(blue, _bgcolor);
     barSpr.drawString(String(value), 15, 19, 4);

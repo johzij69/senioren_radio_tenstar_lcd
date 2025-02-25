@@ -29,6 +29,8 @@
 
 /* Next Button */
 #define NEXT_BUTTON_PIN 21 // ESP32 pin GPIO33, which connected to button
+#define PRESET1_BUTTON_PIN 47
+#define PRESET2_BUTTON_PIN 48
 
 #define VOLUME_STEPS 30
 #define MIN_VOLUME 0
@@ -47,20 +49,26 @@ int next_button_state = 0;
 
 const char *current_url;
 
-bool next_button_isreleased = true;
-bool streamSwitched = false;
+//bool next_button_isreleased = true;
+// bool streamSwitched = false;
 
 String default_url = "https://icecast.omroep.nl/radio1-bb-mp3:443";
 String last_url;
 
 PrioRotary rotaryInstance(ROT_CLK_PIN, ROT_DT_PIN);
-ezButton rotary_button(ROT_SW_PIN);
-ezButton next_button(NEXT_BUTTON_PIN);
 MyPreferences myPrefs("myRadio");
 UrlManager UrlManagerInstance(myPrefs);
 PrioWebServer webServer(UrlManagerInstance, 80);
 DisplayData displayData;
 AudioData audioData;
+
+
+/* Buttons */
+ezButton rotary_button(ROT_SW_PIN);
+ezButton next_button(NEXT_BUTTON_PIN);
+ezButton preset1_bt(PRESET1_BUTTON_PIN);
+ezButton preset2_bt(PRESET2_BUTTON_PIN);
+
 
 
 // Queues
@@ -165,9 +173,17 @@ void setup()
         rotaryInstance.current_value = last_volume;
 
         /* Next Button */
-        pinMode(NEXT_BUTTON_PIN, INPUT_PULLUP);
-        next_button.setDebounceTime(150);
+        //pinMode(NEXT_BUTTON_PIN, INPUT_PULLUP);
+        next_button.setDebounceTime(50);
         next_button_state = next_button.getState();
+
+        /* Preset 1 Button */
+        // pinMode(PRESET1_BUTTON_PIN, INPUT_PULLUP);
+        preset1_bt.setDebounceTime(50);
+
+        /* Preset 2 Button */
+        // pinMode(PRESET2_BUTTON_PIN, INPUT_PULLUP);
+        preset2_bt.setDebounceTime(50);
 
         Serial.println("ESP32 TFT start...");
 
@@ -210,15 +226,14 @@ void setup()
 void loop()
 {
 
-
+    preset1_bt.loop();
+    preset2_bt.loop();
     next_button.loop();
+
     next_button_state = next_button.getState();
-    if (next_button.isPressed() && next_button_isreleased == true)
+//    if (next_button.isPressed() && next_button_isreleased == true)
+    if (next_button.isPressed())
     {
-        Serial.println("The button is pressed");
-        Serial.println(displayData.logo);
-        Serial.println(displayData.ip);
-        next_button_isreleased = false;
 
         if (stream_index == UrlManagerInstance.streamCount - 1)
         {
@@ -233,12 +248,28 @@ void loop()
         CreateAndSendDisplayData(stream_index);
     }
 
-    if (next_button.isReleased())
+    // if (next_button.isReleased())
+    // {
+    //     /* we only will listen to button input if it was released */
+    //     next_button_isreleased = true;
+    //     Serial.println("The button is released");
+    //     Serial.println(current_url);
+    // }
+
+
+
+    if(preset1_bt.isPressed())
     {
-        /* we only will listen to button input if it was released */
-        next_button_isreleased = true;
-        Serial.println("The button is released");
-        Serial.println(current_url);
+        stream_index = 0;
+        CreateAndSendAudioData(stream_index, rotaryInstance.current_value);
+        CreateAndSendDisplayData(stream_index);
+    }
+
+    if(preset2_bt.isPressed())
+    {
+        stream_index = 1;
+        CreateAndSendAudioData(stream_index, rotaryInstance.current_value);
+        CreateAndSendDisplayData(stream_index);
     }
 
     rotaryInstance.loop();

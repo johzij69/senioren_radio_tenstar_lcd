@@ -2,6 +2,8 @@
 #ifndef PRIOTFT_H
 #define PRIOTFT_H
 
+#define TFT_GREYBLUE 0x3DB9
+
 #include <TFT_eSPI.h> // Zorg ervoor dat je TFT_eSPI of een andere bibliotheek gebruikt
 #include "PrioBar.h"
 #include "TFTScroller.h"
@@ -20,7 +22,7 @@ public:
     int max_volume = 30; // Maximale volume waarde
     int last_volume = 10; // Laatst ingestelde volume waarde
     int cur_volume = 0; // Huidige volume waarde
-    int kantline = 35 ;
+    int kantline = 25 ;
     
     PrioTft();
     void begin(); // Initialiseer het scherm
