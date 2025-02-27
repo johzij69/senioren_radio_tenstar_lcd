@@ -17,7 +17,6 @@
 #include "Task_Audio.h"
 #include "Task_Display.h"
 
-
 #define WM_ERASE_NVS
 
 // Rotary Enocder used for Volume control
@@ -29,8 +28,16 @@
 
 /* Next Button */
 #define NEXT_BUTTON_PIN 21 // ESP32 pin GPIO33, which connected to button
-#define PRESET1_BUTTON_PIN 47
-#define PRESET2_BUTTON_PIN 48
+#define PRESET1_BUTTON_PIN 1
+#define PRESET2_BUTTON_PIN 2
+#define PRESET3_BUTTON_PIN 42
+#define PRESET4_BUTTON_PIN 41
+#define PRESET5_BUTTON_PIN 40
+#define PRESET6_BUTTON_PIN 39
+#define PRESET7_BUTTON_PIN 38
+#define PRESET8_BUTTON_PIN 45
+#define PRESET9_BUTTON_PIN 48
+#define PRESET10_BUTTON_PIN 47
 
 #define VOLUME_STEPS 30
 #define MIN_VOLUME 0
@@ -49,8 +56,8 @@ int next_button_state = 0;
 
 const char *current_url;
 
-//bool next_button_isreleased = true;
-// bool streamSwitched = false;
+// bool next_button_isreleased = true;
+//  bool streamSwitched = false;
 
 String default_url = "https://icecast.omroep.nl/radio1-bb-mp3:443";
 String last_url;
@@ -62,14 +69,19 @@ PrioWebServer webServer(UrlManagerInstance, 80);
 DisplayData displayData;
 AudioData audioData;
 
-
 /* Buttons */
 ezButton rotary_button(ROT_SW_PIN);
 ezButton next_button(NEXT_BUTTON_PIN);
 ezButton preset1_bt(PRESET1_BUTTON_PIN);
 ezButton preset2_bt(PRESET2_BUTTON_PIN);
-
-
+ezButton preset3_bt(PRESET3_BUTTON_PIN);
+ezButton preset4_bt(PRESET4_BUTTON_PIN);
+ezButton preset5_bt(PRESET5_BUTTON_PIN);
+ezButton preset6_bt(PRESET6_BUTTON_PIN);
+ezButton preset7_bt(PRESET7_BUTTON_PIN);
+ezButton preset8_bt(PRESET8_BUTTON_PIN);
+ezButton preset9_bt(PRESET9_BUTTON_PIN);
+ezButton preset10_bt(PRESET10_BUTTON_PIN);
 
 // Queues
 QueueHandle_t logoQueue = xQueueCreate(3, sizeof(int));
@@ -90,7 +102,6 @@ TaskHandle_t scrollerTaskHandle;  // Task handle for the scroller task
 TaskHandle_t displayTaskHandle;   // Task handle for the TFT task
 TaskHandle_t audioTaskHandle;     // Task handle for the audio task
 TaskHandle_t webServerTaskHandle; // Task handle for the webserver task
-
 
 // Functie om de core van een taak te printen
 void printTaskCore(TaskHandle_t taskHandle, const char *taskName)
@@ -127,8 +138,6 @@ void setup()
         Serial.println(WiFi.dnsIP());
         Serial.print("Gateway address: ");
         Serial.println(WiFi.gatewayIP());
-
-
 
         /* start touch */
         // touchp.begin();
@@ -173,7 +182,7 @@ void setup()
         rotaryInstance.current_value = last_volume;
 
         /* Next Button */
-        //pinMode(NEXT_BUTTON_PIN, INPUT_PULLUP);
+        // pinMode(NEXT_BUTTON_PIN, INPUT_PULLUP);
         next_button.setDebounceTime(50);
         next_button_state = next_button.getState();
 
@@ -184,6 +193,14 @@ void setup()
         /* Preset 2 Button */
         // pinMode(PRESET2_BUTTON_PIN, INPUT_PULLUP);
         preset2_bt.setDebounceTime(50);
+        preset3_bt.setDebounceTime(50);
+        preset4_bt.setDebounceTime(50);
+        preset5_bt.setDebounceTime(50);
+        preset6_bt.setDebounceTime(50);
+        preset7_bt.setDebounceTime(50);
+        preset8_bt.setDebounceTime(50);
+        preset9_bt.setDebounceTime(50);
+        preset10_bt.setDebounceTime(50);
 
         Serial.println("ESP32 TFT start...");
 
@@ -210,7 +227,6 @@ void setup()
             5,                  // Priority of the task
             &webServerTaskHandle,
             1); // Task handle
-          
 
         // Create the FreeRTOS task for the AudioTask
         xTaskCreatePinnedToCore(
@@ -220,7 +236,7 @@ void setup()
             (void *)AudioQueue,   // Task parameter
             1,                    // Priority of the task
             &audioTaskHandle, 1); // Task handle
-     }
+    }
 }
 
 void loop()
@@ -228,10 +244,18 @@ void loop()
 
     preset1_bt.loop();
     preset2_bt.loop();
+    preset3_bt.loop();
+    preset4_bt.loop();
+    preset5_bt.loop();
+    preset6_bt.loop();
+    preset7_bt.loop();
+    preset8_bt.loop();
+    preset9_bt.loop();
+    preset10_bt.loop();
     next_button.loop();
 
     next_button_state = next_button.getState();
-//    if (next_button.isPressed() && next_button_isreleased == true)
+    //    if (next_button.isPressed() && next_button_isreleased == true)
     if (next_button.isPressed())
     {
 
@@ -248,30 +272,18 @@ void loop()
         CreateAndSendDisplayData(stream_index);
     }
 
-    // if (next_button.isReleased())
-    // {
-    //     /* we only will listen to button input if it was released */
-    //     next_button_isreleased = true;
-    //     Serial.println("The button is released");
-    //     Serial.println(current_url);
-    // }
 
-
-
-    if(preset1_bt.isPressed())
-    {
-        stream_index = 0;
-        CreateAndSendAudioData(stream_index, rotaryInstance.current_value);
-        CreateAndSendDisplayData(stream_index);
-    }
-
-    if(preset2_bt.isPressed())
-    {
-        stream_index = 1;
-        CreateAndSendAudioData(stream_index, rotaryInstance.current_value);
-        CreateAndSendDisplayData(stream_index);
-    }
-
+    if (preset1_bt.isPressed())  usePreset(0);
+    if (preset2_bt.isPressed())  usePreset(1);
+    if (preset3_bt.isPressed())  usePreset(2);
+    if (preset4_bt.isPressed())  usePreset(3);
+    if (preset5_bt.isPressed())  usePreset(4);
+    if (preset6_bt.isPressed())  usePreset(5);
+    if (preset7_bt.isPressed())  usePreset(6);
+    if (preset8_bt.isPressed())  usePreset(7);
+    if (preset9_bt.isPressed())  usePreset(8);
+    if (preset10_bt.isPressed()) usePreset(9);
+  
     rotaryInstance.loop();
     if (rotaryInstance.current_value_changed)
     {
@@ -287,6 +299,12 @@ void loop()
     vTaskDelay(1 / portTICK_PERIOD_MS); // Adjust the delay as needed (e.g., 10ms)
 } // end loop
 
+void usePreset(int preset)
+{
+    stream_index = preset;
+    CreateAndSendAudioData(stream_index, rotaryInstance.current_value);
+    CreateAndSendDisplayData(stream_index);
+}
 void CreateAndSendDisplayData(int streamIndex)
 {
     displayData.volume = last_volume;

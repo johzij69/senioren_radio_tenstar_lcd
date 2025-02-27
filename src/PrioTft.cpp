@@ -84,13 +84,13 @@ void PrioTft::setTitle(const String &title)
 void PrioTft::setStreamTitle(const String &streamTitle)
 {
     prepLine(12);
-    if (streamTitle.length() < 34)
+    if (streamTitle.length() < 32)
     {
         tft.println(streamTitle);
     }
     else
     {
-        tft.println(streamTitle.substring(0, 34));
+        tft.println(streamTitle.substring(0, 32));
     }
 }
 
