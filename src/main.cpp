@@ -8,40 +8,13 @@
 #include "PrioWebserver.h"
 #include "UrlManager.h"
 #include "PrioTft.h"
-
 #include "Free_Fonts.h"
-// #include <PRIO_GT911.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "task_webServer.h"
 #include "Task_Audio.h"
 #include "Task_Display.h"
-
-#define WM_ERASE_NVS
-
-// Rotary Enocder used for Volume control
-#define ROT_CLK_PIN 17  // ESP32 pin GPIO17 connected to the rotary encoder's CLK pin
-#define ROT_DT_PIN 16   // ESP32 pin GPIO16 connected to the rotary encoder's DT pin
-#define ROT_SW_PIN 15   // ESP32 pin GPIO15 connected to the rotary encoder's SW pin
-#define DIRECTION_CW 0  // clockwise direction
-#define DIRECTION_CCW 1 // counter-clockwise direction
-
-/* Next Button */
-#define NEXT_BUTTON_PIN 21 // ESP32 pin GPIO33, which connected to button
-#define PRESET1_BUTTON_PIN 1
-#define PRESET2_BUTTON_PIN 2
-#define PRESET3_BUTTON_PIN 42
-#define PRESET4_BUTTON_PIN 41
-#define PRESET5_BUTTON_PIN 40
-#define PRESET6_BUTTON_PIN 39
-#define PRESET7_BUTTON_PIN 38
-#define PRESET8_BUTTON_PIN 45
-#define PRESET9_BUTTON_PIN 48
-#define PRESET10_BUTTON_PIN 47
-
-#define VOLUME_STEPS 30
-#define MIN_VOLUME 0
-#define DEF_VOLUME 15
+// #include <PRIO_GT911.h>
 
 // /* touch */
 // #define TOUCH_SDA 48
@@ -56,9 +29,6 @@ int next_button_state = 0;
 
 const char *current_url;
 
-// bool next_button_isreleased = true;
-//  bool streamSwitched = false;
-
 String default_url = "https://icecast.omroep.nl/radio1-bb-mp3:443";
 String last_url;
 
@@ -71,17 +41,17 @@ AudioData audioData;
 
 /* Buttons */
 ezButton rotary_button(ROT_SW_PIN);
-ezButton next_button(NEXT_BUTTON_PIN);
-ezButton preset1_bt(PRESET1_BUTTON_PIN);
-ezButton preset2_bt(PRESET2_BUTTON_PIN);
-ezButton preset3_bt(PRESET3_BUTTON_PIN);
-ezButton preset4_bt(PRESET4_BUTTON_PIN);
-ezButton preset5_bt(PRESET5_BUTTON_PIN);
-ezButton preset6_bt(PRESET6_BUTTON_PIN);
-ezButton preset7_bt(PRESET7_BUTTON_PIN);
-ezButton preset8_bt(PRESET8_BUTTON_PIN);
-ezButton preset9_bt(PRESET9_BUTTON_PIN);
-ezButton preset10_bt(PRESET10_BUTTON_PIN);
+// ezButton next_button(NEXT_BUTTON_PIN);
+
+// Array om de status van de buttons bij te houden
+volatile bool buttonPressed[10] = {false};
+volatile bool min_one_preset_ispressed = false;
+volatile bool next_button_ispressed = false;
+// Array om de laatste tijd van button-drukken bij te houden
+volatile unsigned long next_lastDebounceTime = 0;
+
+// Debounce-tijd in milliseconden
+const unsigned long debounceDelay = 100;
 
 // Queues
 QueueHandle_t logoQueue = xQueueCreate(3, sizeof(int));
@@ -96,6 +66,33 @@ QueueHandle_t AudioQueue = xQueueCreate(3, sizeof(AudioData));
 void IRAM_ATTR checkVolume()
 {
     rotaryInstance.rotaryEncoder = true;
+}
+
+// Interrupt Service Routine (ISR)
+void IRAM_ATTR buttonISR()
+{
+
+    min_one_preset_ispressed = true;
+    // Lees de status van alle buttons en zet de juiste vlag
+    for (int i = 0; i < 10; i++)
+    {
+        if (digitalRead(buttonPins[i]) == LOW)
+        {
+            buttonPressed[i] = true;
+            break;
+        }
+    }
+}
+
+void IRAM_ATTR next_buttonISR()
+{
+
+    unsigned long currentTime = millis();
+    if (currentTime - next_lastDebounceTime >= debounceDelay)
+    {
+        next_button_ispressed = true;
+        next_lastDebounceTime = currentTime; // Update de laatste tijd
+    }
 }
 
 TaskHandle_t scrollerTaskHandle;  // Task handle for the scroller task
@@ -183,24 +180,20 @@ void setup()
 
         /* Next Button */
         // pinMode(NEXT_BUTTON_PIN, INPUT_PULLUP);
-        next_button.setDebounceTime(50);
-        next_button_state = next_button.getState();
+        // next_button.setDebounceTime(50);
+        // next_button_state = next_button.getState();
 
-        /* Preset 1 Button */
-        // pinMode(PRESET1_BUTTON_PIN, INPUT_PULLUP);
-        preset1_bt.setDebounceTime(50);
+        pinMode(NEXT_BUTTON_PIN, INPUT_PULLUP);
+        // Voeg een interrupt toe aan pin voor next_button
+        attachInterrupt(digitalPinToInterrupt(NEXT_BUTTON_PIN), next_buttonISR, FALLING);
 
-        /* Preset 2 Button */
-        // pinMode(PRESET2_BUTTON_PIN, INPUT_PULLUP);
-        preset2_bt.setDebounceTime(50);
-        preset3_bt.setDebounceTime(50);
-        preset4_bt.setDebounceTime(50);
-        preset5_bt.setDebounceTime(50);
-        preset6_bt.setDebounceTime(50);
-        preset7_bt.setDebounceTime(50);
-        preset8_bt.setDebounceTime(50);
-        preset9_bt.setDebounceTime(50);
-        preset10_bt.setDebounceTime(50);
+        // Configureer de GPIO pinnen als input met pull-up weerstand
+        for (int i = 0; i < 10; i++)
+        {
+            pinMode(buttonPins[i], INPUT_PULLUP);
+            // Voeg een interrupt toe aan elke pin
+            attachInterrupt(digitalPinToInterrupt(buttonPins[i]), buttonISR, FALLING);
+        }
 
         Serial.println("ESP32 TFT start...");
 
@@ -242,23 +235,34 @@ void setup()
 void loop()
 {
 
-    preset1_bt.loop();
-    preset2_bt.loop();
-    preset3_bt.loop();
-    preset4_bt.loop();
-    preset5_bt.loop();
-    preset6_bt.loop();
-    preset7_bt.loop();
-    preset8_bt.loop();
-    preset9_bt.loop();
-    preset10_bt.loop();
-    next_button.loop();
-
-    next_button_state = next_button.getState();
-    //    if (next_button.isPressed() && next_button_isreleased == true)
-    if (next_button.isPressed())
+    // next_button.loop();
+    // Controleer of een button is ingedrukt
+    if (min_one_preset_ispressed)
     {
-
+        noInterrupts(); // Schakel interrupts uit, zodat de vlaggen niet worden overschreven
+        min_one_preset_ispressed = false;
+        interrupts(); // Schakel interrupts weer in
+        // Loop door alle buttons
+        for (int i = 0; i < 10; i++)
+        {
+            if (buttonPressed[i])
+            {
+                // Reset de vlag
+                buttonPressed[i] = false;
+                // Voer de gewenste actie uit
+                usePreset(i);
+                break;
+            }
+        }
+    }
+    // next_button_state = next_button.getState();
+    // if (next_button.isPressed())
+    if (next_button_ispressed)
+    {
+        noInterrupts();
+        next_button_ispressed = false;
+        interrupts();
+        Serial.println("Next button pressed");
         if (stream_index == UrlManagerInstance.streamCount - 1)
         {
             stream_index = 0;
@@ -271,19 +275,21 @@ void loop()
         CreateAndSendAudioData(stream_index, rotaryInstance.current_value);
         CreateAndSendDisplayData(stream_index);
     }
+    // {
 
+    //     if (stream_index == UrlManagerInstance.streamCount - 1)
+    //     {
+    //         stream_index = 0;
+    //     }
+    //     else
+    //     {
+    //         stream_index++;
+    //     }
+    //     Serial.println("Switching stream! ");
+    //     CreateAndSendAudioData(stream_index, rotaryInstance.current_value);
+    //     CreateAndSendDisplayData(stream_index);
+    // }
 
-    if (preset1_bt.isPressed())  usePreset(0);
-    if (preset2_bt.isPressed())  usePreset(1);
-    if (preset3_bt.isPressed())  usePreset(2);
-    if (preset4_bt.isPressed())  usePreset(3);
-    if (preset5_bt.isPressed())  usePreset(4);
-    if (preset6_bt.isPressed())  usePreset(5);
-    if (preset7_bt.isPressed())  usePreset(6);
-    if (preset8_bt.isPressed())  usePreset(7);
-    if (preset9_bt.isPressed())  usePreset(8);
-    if (preset10_bt.isPressed()) usePreset(9);
-  
     rotaryInstance.loop();
     if (rotaryInstance.current_value_changed)
     {
@@ -321,6 +327,7 @@ void CreateAndSendDisplayData(int streamIndex)
 
 void CreateAndSendAudioData(int streamIndex, int last_volume)
 {
+    Serial.println("CreateAndSendAudioData");
     audioData.volume = last_volume;
     strncpy(audioData.url, UrlManagerInstance.Streams[streamIndex].url.c_str(), sizeof(audioData.url));
     xQueueSend(AudioQueue, &audioData, portMAX_DELAY);
