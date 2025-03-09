@@ -2,11 +2,22 @@
 #include <WiFi.h>
 #include <time.h>
 
-PrioDateTime::PrioDateTime() {
+PrioDateTime::PrioDateTime(int clkPin, int datPin, int rstPin)
+    : _threeWire(datPin, clkPin, rstPin), _rtc(_threeWire), // Initialiseer ThreeWire en RtcDS1302
+      _clkPin(clkPin), _datPin(datPin), _rstPin(rstPin) {
     timeSynced = false;  // Standaard niet gesynchroniseerd
 }
 
 void PrioDateTime::begin() {
+    // Initialiseer de RTC
+    _rtc.Begin();
+
+    // Controleer of de RTC werkt
+    if (!_rtc.IsDateTimeValid()) {
+        Serial.println("⛔ RTC heeft geen geldige tijd!");
+    }
+
+    // Synchroniseer de tijd
     syncTime();
 }
 
@@ -31,55 +42,38 @@ void PrioDateTime::syncTime() {
     } else {
         Serial.println("\n✅ Tijd gesynchroniseerd!");
         timeSynced = true;
+
+        // Werk de RTC bij met de gesynchroniseerde tijd
+        struct tm timeinfo;
+        if (getLocalTime(&timeinfo)) {
+            RtcDateTime compiledDateTime(
+                timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+                timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec
+            );
+            _rtc.SetDateTime(compiledDateTime);
+            Serial.println("RTC bijgewerkt met NTP-tijd.");
+        }
     }
 }
 
 char* PrioDateTime::getTime() {
-    if (!timeSynced) {
-        strcpy(buffer, "00:00");
-        return buffer;
-    }
-    
-    struct tm timeinfo;
-    if (!getLocalTime(&timeinfo)) {
-        strcpy(buffer, "00:00");
-        return buffer;
-    }
-    
-    snprintf(buffer, sizeof(buffer), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+    RtcDateTime now = _rtc.GetDateTime(); // Lees de tijd van de RTC
+
+    snprintf(buffer, sizeof(buffer), "%02d:%02d", now.Hour(), now.Minute());
     return buffer;
 }
 
 char* PrioDateTime::getDate() {
-    if (!timeSynced) {
-        strcpy(buffer, "00-00-0000");
-        return buffer;
-    }
-    
-    struct tm timeinfo;
-    if (!getLocalTime(&timeinfo)) {
-        strcpy(buffer, "00-00-0000");
-        return buffer;
-    }
-    
-    snprintf(buffer, sizeof(buffer), "%02d-%02d-%04d", timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900);
+    RtcDateTime now = _rtc.GetDateTime(); // Lees de datum van de RTC
+
+    snprintf(buffer, sizeof(buffer), "%02d-%02d-%04d", now.Day(), now.Month(), now.Year());
     return buffer;
 }
 
 char* PrioDateTime::getDateTime() {
-    if (!timeSynced) {
-        strcpy(buffer, "00-00-0000 00:00");
-        return buffer;
-    }
-    
-    struct tm timeinfo;
-    if (!getLocalTime(&timeinfo)) {
-        strcpy(buffer, "00-00-0000 00:00");
-        return buffer;
-    }
-    
+    RtcDateTime now = _rtc.GetDateTime(); // Lees datum en tijd van de RTC
+
     snprintf(buffer, sizeof(buffer), "%02d-%02d-%04d %02d:%02d",
-             timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900,
-             timeinfo.tm_hour, timeinfo.tm_min);
+             now.Day(), now.Month(), now.Year(), now.Hour(), now.Minute());
     return buffer;
 }
