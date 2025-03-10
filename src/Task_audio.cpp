@@ -1,5 +1,6 @@
 #include "Task_Audio.h"
 #include "Audio.h"
+#include "task_shared.h"
 
 // DAC I2S
 #define I2S_DOUT 7
@@ -21,6 +22,14 @@ void AudioTask(void *parameter)
     audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
     audio.setVolume(DEF_VOLUME);
     audio.setVolumeSteps(VOLUME_STEPS);
+
+    // Wacht totdat zowel de DisplayTask als de webServerTask zijn gestart
+    xEventGroupWaitBits(
+        taskEvents,                                            // Event group
+        DISPLAY_TASK_STARTED_BIT | WEBSERVER_TASK_STARTED_BIT, // Bits om op te wachten
+        pdTRUE,                                                // Clear de bits na het wachten
+        pdTRUE,                                                // Wacht op ALLE bits
+        portMAX_DELAY);                                        // Wacht oneindig lang
 
     while (true)
     {

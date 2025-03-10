@@ -11,9 +11,11 @@
 #include "Free_Fonts.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include <freertos/event_groups.h>
 #include "task_webServer.h"
 #include "Task_Audio.h"
 #include "Task_Display.h"
+#include "Task_Shared.h"
 // #include <PRIO_GT911.h>
 
 // /* touch */
@@ -21,6 +23,8 @@
 // #define TOUCH_SCL 47
 // #define TOUCH_WIDTH 480
 // #define TOUCH_HEIGHT 320
+
+
 
 int max_volume = 30; // set default max volume
 int last_volume = 10;
@@ -59,6 +63,9 @@ QueueHandle_t streamQueue = xQueueCreate(3, sizeof(int));
 QueueHandle_t volumeQueue = xQueueCreate(3, sizeof(int));
 QueueHandle_t DisplayQueue = xQueueCreate(3, sizeof(DisplayData));
 QueueHandle_t AudioQueue = xQueueCreate(3, sizeof(AudioData));
+
+// Maak een event group
+EventGroupHandle_t taskEvents; // Event group handle for starting order of the tasks
 
 // PRIO_GT911 touchp = PRIO_GT911(TOUCH_SDA, TOUCH_SCL, TOUCH_WIDTH, TOUCH_HEIGHT);
 
@@ -201,6 +208,9 @@ void setup()
         strncpy(displayData.ip, WiFi.localIP().toString().c_str(), sizeof(displayData.ip));
         displayData.volume = last_volume;
         CreateAndSendDisplayData(stream_index);
+
+        // Initialiseer het event group
+        taskEvents = xEventGroupCreate();
 
         Serial.println("Starting tasks");
         //   Create the FreeRTOS task for the Display

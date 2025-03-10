@@ -2,6 +2,8 @@
 #define TaskDisplay_H
 #include <Arduino.h>
 
+
+
 void DisplayTask(void *parameter);
 void spl(String mes);
 void cleanStreamTitle(struct DisplayData * data);
@@ -19,6 +21,8 @@ struct DisplayData {
     char currenTime[5];
 
 };
+
+
 
 
 

@@ -1,6 +1,7 @@
 #include "Arduino.h"
 #include <SPI.h>
 #include <TFT_eSPI.h>
+#include "PrioDateTime.h"
 
 #define WM_ERASE_NVS
 
@@ -8,6 +9,7 @@
 #define ROT_CLK_PIN 17  // ESP32 pin GPIO17 connected to the rotary encoder's CLK pin
 #define ROT_DT_PIN 16   // ESP32 pin GPIO16 connected to the rotary encoder's DT pin
 #define ROT_SW_PIN 15   // ESP32 pin GPIO15 connected to the rotary encoder's SW pin
+
 #define DIRECTION_CW 0  // clockwise direction
 #define DIRECTION_CCW 1 // counter-clockwise direction
 
@@ -29,6 +31,8 @@
 #define PRESET8_BUTTON_PIN 45
 #define PRESET9_BUTTON_PIN 48
 #define PRESET10_BUTTON_PIN 47
+
+
 
 
 

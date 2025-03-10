@@ -12,19 +12,21 @@ void PrioDateTime::begin() {
     // Initialiseer de RTC
     _rtc.Begin();
 
-    // Controleer of de RTC werkt
+    // Controleer of de RTC werkt en een geldige tijd heeft
     if (!_rtc.IsDateTimeValid()) {
-        Serial.println("⛔ RTC heeft geen geldige tijd!");
+        Serial.println("⛔ RTC heeft geen geldige tijd! Synchroniseren met NTP...");
+        syncTime(); // Synchroniseer de tijd met NTP als de RTC-tijd ongeldig is
+    } else {
+        Serial.println("✅ RTC heeft een geldige tijd.");
+        timeSynced = true;
     }
-
-    // Synchroniseer de tijd
-    syncTime();
 }
 
 void PrioDateTime::syncTime() {
     Serial.println("Synchroniseren met NTP-server...");
 
-    configTime(3600, 3600, "pool.ntp.org", "time.nist.gov"); // UTC+1 (wintertijd), +2 in zomer
+    // Stel de tijdzone in op GMT+1 (zonder zomertijd)
+    configTime(3600, 0, "pool.ntp.org", "time.nist.gov");
 
     // Wachten op tijdsynchronisatie (max 20 sec)
     int timeout = 20;

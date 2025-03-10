@@ -8,7 +8,7 @@
 
 class PrioDateTime {
 public:
-    PrioDateTime(int clkPin = 14, int datPin = 27, int rstPin = 26); // Constructor met standaardpinnen
+    PrioDateTime(int clkPin = 5, int datPin = 6, int rstPin = 7); // Veilige pinnen
     void begin();
     char* getTime();        // HH:MM teruggeven
     char* getDate();        // DD-MM-YYYY teruggeven
