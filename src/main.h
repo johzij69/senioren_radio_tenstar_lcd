@@ -2,6 +2,9 @@
 #include <SPI.h>
 #include <TFT_eSPI.h>
 #include "PrioDateTime.h"
+#include <Wire.h>
+
+
 
 #define WM_ERASE_NVS
 
@@ -35,9 +38,21 @@
 
 
 
+// PCF8575 I2C-adres
+#define PCF8575_ADDRESS 0x20
+
+// Interrupt pin voor PCF8575
+#define PCF8575_INT_PIN 21
+
+// Declareer functies
+// void IRAM_ATTR buttonISR();
+// void IRAM_ATTR preset_buttonISR();
+void readPresetButtons();
+
 
 void CreateAndSendDisplayData(int streamIndex);
 void CreateAndSendAudioData(int streamIndex, int last_volume);
+void printBinary(int v, int num_places);
 
 
 // Definieer de GPIO pinnen voor de buttons

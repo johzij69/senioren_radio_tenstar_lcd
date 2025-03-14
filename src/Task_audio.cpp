@@ -56,7 +56,7 @@ void AudioTask(void *parameter)
                 //                myPrefs.putUInt("stream_index", streamIndex);
             }
         }
-        Serial.println("playing audio");
+ //       Serial.println("playing audio");
         audio.loop();
         vTaskDelay(10);
     }

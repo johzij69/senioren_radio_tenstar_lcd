@@ -24,7 +24,10 @@
 // #define TOUCH_WIDTH 480
 // #define TOUCH_HEIGHT 320
 
+#include "PCF8575.h"
 
+// Set i2c address
+PCF8575 pcf8575(0x20);
 
 int max_volume = 30; // set default max volume
 int last_volume = 10;
@@ -51,6 +54,7 @@ ezButton rotary_button(ROT_SW_PIN);
 volatile bool buttonPressed[10] = {false};
 volatile bool min_one_preset_ispressed = false;
 volatile bool next_button_ispressed = false;
+volatile bool preset_buttonPressed = false;
 // Array om de laatste tijd van button-drukken bij te houden
 volatile unsigned long next_lastDebounceTime = 0;
 
@@ -91,15 +95,21 @@ void IRAM_ATTR buttonISR()
     }
 }
 
+void IRAM_ATTR preset_buttonISR()
+{
+
+    preset_buttonPressed = true;
+}
+
 void IRAM_ATTR next_buttonISR()
 {
 
-    unsigned long currentTime = millis();
-    if (currentTime - next_lastDebounceTime >= debounceDelay)
-    {
-        next_button_ispressed = true;
-        next_lastDebounceTime = currentTime; // Update de laatste tijd
-    }
+    // unsigned long currentTime = millis();
+    // if (currentTime - next_lastDebounceTime >= debounceDelay)
+    // {
+    //     next_button_ispressed = true;
+    //     next_lastDebounceTime = currentTime; // Update de laatste tijd
+    // }
 }
 
 TaskHandle_t scrollerTaskHandle;  // Task handle for the scroller task
@@ -190,9 +200,27 @@ void setup()
         // next_button.setDebounceTime(50);
         // next_button_state = next_button.getState();
 
-        pinMode(NEXT_BUTTON_PIN, INPUT_PULLUP);
-        // Voeg een interrupt toe aan pin voor next_button
-        attachInterrupt(digitalPinToInterrupt(NEXT_BUTTON_PIN), next_buttonISR, FALLING);
+        // pinMode(NEXT_BUTTON_PIN, INPUT_PULLUP);
+        // // Voeg een interrupt toe aan pin voor next_button
+        // attachInterrupt(digitalPinToInterrupt(NEXT_BUTTON_PIN), next_buttonISR, FALLING);
+
+        // I2C initialiseren
+        Wire.begin();
+
+        // Interrupt pin configureren
+        pinMode(PCF8575_INT_PIN, INPUT_PULLUP);
+        attachInterrupt(digitalPinToInterrupt(PCF8575_INT_PIN), preset_buttonISR, FALLING);
+
+        // // PCF8575 configureren: alle pinnen als input
+        // Wire.beginTransmission(PCF8575_ADDRESS);
+        // Wire.write(0xFF); // Alle pinnen als input (1 = input)
+        // Wire.write(0xFF); // Tweede byte voor PCF8575 (16 pinnen)
+        // Wire.endTransmission();
+
+        pcf8575.pinMode(P0, INPUT);
+
+      
+        pcf8575.begin();
 
         // Configureer de GPIO pinnen als input met pull-up weerstand
         for (int i = 0; i < 10; i++)
@@ -242,11 +270,30 @@ void setup()
     }
 }
 
+uint8_t button_counter = 0;
+
 void loop()
 {
 
     // next_button.loop();
     // Controleer of een button is ingedrukt
+
+    uint8_t val = pcf8575.digitalRead(P0);
+    if (val == HIGH)
+    {
+
+      Serial.println("P0 is HIGH");
+  
+    }
+
+    if (preset_buttonPressed)
+    {
+        // Lees de buttons
+        readPresetButtons();
+        // Reset de vlag
+        preset_buttonPressed = false;
+  
+    }
     if (min_one_preset_ispressed)
     {
         noInterrupts(); // Schakel interrupts uit, zodat de vlaggen niet worden overschreven
@@ -267,26 +314,12 @@ void loop()
     }
     // next_button_state = next_button.getState();
     // if (next_button.isPressed())
-    if (next_button_ispressed)
-    {
-        noInterrupts();
-        next_button_ispressed = false;
-        interrupts();
-        Serial.println("Next button pressed");
-        if (stream_index == UrlManagerInstance.streamCount - 1)
-        {
-            stream_index = 0;
-        }
-        else
-        {
-            stream_index++;
-        }
-        Serial.println("Switching stream! ");
-        CreateAndSendAudioData(stream_index, rotaryInstance.current_value);
-        CreateAndSendDisplayData(stream_index);
-    }
+    // if (next_button_ispressed)
     // {
-
+    //     noInterrupts();
+    //     next_button_ispressed = false;
+    //     interrupts();
+    //     Serial.println("Next button pressed");
     //     if (stream_index == UrlManagerInstance.streamCount - 1)
     //     {
     //         stream_index = 0;
@@ -315,6 +348,31 @@ void loop()
     vTaskDelay(1 / portTICK_PERIOD_MS); // Adjust the delay as needed (e.g., 10ms)
 } // end loop
 
+// Functie om de buttons uit te lezen
+void readPresetButtons() {
+    // Lees de status van de PCF8575
+    Wire.beginTransmission(PCF8575_ADDRESS);
+    Wire.requestFrom(PCF8575_ADDRESS, 2); // Lees 2 bytes (16 pinnen)
+  
+    // Lees de eerste byte (P0-P7)
+    uint8_t buttonStates1 = Wire.read();
+    // Lees de tweede byte (P8-P15)
+    uint8_t buttonStates2 = Wire.read();
+    Wire.endTransmission();
+  
+    // Combineer de twee bytes tot een 16-bit waarde
+    uint16_t buttonStates = (buttonStates2 << 8) | buttonStates1;
+  Serial.print("buttonStates: ");
+    printBinary(buttonStates, 16);
+    // Controleer welke button is ingedrukt
+    for (int i = 0; i < 10; i++) {
+      if (!(buttonStates & (1 << i))) { // Als de pin laag is (button ingedrukt)
+        usePreset(i); // Voer de bijbehorende actie uit
+        break; // Stop na de eerste gedrukte button
+      }
+    }
+  }
+
 void usePreset(int preset)
 {
     stream_index = preset;
@@ -341,6 +399,31 @@ void CreateAndSendAudioData(int streamIndex, int last_volume)
     audioData.volume = last_volume;
     strncpy(audioData.url, UrlManagerInstance.Streams[streamIndex].url.c_str(), sizeof(audioData.url));
     xQueueSend(AudioQueue, &audioData, portMAX_DELAY);
+}
+
+void printBinary(int v, int num_places) {
+	int mask = 0, n;
+
+	for (n = 1; n <= num_places; n++) {
+		mask = (mask << 1) | 0x0001;
+	}
+	v = v & mask;  // truncate v to specified number of places
+
+	while (num_places) {
+
+		if (v & (0x0001 << (num_places - 1))) {
+			Serial.print("1");
+		}
+		else {
+			Serial.print("0");
+		}
+
+		--num_places;
+		if (((num_places % 4) == 0) && (num_places != 0)) {
+			Serial.print("_");
+		}
+	}
+	Serial.println("");
 }
 
 // // optional
