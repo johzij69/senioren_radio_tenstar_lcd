@@ -43,6 +43,7 @@ UrlManager UrlManagerInstance(myPrefs);
 PrioWebServer webServer(UrlManagerInstance, 80);
 DisplayData displayData;
 AudioData audioData;
+PrioRfReceiver rfReceiver(RF_RECEIVER_PIN); // Gebruik GPIO 23 voor de RF-ontvanger
 
 /* Buttons */
 ezButton rotary_button(ROT_SW_PIN);
@@ -160,6 +161,13 @@ void setup()
 
         inputPanel.begin(); // Initialiseer de input panel
         inputPanel.setButtonPressedCallback(onButtonPressed); // Stel de callback in
+
+        // Initialiseer de RF-ontvanger
+        rfReceiver.begin();
+        rfReceiver.setKeyReceivedCallback(onRfButtonPressed); // Stel de callback-functie in
+
+
+        
         Serial.println("ESP32 TFT start...");
 
         // Set default display data and put it queue
@@ -207,6 +215,7 @@ void loop()
 
     
     inputPanel.loop(); // Voer de loop van de input panel uit
+    rfReceiver.loop(); // Voer de loop van de RF-ontvanger uit
  
     rotaryInstance.loop();
     if (rotaryInstance.current_value_changed)
@@ -235,6 +244,14 @@ void usePreset(int preset)
 void onButtonPressed(int buttonIndex) {
     usePreset(buttonIndex); // Roep de usePreset functie aan
   }
+
+  void onRfButtonPressed(int KeyIndex) {
+    usePreset(KeyIndex); // Roep de usePreset functie aan
+  }
+
+
+
+
 // Voorbeeld implementatie van usePreset
 // void usePreset(int buttonPressed) {
 //     Serial.print("Preset gebruikt: ");

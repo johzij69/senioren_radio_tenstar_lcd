@@ -1,0 +1,47 @@
+#my projects
+https://app.cirkitdesigner.com/project/10fed2c3-789d-42b1-9911-489bf3d0b9b7
+
+esp-board
+https://github.com/vcc-gnd/YD-ESP32-S3/blob/main/IMG/img11.jpg
+
+#used for connecting PCF8575 i2c, did not used any code but just for principles.
+https://mischianti.org/pcf8575-i2c-16-bit-digital-i-o-expander/
+https://github.com/xreef/PCF8575_library
+https://github.com/donskytech/platformio-projects/blob/main/esp32-projects/esp32-pcf8575-port-expander/src/button_keypress.cpp.txt
+https://www.youtube.com/watch?v=UJH-STJ3-xA&t=1s
+
+RalphBacon
+https://github.com/RalphBacon/PCF8574-Pin-Extender-I2C/blob/master/PCF8574_Interrupts.ino
+https://www.youtube.com/watch?v=kQZU8kE3ksU&t=1s
+https://github.com/RalphBacon/205-Internet-Radio/blob/main/PlatformIO/ESP32%20Better%20Internet%20Radio%20-%20YouTube/src/main.cpp
+
+
+PCB creation example
+https://thehardwareacademy.com/courses/tutorial-full-length-how-to-design-a-custom-esp32-pcb/
+
+WIfi Manager
+https://github.com/tzapu/WiFiManager
+
+DAC
+https://github.com/schreibfaul1/ESP32-audioI2S
+https://github.com/Frank-Bemelman/ESP32-Sonos-Jukebox-V3
+
+Display
+https://github.com/Bodmer/TFT_eSPI
+
+
+EzButton, not used anymore
+https://github.com/ArduinoGetStarted/button/blob/master/examples/05.MultipleButtonAll/05.MultipleButtonAll.ino
+
+Tasks examples
+https://www.hackster.io/Niket/tasks-parametertotasks-freertos-tutorial-5-b8a7b7
+https://github.com/thelastoutpostworkshop/esp32_task_demo
+
+ESP partitionmanager
+https://thelastoutpostworkshop.github.io/microcontroller_devkit/esp32partitionbuilder/
+
+RF 433
+https://michiel.vanderwulp.be/domotica/Modules/RF-433Mhz-transmitter-receiver/
+https://www.ozeki.hu/p_6034-information-about-433-mhz-modules.html
+https://github.com/ESP32-Work/RF-Transmitter-Reciever
+https://michiel.vanderwulp.be/domotica/Modules/RF-433Mhz-transmitter-receiver/

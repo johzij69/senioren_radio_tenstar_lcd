@@ -3,6 +3,7 @@
 #include <TFT_eSPI.h>
 #include "PrioDateTime.h"
 #include "PrioInputPanel.h"
+#include "PrioRfReceiver.h"
 
 
 
@@ -18,41 +19,20 @@
 
 // /* Next Button */
 // #define NEXT_BUTTON_PIN 21 // ESP32 pin GPIO21, which connected to button
-
-
 #define VOLUME_STEPS 30
 #define MIN_VOLUME 0
 #define DEF_VOLUME 15
 
-// #define PRESET1_BUTTON_PIN 1
-// #define PRESET2_BUTTON_PIN 2
-// #define PRESET3_BUTTON_PIN 42
-// #define PRESET4_BUTTON_PIN 41
-// #define PRESET5_BUTTON_PIN 40
-// #define PRESET6_BUTTON_PIN 39
-// #define PRESET7_BUTTON_PIN 38
-// #define PRESET8_BUTTON_PIN 45
-// #define PRESET9_BUTTON_PIN 48
-// #define PRESET10_BUTTON_PIN 47
-
+// Input panel
 #define INPUTPANEL_ADDRESS 0x20
 #define INPUTPANEL_INT_PIN 21
 #define INPUTPANEL_SDA 47
 #define INPUTPANEL_SCL 48
 
-
-// // PCF8575 I2C-adres
-// #define PCF8575_ADDRESS 0x20
-
-// // Interrupt pin voor PCF8575
-// #define PCF8575_INT_PIN 21
-
-// Declareer functies
-// void IRAM_ATTR buttonISR();
-// void IRAM_ATTR preset_buttonISR();
+#define RF_RECEIVER_PIN 42
 
 extern PrioInputPanel inputPanel;
-
+extern PrioRfReceiver rfReceiver;
 
 // void readPresetButtons();
 
@@ -61,6 +41,7 @@ void CreateAndSendDisplayData(int streamIndex);
 void CreateAndSendAudioData(int streamIndex, int last_volume);
 void printBinary(int v, int num_places);
 void onButtonPressed(int buttonIndex);
+void onRfButtonPressed(int KeyIndex);
 //void usePreset(int buttonPressed);
 void usePreset(int presetNumber);
 
