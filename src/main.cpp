@@ -1,31 +1,4 @@
-// vTask explained -> https://www.youtube.com/watch?v=ywbq1qR-fY0
-
 #include "main.h"
-#include <WiFiManager.h>
-#include "PrioRotary.h"
-#include <ezButton.h> // the library to use for SW pin
-#include "MyPreferences.h"
-#include "PrioWebserver.h"
-#include "UrlManager.h"
-#include "PrioTft.h"
-#include "Free_Fonts.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include <freertos/event_groups.h>
-#include "task_webServer.h"
-#include "Task_Audio.h"
-#include "Task_Display.h"
-#include "Task_Shared.h"
-
-// #include <PRIO_GT911.h>
-
-// /* touch */
-// #define TOUCH_SDA 48
-// #define TOUCH_SCL 47
-// #define TOUCH_WIDTH 480
-// #define TOUCH_HEIGHT 320
-
-
 
 int max_volume = 30; // set default max volume
 int last_volume = 10;
@@ -35,7 +8,7 @@ int next_button_state = 0;
 const char *current_url;
 
 String default_url = "https://icecast.omroep.nl/radio1-bb-mp3:443";
-String last_url;
+String last_url = "";
 
 PrioRotary rotaryInstance(ROT_CLK_PIN, ROT_DT_PIN);
 MyPreferences myPrefs("myRadio");
@@ -47,35 +20,20 @@ PrioRfReceiver rfReceiver(RF_RECEIVER_PIN); // Gebruik GPIO 23 voor de RF-ontvan
 
 /* Buttons */
 ezButton rotary_button(ROT_SW_PIN);
-// ezButton next_button(NEXT_BUTTON_PIN);
-
-
 
 // Queues
-QueueHandle_t logoQueue = xQueueCreate(3, sizeof(int));
-QueueHandle_t streamQueue = xQueueCreate(3, sizeof(int));
-QueueHandle_t volumeQueue = xQueueCreate(3, sizeof(int));
 QueueHandle_t DisplayQueue = xQueueCreate(3, sizeof(DisplayData));
 QueueHandle_t AudioQueue = xQueueCreate(3, sizeof(AudioData));
 
 // Maak een event group
 EventGroupHandle_t taskEvents; // Event group handle for starting order of the tasks
 
+/* touch not used in this release */
 // PRIO_GT911 touchp = PRIO_GT911(TOUCH_SDA, TOUCH_SCL, TOUCH_WIDTH, TOUCH_HEIGHT);
 
 // Maak een instantie van de PrioInputPanel class
 PrioInputPanel inputPanel(INPUTPANEL_ADDRESS, INPUTPANEL_INT_PIN, INPUTPANEL_SDA, INPUTPANEL_SCL);
 
-
-
-// Interrupt routine just sets a flag when rotation is detected
-void IRAM_ATTR checkVolume()
-{
-    rotaryInstance.rotaryEncoder = true;
-}
-
-
-TaskHandle_t scrollerTaskHandle;  // Task handle for the scroller task
 TaskHandle_t displayTaskHandle;   // Task handle for the TFT task
 TaskHandle_t audioTaskHandle;     // Task handle for the audio task
 TaskHandle_t webServerTaskHandle; // Task handle for the webserver task
@@ -160,11 +118,11 @@ void setup()
 
 
         inputPanel.begin(); // Initialiseer de input panel
-        inputPanel.setButtonPressedCallback(onButtonPressed); // Stel de callback in
+        inputPanel.setButtonPressedCallback(usePreset); // Stel de callback in
 
         // Initialiseer de RF-ontvanger
         rfReceiver.begin();
-        rfReceiver.setKeyReceivedCallback(onRfButtonPressed); // Stel de callback-functie in
+        rfReceiver.setKeyReceivedCallback(usePreset); // Stel de callback-functie in
 
 
         
@@ -232,31 +190,19 @@ void loop()
     vTaskDelay(1 / portTICK_PERIOD_MS); // Adjust the delay as needed (e.g., 10ms)
 } // end loop
 
-
+// Interrupt routine just sets a flag when rotation is detected
+void IRAM_ATTR checkVolume()
+{
+    rotaryInstance.rotaryEncoder = true;
+}
+/* Switching radio stream */
 void usePreset(int preset)
 {
     stream_index = preset;
     CreateAndSendAudioData(stream_index, rotaryInstance.current_value);
     CreateAndSendDisplayData(stream_index);
 }
-
-// Callback functie voor button-drukken
-void onButtonPressed(int buttonIndex) {
-    usePreset(buttonIndex); // Roep de usePreset functie aan
-  }
-
-  void onRfButtonPressed(int KeyIndex) {
-    usePreset(KeyIndex); // Roep de usePreset functie aan
-  }
-
-
-
-
-// Voorbeeld implementatie van usePreset
-// void usePreset(int buttonPressed) {
-//     Serial.print("Preset gebruikt: ");
-//     Serial.println(buttonPressed);
-//   }
+/* Get data and send it to display queue */
 void CreateAndSendDisplayData(int streamIndex)
 {
     displayData.volume = last_volume;
@@ -270,38 +216,12 @@ void CreateAndSendDisplayData(int streamIndex)
     strncpy(displayData.streamtitle, "Loading...", sizeof(displayData.streamtitle));
     xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
 }
-
+/* Get data and send it to audio queue */
 void CreateAndSendAudioData(int streamIndex, int last_volume)
 {
-    Serial.println("CreateAndSendAudioData");
     audioData.volume = last_volume;
     strncpy(audioData.url, UrlManagerInstance.Streams[streamIndex].url.c_str(), sizeof(audioData.url));
     xQueueSend(AudioQueue, &audioData, portMAX_DELAY);
-}
-
-void printBinary(int v, int num_places) {
-	int mask = 0, n;
-
-	for (n = 1; n <= num_places; n++) {
-		mask = (mask << 1) | 0x0001;
-	}
-	v = v & mask;  // truncate v to specified number of places
-
-	while (num_places) {
-
-		if (v & (0x0001 << (num_places - 1))) {
-			Serial.print("1");
-		}
-		else {
-			Serial.print("0");
-		}
-
-		--num_places;
-		if (((num_places % 4) == 0) && (num_places != 0)) {
-			Serial.print("_");
-		}
-	}
-	Serial.println("");
 }
 
 // // optional

@@ -4,6 +4,7 @@
 
 
   void searchAndReplace(String *htmlString, String findPattern, String replaceWith);
+  void printBinary(int v, int num_places);
 
 
 #endif
