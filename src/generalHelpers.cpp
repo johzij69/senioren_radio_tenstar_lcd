@@ -37,3 +37,17 @@ void printBinary(int v, int num_places)
 	}
 	Serial.println("");
 }
+
+// Functie om de core van een taak te printen
+void printTaskCore(TaskHandle_t taskHandle, const char *taskName)
+{
+    BaseType_t coreID = xTaskGetCoreID(taskHandle);
+    if (coreID == tskNO_AFFINITY)
+    {
+        Serial.printf("Task %s is not pinned to any core.\n", taskName);
+    }
+    else
+    {
+        Serial.printf("Task %s is running on core %d.\n", taskName, coreID);
+    }
+}

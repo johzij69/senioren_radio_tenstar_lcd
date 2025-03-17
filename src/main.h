@@ -28,6 +28,7 @@
 // #define TOUCH_WIDTH 480
 // #define TOUCH_HEIGHT 320
 
+#define WEB_SERVER_PORT 80
 
 // Rotary Enocder used for Volume control
 #define ROT_CLK_PIN 17  // ESP32 pin GPIO17 connected to the rotary encoder's CLK pin
@@ -41,6 +42,7 @@
 // #define NEXT_BUTTON_PIN 21 // ESP32 pin GPIO21, which connected to button
 #define VOLUME_STEPS 30
 #define MIN_VOLUME 0
+#define MAX_VOLUME 30
 #define DEF_VOLUME 15
 
 // Input panel
