@@ -203,27 +203,6 @@ void PrioWebServer::handleSettings(AsyncWebServerRequest *request, uint8_t *data
   urlManager.saveStreams(data);
 }
 
-
-
-// void PrioWebServer::deleteStreamItem(AsyncWebServerRequest *request)
-// {
-//   String body PROGMEM = "";
-//   for (size_t i = 0; i < urlManager.urls.size(); i++)
-//   {
-//     body += "<form action='deleteurl' method='post'>";
-//     body += "<p>";
-//     body += "<label for='url'" + String(i) + ">URL" + String(i) + ":</label>";
-//     body += "<span>";
-//     body += urlManager.urls[i];
-//     body += "</span>";
-//     body += "<button class='input_button' type='submit' name='urlindex' value='" + String(i) + "'>X</button>";
-//     body += "</p>";
-//     body += "</form>";
-//   }
-
-//   request->send(200, "text/html", createHtmlPage(body));
-// }
-
 String PrioWebServer::createHtmlPage(String body)
 {
 

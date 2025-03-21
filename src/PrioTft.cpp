@@ -1,4 +1,3 @@
-// see -> https://doc-tft-espi.readthedocs.io/
 #include "PrioTft.h"
 
 PrioTft::PrioTft() : tft(), pBar(&tft), sLogo(&tft), max_volume(30), last_volume(10), cur_volume(0), isInitialized(false), sTitle(tft, 20, 60, 100, 450, FM12)
@@ -49,34 +48,14 @@ void PrioTft::setVolume(int _cur_volume)
 
 void PrioTft::drawParaLine(const String &text, int startY)
 {
-
     tft.drawLine(10, startY, tft.width() - (pBar.width_set), startY, TFT_GREYBLUE);
-    // for (int i = 1; i < 18; i++)
-    // {
-    //     tft.drawLine(10 + i, startY + i, 120 - i, startY + i, TFT_GREYBLUE);
-    // }
-
-    // tft.setTextFont(2);
-    // tft.setTextSize(1);
-    // tft.setCursor(kantline, startY+1);
-    // tft.setTextColor(TFT_BLACK, TFT_GREYBLUE);
-    // tft.println(text);
-    // tft.setTextFont(4);
-    // tft.setTextColor(TFT_WHITE,TFT_BLACK );
-
 }
 
 void PrioTft::setTitle(const String &title)
 {
     prepLine(10);
-    if (title.length() < 32)
-    {
-        tft.println(title);
-    }
-    else
-    {
-        tft.println(title.substring(0, 32));
-    }
+    String truncatedTitle = truncateStringToFit(title, tft.width() - (pBar.width_set + kantline));
+    tft.println(truncatedTitle);
     // When Title changed, we need to wipe the streamTitle name
     clearLine(12);
 }
@@ -84,14 +63,8 @@ void PrioTft::setTitle(const String &title)
 void PrioTft::setStreamTitle(const String &streamTitle)
 {
     prepLine(12);
-    if (streamTitle.length() < 32)
-    {
-        tft.println(streamTitle);
-    }
-    else
-    {
-        tft.println(streamTitle.substring(0, 32));
-    }
+    String truncatedStreamTitle = truncateStringToFit(streamTitle, tft.width() - (pBar.width_set + kantline));
+    tft.println(truncatedStreamTitle);
 }
 
 void PrioTft::prepLine(int lineNumber)
@@ -113,6 +86,7 @@ void PrioTft::clearLogoLine(int lineNumber)
     int line = 25 * (lineNumber - 1);
     tft.fillRect(200, line, tft.width() - (pBar.width_set + 200), tft.fontHeight(), TFT_BLACK);
 }
+
 void PrioTft::clearGreenLine(int lineNumber)
 {
     int line = 25 * (lineNumber - 1);
@@ -126,7 +100,6 @@ void PrioTft::setLogo(const String &url)
 
 void PrioTft::showTime(const String &time)
 {
-
     tft.setTextFont(8);
     tft.setTextSize(1);
     tft.fillRect(185, 90, tft.width() - (pBar.width_set + 200), tft.fontHeight(), TFT_BLACK);
@@ -135,4 +108,22 @@ void PrioTft::showTime(const String &time)
     tft.println(time);
     tft.setTextFont(4);
     tft.setTextSize(1);
+}
+
+String PrioTft::truncateStringToFit(const String &text, int maxWidth)
+{
+    int textWidth = tft.textWidth(text);
+    if (textWidth <= maxWidth)
+    {
+        return text;
+    }
+
+    String truncatedText = text;
+    while (textWidth > maxWidth && truncatedText.length() > 0)
+    {
+        truncatedText.remove(truncatedText.length() - 1);
+        textWidth = tft.textWidth(truncatedText);
+    }
+
+    return truncatedText;
 }

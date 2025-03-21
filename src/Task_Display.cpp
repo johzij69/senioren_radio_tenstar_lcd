@@ -86,11 +86,8 @@ void DisplayTask(void *parameter)
                 prevLogo = _displayData.logo;
             }
         }
-
-        if (!pDateTime.timeSynced)
-        {
-            pDateTime.begin();
-        }
+        pDateTime.checkSync(); // Controleer of synchronisatie nodig is at the moment ones every hour
+        
         strncpy(_displayData.currenTime, pDateTime.getTime(), sizeof(_displayData.currenTime));
         if (prevTime != _displayData.currenTime)
         {

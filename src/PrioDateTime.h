@@ -1,29 +1,51 @@
-#ifndef PRIO_DATETIME_H
-#define PRIO_DATETIME_H
+#ifndef PRIODATETIME_H
+#define PRIODATETIME_H
 
-#include <Arduino.h>
-#include <ctime>
 #include <ThreeWire.h>
 #include <RtcDS1302.h>
+#include <WiFi.h>
+#include <time.h>
 
 class PrioDateTime {
 public:
-    PrioDateTime(int clkPin = 5, int datPin = 6, int rstPin = 7); // Veilige pinnen
-    void begin();
-    char* getTime();        // HH:MM teruggeven
-    char* getDate();        // DD-MM-YYYY teruggeven
-    char* getDateTime();    // DD-MM-YYYY HH:MM teruggeven
+    // Constructor
+    PrioDateTime(int clkPin, int datPin, int rstPin);
 
-    bool timeSynced;        // Publieke variabele om status te controleren
+    // Initialiseer de RTC en synchroniseer indien nodig
+    void begin();
+
+    // Synchroniseer de tijd met de NTP-server
+    void syncTime();
+
+    // Geeft aan of de tijd succesvol is gesynchroniseerd
+    bool isTimeSynced();
+
+    // Controleer of synchronisatie nodig is en voer deze uit
+    void checkSync();
+
+    // Haal de huidige tijd op (formaat: "HH:MM")
+    char* getTime();
+
+    // Haal de huidige datum op (formaat: "DD-MM-JJJJ")
+    char* getDate();
+
+    // Haal de huidige datum en tijd op (formaat: "DD-MM-JJJJ HH:MM")
+    char* getDateTime();
+
+    // Controleer of de zomertijd actief is
+    bool isSummerTime(tm* timeinfo);
+
+    void setTimeZone(tm *timeinfo);
 
 private:
-    void syncTime();        // Tijd synchroniseren met timeout
-    char buffer[20];        // Buffer voor datum/tijd strings
-    ThreeWire _threeWire;   // ThreeWire instantie
-    RtcDS1302<ThreeWire> _rtc; // RTC instantie
-    int _clkPin;            // CLK-pin
-    int _datPin;            // DAT-pin
-    int _rstPin;            // RST-pin
+    ThreeWire _threeWire; // ThreeWire-object voor communicatie met de RTC
+    RtcDS1302<ThreeWire> _rtc; // RTC-object
+
+    bool timeSynced; // Geeft aan of de tijd succesvol is gesynchroniseerd
+    unsigned long _lastSyncTime; // Laatste synchronisatietijd (in milliseconden)
+    unsigned long _syncInterval; // Interval tussen synchronisaties (in milliseconden)
+
+    char buffer[20]; // Buffer voor het opslaan van tijd- en datumstrings
 };
 
 #endif
