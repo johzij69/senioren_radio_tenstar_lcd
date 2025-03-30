@@ -48,3 +48,8 @@ https://michiel.vanderwulp.be/domotica/Modules/RF-433Mhz-transmitter-receiver/
 https://www.ozeki.hu/p_6034-information-about-433-mhz-modules.html
 https://github.com/ESP32-Work/RF-Transmitter-Reciever
 https://michiel.vanderwulp.be/domotica/Modules/RF-433Mhz-transmitter-receiver/
+
+
+Webserver
+https://www.youtube.com/watch?v=_fLPRvQS6W4
+https://techtutorialsx.com/2018/10/12/esp32-http-web-server-handling-body-data/

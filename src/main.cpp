@@ -189,7 +189,7 @@ void CreateAndSendDisplayData(int streamIndex)
     strncpy(displayData.station, "Loading...", sizeof(displayData.station));
     strncpy(displayData.icyurl, "Loading...", sizeof(displayData.icyurl));
     strncpy(displayData.lasthost, "Loading...", sizeof(displayData.lasthost));
-    strncpy(displayData.streamtitle, "Loading...", sizeof(displayData.streamtitle));
+    strncpy(displayData.streamtitle, "Wachten op titel...", sizeof(displayData.streamtitle));
     xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
 }
 

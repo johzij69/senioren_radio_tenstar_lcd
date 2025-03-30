@@ -73,7 +73,7 @@ void DisplayTask(void *parameter)
                 prevStreamTitle = _displayData.streamtitle;
             }
 
-            Serial.println("Wat als leeg. Display: streamtitle" + String(_displayData.streamtitle));
+            Serial.println("Display: streamtitle" + String(_displayData.streamtitle));
 
             if (prevVolume != _displayData.volume)
             {
@@ -87,7 +87,7 @@ void DisplayTask(void *parameter)
             }
         }
         pDateTime.checkSync(); // Controleer of synchronisatie nodig is at the moment ones every hour
-        
+
         strncpy(_displayData.currenTime, pDateTime.getTime(), sizeof(_displayData.currenTime));
         if (prevTime != _displayData.currenTime)
         {
@@ -116,8 +116,6 @@ void cleanStreamTitle(struct DisplayData *data)
     // Controleer of streamtitle begint met title
     if (strncmp(data->streamtitle, data->title, strlen(data->title)) == 0)
     {
-
-        Serial.println("Kom i khier wel");
         // Als dat zo is, verschuif alle karakters naar links
         size_t title_len = strlen(data->title);
         memmove(data->streamtitle,

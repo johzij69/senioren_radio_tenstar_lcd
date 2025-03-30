@@ -163,7 +163,7 @@ String getMainScript(String ip)
       pagesizeSelect.setAttribute("name", "pagesize");
       pagesizeSelect.setAttribute("id", "pagesize");
       pagesizeSelect.setAttribute("class", "prio-p2");
-      pagesizeSelect.innerHTML = `<option value="3">3</option><option value="5" selected="selected">5</option><option value="8">8</option><option value="10">10</option>`;
+      pagesizeSelect.innerHTML = `<option value="3">3</option><option value="5" selected="selected">5</option><option value="8">8</option><option value="10">10</option><option value="all">all</option>`;
       pagesizeSelect.addEventListener("change", (event) => {
         if (pagesizeSelect.value != pagesize) {
           currentPage = 1;

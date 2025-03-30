@@ -22,36 +22,59 @@ void PrioWebServer::begin()
     } });
 
   server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request)
-            { request->send(200, "image/x-icon",  (const unsigned char*)favicon, sizeof(favicon)); });
+            { request->send(200, "image/x-icon", (const unsigned char *)favicon, sizeof(favicon)); });
 
   /* root page , which handles overzicht */
   server.on("/", HTTP_GET, std::bind(&PrioWebServer::handleRoot, this, std::placeholders::_1));
 
   /* deliver the streams in json format */
   server.on("/api/streams", HTTP_GET, std::bind(&PrioWebServer::handleApi, this, std::placeholders::_1));
-  
+
   server.on("/api/deletestream", HTTP_GET, std::bind(&PrioWebServer::handleDeleteStream, this, std::placeholders::_1));
 
   /* serves the html page to add a stream */
   server.on("/inpustream", HTTP_GET, std::bind(&PrioWebServer::handleInputStream, this, std::placeholders::_1));
 
-  server.onRequestBody([this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
-                       {
-    if (request->url() == "/updateurls")
-    {
-      this->handleSettings(request, data);
-      request->send(200, "text/plain", "true");
-    }
-    /* api addstream json in data */
-    if (request->url() == "/api/addstream")
-    {
-      urlManager.addStream(data);
-      request->send(200, "text/plain", "true");
-    } });
+      // Voeg een handler toe voor POST-verzoeken naar /updateurls
+      server.on(
+        "/updateurls",
+        HTTP_POST,
+        [](AsyncWebServerRequest * request){},
+        NULL,
+        [this](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) {
+     
+          for (size_t i = 0; i < len; i++) {
+            Serial.write(data[i]);
+          }
+     
+          Serial.println();
+          this->handleSettings(request, data);
+          request->send(200);
+      });
 
+      server.on(
+        "//api/addstream",
+        HTTP_POST,
+        [](AsyncWebServerRequest * request){},
+        NULL,
+        [this](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) {
+          urlManager.addStream(data);
+          request->send(200);
+      });
+     
   server.begin();
 }
+void PrioWebServer::onBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+{
+  // Handle body
 
+  if (request->url() == "/updateurls")
+  {
+
+    Serial.println("Received body data");
+    urlManager.saveStreams(data);
+  }
+}
 void PrioWebServer::handleApi(AsyncWebServerRequest *request)
 {
 
@@ -60,6 +83,8 @@ void PrioWebServer::handleApi(AsyncWebServerRequest *request)
   int page = 1;
   int start = 0;
   int end = 4;
+
+
   int total_pages = ceil((float)urlManager.streamCount / (float)page_size); // set default
   int paramsNr = request->params();
 
@@ -69,7 +94,11 @@ void PrioWebServer::handleApi(AsyncWebServerRequest *request)
 
     if (p->name() == "size")
     {
-      page_size = p->value().toInt();
+      if(p->value() != "all"){
+        page_size = p->value().toInt();
+      } else {
+        page_size = urlManager.streamCount;
+      } 
     }
 
     if (p->name() == "page")
@@ -82,6 +111,10 @@ void PrioWebServer::handleApi(AsyncWebServerRequest *request)
   if (page_size < 1 || page_size > urlManager.streamCount)
   {
     page_size = default_page_size;
+  }
+
+  if(page_size > urlManager.streamCount){
+    page_size = urlManager.streamCount;
   }
 
   /* determine current page */
@@ -134,8 +167,6 @@ void PrioWebServer::handleApi(AsyncWebServerRequest *request)
   request->send(200, "application/json", response);
 }
 
-
-
 void PrioWebServer::handleDeleteStream(AsyncWebServerRequest *request)
 {
 
@@ -151,7 +182,7 @@ void PrioWebServer::handleDeleteStream(AsyncWebServerRequest *request)
     }
   }
   request->send(200, "text/plain", "ok");
-}  
+}
 
 void PrioWebServer::handleRoot(AsyncWebServerRequest *request)
 {
@@ -195,12 +226,16 @@ void PrioWebServer::handleInputStream(AsyncWebServerRequest *request)
 }
 
 void PrioWebServer::handleSettings(AsyncWebServerRequest *request, uint8_t *data)
-{
-
+{ //}, size_t len) {
   JsonDocument doc;
-  DeserializationError error = deserializeJson(doc, data);
+  DeserializationError error = deserializeJson(doc, data); //, len);
+  if (error)
+  {
+    request->send(400, "text/plain", "Invalid JSON");
+    return;
+  }
   serializeJson(doc, Serial);
-  urlManager.saveStreams(data);
+  urlManager.saveStreams(data); //, len);
 }
 
 String PrioWebServer::createHtmlPage(String body)

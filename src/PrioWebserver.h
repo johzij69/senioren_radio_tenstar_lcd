@@ -34,8 +34,9 @@ private:
   void handleRoot(AsyncWebServerRequest *request);
   void handleAddStream(AsyncWebServerRequest *request, uint8_t *data);
   void handleInputStream(AsyncWebServerRequest *request);
-  void handleSettings(AsyncWebServerRequest *request, uint8_t *data);
+  void handleSettings(AsyncWebServerRequest *request, uint8_t *data);//, size_t len);
   void handleDeleteStream(AsyncWebServerRequest *request);
+  void onBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
 
 
 
