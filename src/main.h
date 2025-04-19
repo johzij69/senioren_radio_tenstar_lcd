@@ -54,6 +54,9 @@
 // RF Receiver
 #define RF_RECEIVER_PIN 42
 
+// Back light
+#define BACKLIGHT_PIN 1 // GPIO pin for backlight control
+
 extern PrioInputPanel inputPanel;
 extern PrioRfReceiver rfReceiver;
 

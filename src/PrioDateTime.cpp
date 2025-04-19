@@ -142,7 +142,7 @@ bool PrioDateTime::isSummerTime(tm *timeinfo)
 void PrioDateTime::setTimeZone(tm *timeinfo) {
     if (isSummerTime(timeinfo)) {
         // Zomertijd: UTC+2
-        setenv("TZ", "CEST", 1);
+        setenv("TZ", "UTC+2", 1);
     } else {
         // Wintertijd: UTC+1
         setenv("TZ", "CET-1", 1);

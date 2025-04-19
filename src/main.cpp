@@ -1,4 +1,5 @@
 #include "main.h"
+#include "driver/ledc.h" // Include LEDC driver header for PWM functionality
 
 int max_volume = MAX_VOLUME; // set default max volume
 int last_volume = 10;
@@ -36,6 +37,11 @@ EventGroupHandle_t taskEvents; // Event group handle for starting order of the t
 TaskHandle_t displayTaskHandle;   // Task handle for the TFT task
 TaskHandle_t audioTaskHandle;     // Task handle for the audio task
 TaskHandle_t webServerTaskHandle; // Task handle for the webserver task
+
+const int backlightPin = BACKLIGHT_PIN;   // GPIO voor backlight  
+const int pwmChannel = 0;     // Kies een kanaal (0-15)  
+const int freq = 5000;       // Frequentie (Hz), 1k-5k is stabiel  
+const int resolution = 8;     // Resolutie in bits (8 = 0-255)
 
 void setup()
 {
@@ -138,6 +144,10 @@ void setup()
             1,                    // Priority of the task
             &audioTaskHandle, 1); // Task handle
     }
+
+    ledcSetup(pwmChannel, freq, resolution);  // Configureer PWM  
+    ledcAttachPin(backlightPin, pwmChannel);  // Koppel pin aan kanaal  
+    ledcWrite(pwmChannel, 128);               // 50% helderheid (128/255) 
 }
 
 /* main loop ;-) */
