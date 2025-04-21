@@ -8,6 +8,7 @@ int next_button_state = 0;
 
 String default_url = "https://icecast.omroep.nl/radio1-bb-mp3:443";
 String last_url = "";
+String prevTime = "";
 
 AudioData audioData;
 DisplayData displayData;
@@ -24,9 +25,6 @@ ezButton rotary_button(ROT_SW_PIN);
 QueueHandle_t DisplayQueue = xQueueCreate(3, sizeof(DisplayData));
 QueueHandle_t AudioQueue = xQueueCreate(3, sizeof(AudioData));
 
-/* touch not used in this release */
-// PRIO_GT911 touchp = PRIO_GT911(TOUCH_SDA, TOUCH_SCL, TOUCH_WIDTH, TOUCH_HEIGHT);
-
 // Maak een instantie van de PrioInputPanel class
 PrioInputPanel inputPanel(INPUTPANEL_ADDRESS, INPUTPANEL_INT_PIN, INPUTPANEL_SDA, INPUTPANEL_SCL);
 
@@ -38,10 +36,14 @@ TaskHandle_t displayTaskHandle;   // Task handle for the TFT task
 TaskHandle_t audioTaskHandle;     // Task handle for the audio task
 TaskHandle_t webServerTaskHandle; // Task handle for the webserver task
 
-const int backlightPin = BACKLIGHT_PIN;   // GPIO voor backlight  
-const int pwmChannel = 0;     // Kies een kanaal (0-15)  
-const int freq = 5000;       // Frequentie (Hz), 1k-5k is stabiel  
-const int resolution = 8;     // Resolutie in bits (8 = 0-255)
+PrioDateTime pDateTime(RTC_CLK_PIN, RTC_DAT_PIN, RTC_RST_PIN);
+
+// Configuratie voor backlight-PWM
+const int backlightPin = BACKLIGHT_PIN;           // GPIO voor backlight
+const ledc_channel_t pwmChannel = LEDC_CHANNEL_0; // Kanaal 0-7
+const ledc_timer_t pwmTimer = LEDC_TIMER_0;       // Timer 0-3 (nu wél gedefinieerd!)
+const int freq = 5000;                            // Frequentie (Hz)
+const int resolution = 8;
 
 void setup()
 {
@@ -49,7 +51,7 @@ void setup()
     WiFi.mode(WIFI_STA);  // explicitly set mode, esp defaults to STA+AP
     WiFiManager wm;
     bool res;
-    res = wm.autoConnect("prio-radio"); 
+    res = wm.autoConnect("prio-radio");
     if (!res)
     {
         Serial.println("Failed to connect");
@@ -65,12 +67,10 @@ void setup()
         Serial.print("Gateway address: ");
         Serial.println(WiFi.gatewayIP());
 
-        /* start touch */
-        // touchp.begin();
-        // touchp.setRotation(ROTATION_LEFT);
-        //        audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
-
         myPrefs.begin();
+        // Start de tijdservice
+        Serial.println("Starting time service");
+        pDateTime.begin();
 
         /* Volume handling */
         last_volume = myPrefs.readValue("volume", DEF_VOLUME);
@@ -107,6 +107,7 @@ void setup()
 
         // Set ip display data and volume
         strncpy(displayData.ip, WiFi.localIP().toString().c_str(), sizeof(displayData.ip));
+        displayData.syncTime = true; // Reset syncTime flag
         displayData.volume = last_volume;
         audioData.volume = last_volume;
 
@@ -115,6 +116,7 @@ void setup()
 
         // Initialiseer het event group
         taskEvents = xEventGroupCreate();
+        setup_backlight();
 
         Serial.println("Starting tasks");
         //   Create the FreeRTOS task for the Display
@@ -144,16 +146,13 @@ void setup()
             1,                    // Priority of the task
             &audioTaskHandle, 1); // Task handle
     }
-
-    ledcSetup(pwmChannel, freq, resolution);  // Configureer PWM  
-    ledcAttachPin(backlightPin, pwmChannel);  // Koppel pin aan kanaal  
-    ledcWrite(pwmChannel, 128);               // 50% helderheid (128/255) 
 }
 
 /* main loop ;-) */
 void loop()
 {
 
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, pwmChannel, 125);
     inputPanel.loop();     // Voer de loop van de input panel uit -> presets buttons and power led
     rfReceiver.loop();     // Voer de loop van de RF-ontvanger uit -> rf remote
     rotaryInstance.loop(); // Voer de loop van de rotary encoder uit -> volume
@@ -169,6 +168,9 @@ void loop()
         xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
         rotaryInstance.current_value_changed = false;
     }
+
+    sync_time(); 
+
     vTaskDelay(1 / portTICK_PERIOD_MS); // Adjust the delay as needed (e.g., 10ms)
 }
 
@@ -200,6 +202,7 @@ void CreateAndSendDisplayData(int streamIndex)
     strncpy(displayData.icyurl, "Loading...", sizeof(displayData.icyurl));
     strncpy(displayData.lasthost, "Loading...", sizeof(displayData.lasthost));
     strncpy(displayData.streamtitle, "Wachten op titel...", sizeof(displayData.streamtitle));
+    strncpy(displayData.currenTime, pDateTime.getTime(), sizeof(displayData.currenTime));
     xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
 }
 
@@ -226,4 +229,42 @@ void audio_bitrate(const char *info)
 {
     strncpy(displayData.bitrate, info, sizeof(displayData.bitrate));
     xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
+}
+
+void sync_time()
+{
+    pDateTime.checkSync(); // Controleer of synchronisatie nodig is at the moment ones every hour
+    strncpy(displayData.currenTime, pDateTime.getTime(), sizeof(displayData.currenTime));
+    if (prevTime != displayData.currenTime)
+    {
+        prevTime = displayData.currenTime;
+        xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
+    }
+}
+
+void setup_backlight()
+{
+    // Stap 1: Timer configureren
+    ledc_timer_config_t timer_cfg = {
+        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .duty_resolution = LEDC_TIMER_8_BIT, // Resolutie
+        .timer_num = pwmTimer,               // Timer
+        .freq_hz = freq,                     // Frequentie
+        .clk_cfg = LEDC_AUTO_CLK             // Clock source
+    };
+    ledc_timer_config(&timer_cfg);
+
+    // Stap 2: Kanaal koppelen aan GPIO
+    ledc_channel_config_t channel_cfg = {
+        .gpio_num = backlightPin,
+        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .channel = pwmChannel,
+        .timer_sel = pwmTimer,
+        .duty = 0, // Start bij 0% duty cycle
+        .hpoint = 0};
+    ledc_channel_config(&channel_cfg);
+
+    // Stap 3: Heldereheid instellen (bijv. 50%)
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, pwmChannel, 128);
+    ledc_update_duty(LEDC_LOW_SPEED_MODE, pwmChannel);
 }

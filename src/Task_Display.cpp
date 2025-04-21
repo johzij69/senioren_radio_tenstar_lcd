@@ -1,11 +1,7 @@
 #include "Task_Display.h"
 #include "PrioTft.h"
-#include "PrioDateTime.h"
 #include "Task_Shared.h"
 
-#define RTC_CLK_PIN 3
-#define RTC_DAT_PIN 18
-#define RTC_RST_PIN 4
 
 void DisplayTask(void *parameter)
 {
@@ -18,11 +14,11 @@ void DisplayTask(void *parameter)
         Serial.println("TFT-initialisatie mislukt. Controleer hardwareverbindingen.");
     }
 
-    // Start de tijdservice
-    Serial.println("Starting time service");
-    //    PrioDateTime pDateTime;
-    PrioDateTime pDateTime(RTC_CLK_PIN, RTC_DAT_PIN, RTC_RST_PIN); // SCL/CLK=19,SDA/DAT=20, RST=4
-    pDateTime.begin();
+    // // Start de tijdservice
+    // Serial.println("Starting time service");
+    // //    PrioDateTime pDateTime;
+    // PrioDateTime pDateTime(RTC_CLK_PIN, RTC_DAT_PIN, RTC_RST_PIN); 
+    // pDateTime.begin();
 
     QueueHandle_t DisplayQueue = static_cast<QueueHandle_t>(parameter);
 
@@ -53,6 +49,7 @@ void DisplayTask(void *parameter)
             // spl("icyurl: " + String(_displayData.icyurl));
             // spl("lasthost: " + String(_displayData.lasthost));
             spl("tft_streamtitle: " + String(_displayData.streamtitle));
+            spl("currenTime: " + String(_displayData.currenTime));
 
             // Controleer en update alleen als de waarde is gewijzigd
             if (prevIp != _displayData.ip)
@@ -86,14 +83,13 @@ void DisplayTask(void *parameter)
                 prevLogo = _displayData.logo;
             }
         }
-        pDateTime.checkSync(); // Controleer of synchronisatie nodig is at the moment ones every hour
 
-        strncpy(_displayData.currenTime, pDateTime.getTime(), sizeof(_displayData.currenTime));
-        if (prevTime != _displayData.currenTime)
-        {
-            prioTft.showTime(_displayData.currenTime);
-            prevTime = _displayData.currenTime;
-        }
+  //      Serial.println("Display: currenTime" + String(_displayData.currenTime));
+         if (prevTime != _displayData.currenTime)
+         {
+             prioTft.showTime(_displayData.currenTime);
+             prevTime = _displayData.currenTime;
+         }
 
         vTaskDelay(100 / portTICK_PERIOD_MS); // Adjust the delay as needed (e.g., 10ms)
     }

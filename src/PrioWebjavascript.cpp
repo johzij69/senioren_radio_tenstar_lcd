@@ -1,5 +1,33 @@
 #include "PrioWebjavascript.h"
 
+String putInstellingenSyncTimeButton(String ip)
+ {
+  String script PROGMEM = R"(
+     <script>
+      async function syncTime() {
+        try {
+          document.getElementById("syncing").style.display = "block";
+          const url = "/api/synctime";
+          const options = {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          };
+          const response = await fetch(url, options);
+          if (!response.ok) {
+            throw new Error("Network response was not ok");
+          }
+          document.getElementById("syncing").style.display = "none";
+        } catch (error) {
+          console.error("Er is een fout opgetreden:", error);
+        }
+      }
+    </script>)";
+//   searchAndReplace(&script, String("@ip"), ip);
+   return script;
+ }    
+
 String getAddScript(String ip)
 {
   String script PROGMEM = R"(

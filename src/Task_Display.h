@@ -17,7 +17,7 @@ struct DisplayData {
     char lasthost[255];
     char streamtitle[255];
     int volume;
-
+    bool syncTime;
     char currenTime[5];
 
 };

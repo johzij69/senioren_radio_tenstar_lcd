@@ -26,7 +26,8 @@ void PrioDateTime::begin()
     }
 }
 
-void PrioDateTime::syncTime() {
+void PrioDateTime::syncTime()
+{
     Serial.println("Synchroniseren met NTP-server...");
 
     // Stel de tijdzone in op UTC (zonder zomer/wintertijdcorrectie)
@@ -35,32 +36,39 @@ void PrioDateTime::syncTime() {
     // Wachten op tijdsynchronisatie (max 20 sec)
     int timeout = 20;
     time_t now = time(nullptr);
-    while (now < 1000000000 && timeout > 0) {
+    while (now < 1000000000 && timeout > 0)
+    {
         delay(1000);
         now = time(nullptr);
         Serial.print(".");
         timeout--;
     }
 
-    if (timeout == 0) {
+    if (timeout == 0)
+    {
         Serial.println("\n⛔ Tijd synchronisatie mislukt!");
         timeSynced = false;
-    } else {
+    }
+    else
+    {
         Serial.println("\n✅ Tijd gesynchroniseerd!");
         timeSynced = true;
 
         // Werk de RTC bij met de gesynchroniseerde tijd
+
         struct tm timeinfo;
-        if (getLocalTime(&timeinfo)) {
+        if (getLocalTime(&timeinfo))
+        {
             // Pas de tijdzone aan op basis van zomer/wintertijd
             setTimeZone(&timeinfo);
 
             RtcDateTime compiledDateTime(
                 timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
-                timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec
-            );
+                timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
             _rtc.SetDateTime(compiledDateTime);
             Serial.println("RTC bijgewerkt met NTP-tijd.");
+            Serial.println("Tijd: " + String(timeinfo.tm_hour) + ":" + String(timeinfo.tm_min) + ":" + String(timeinfo.tm_sec));
+            Serial.println("Datum: " + String(timeinfo.tm_mday) + "-" + String(timeinfo.tm_mon + 1) + "-" + String(timeinfo.tm_year + 1900));
         }
     }
 
@@ -74,6 +82,8 @@ void PrioDateTime::checkSync()
     // Controleer of het synchronisatie-interval is verstreken
     if (currentTime - _lastSyncTime >= _syncInterval)
     {
+        Serial.println("⏰ Synchronisatie-interval verstreken. Tijd synchroniseren...");
+
         syncTime(); // Voer synchronisatie uit
     }
 }
@@ -115,11 +125,13 @@ bool PrioDateTime::isSummerTime(tm *timeinfo)
     if (timeinfo->tm_mon < 2 || timeinfo->tm_mon > 9)
     {
         // Jan, Feb, Nov, Dec: altijd wintertijd
+        Serial.println("Wintertijd: " + String(timeinfo->tm_mon));
         return false;
     }
     else if (timeinfo->tm_mon > 2 && timeinfo->tm_mon < 9)
     {
         // Apr, May, Jun, Jul, Aug, Sep: altijd zomertijd
+        Serial.println("Zomertijd: " + String(timeinfo->tm_mon));
         return true;
     }
     else
@@ -139,13 +151,26 @@ bool PrioDateTime::isSummerTime(tm *timeinfo)
         }
     }
 }
-void PrioDateTime::setTimeZone(tm *timeinfo) {
-    if (isSummerTime(timeinfo)) {
+void PrioDateTime::setTimeZone(tm *timeinfo)
+{
+    if (isSummerTime(timeinfo))
+    {
+        Serial.println("Zomertijd: " + String(timeinfo->tm_mon));
         // Zomertijd: UTC+2
         setenv("TZ", "UTC+2", 1);
-    } else {
+        timeinfo->tm_hour += 2; // Voeg 2 uur toe voor zomertijd
+
+    }
+    else
+    {
+        Serial.println("Wintertijd: " + String(timeinfo->tm_mon));
         // Wintertijd: UTC+1
-        setenv("TZ", "CET-1", 1);
+        setenv("TZ", "UTC+1", 1);
+        timeinfo->tm_hour += 1; // Voeg 1 uur toe voor wintertijd
     }
     tzset(); // Pas de tijdzone-instelling toe
+    // Converteer de tijd naar time_t en terug naar tm om de tijdzone correct toe te passen
+//    time_t time = mktime(timeinfo);
+//    localtime_r(&time, timeinfo);
+  
 }

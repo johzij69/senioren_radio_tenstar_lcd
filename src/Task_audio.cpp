@@ -3,9 +3,10 @@
 #include "task_shared.h"
 
 // DAC I2S
-#define I2S_DOUT 7
-#define I2S_BCLK 5
-#define I2S_LRC 6
+
+#define I2S_BCLK 5 // BCK
+#define I2S_LRC 6 // LCK
+#define I2S_DOUT 7 // DIN
 
 #define VOLUME_STEPS 30
 #define MIN_VOLUME 0

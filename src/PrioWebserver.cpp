@@ -27,10 +27,15 @@ void PrioWebServer::begin()
   /* root page , which handles overzicht */
   server.on("/", HTTP_GET, std::bind(&PrioWebServer::handleRoot, this, std::placeholders::_1));
 
+    /* instellingen page , which handles instellingen */
+    server.on("/instellingen", HTTP_GET, std::bind(&PrioWebServer::handleInstellingen, this, std::placeholders::_1));
+
   /* deliver the streams in json format */
   server.on("/api/streams", HTTP_GET, std::bind(&PrioWebServer::handleApi, this, std::placeholders::_1));
 
   server.on("/api/deletestream", HTTP_GET, std::bind(&PrioWebServer::handleDeleteStream, this, std::placeholders::_1));
+
+  server.on("/api/synctime", HTTP_GET, std::bind(&PrioWebServer::handleSynctime, this, std::placeholders::_1));
 
   /* serves the html page to add a stream */
   server.on("/inpustream", HTTP_GET, std::bind(&PrioWebServer::handleInputStream, this, std::placeholders::_1));
@@ -53,7 +58,7 @@ void PrioWebServer::begin()
       });
 
       server.on(
-        "//api/addstream",
+        "/api/addstream",
         HTTP_POST,
         [](AsyncWebServerRequest * request){},
         NULL,
@@ -202,6 +207,26 @@ void PrioWebServer::handleRoot(AsyncWebServerRequest *request)
   mybigString = "";
 }
 
+void PrioWebServer::handleInstellingen(AsyncWebServerRequest *request)
+{
+ //TODO!!!!!
+ 
+  String body PROGMEM = R"(<div id="content-container" class="content"></div>)";
+   String mybigString = "";
+
+  // String h_start PROGMEM = getHtmlStart();
+  // String h_script PROGMEM = getMainScript(this->ip);
+  // String h_body PROGMEM = setHtmlBody(body, h_script);
+  // String h_end PROGMEM = getHtmlEnd();
+
+  // mybigString.concat(h_start);
+  // mybigString.concat(h_body);
+  // mybigString.concat(h_end);
+
+  request->send(200, "text/html", mybigString.c_str());
+  mybigString = "";
+}
+
 void PrioWebServer::handleAddStream(AsyncWebServerRequest *request, uint8_t *data)
 {
   urlManager.addStream(data);
@@ -238,6 +263,15 @@ void PrioWebServer::handleSettings(AsyncWebServerRequest *request, uint8_t *data
   urlManager.saveStreams(data); //, len);
 }
 
+
+void PrioWebServer::handleSynctime(AsyncWebServerRequest *request)
+{
+  Serial.println("Sync time requested");
+  Serial.println("Sync time requested" + String(pDateTime.getTime()));
+  pDateTime.syncTime(); 
+  request->send(200, "text/plain", "ok");
+}
+
 String PrioWebServer::createHtmlPage(String body)
 {
 
@@ -270,8 +304,8 @@ String PrioWebServer::getTopMenu()
   String html PROGMEM = R"(
   <div class='top-menu'>
     <a href='/'>Overzicht</a>
-    <a href='/deleteurl'>Verwijder</a>
     <a href='/inpustream'>Voeg toe</a>
+    <a href='/instellingen'>Instellingen</a>
     <a href='#'>Contact</a>
   </div>
   )";

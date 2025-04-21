@@ -7,6 +7,9 @@
 #include "ArduinoJson.h"
 #include "PrioWebjavascript.h"
 #include "PrioWebcss.h"
+#include "globals.h" 
+
+
 
 class PrioWebServer
 {
@@ -36,6 +39,8 @@ private:
   void handleInputStream(AsyncWebServerRequest *request);
   void handleSettings(AsyncWebServerRequest *request, uint8_t *data);//, size_t len);
   void handleDeleteStream(AsyncWebServerRequest *request);
+  void handleInstellingen(AsyncWebServerRequest *request);
+  void handleSynctime(AsyncWebServerRequest *request);
   void onBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
 
 

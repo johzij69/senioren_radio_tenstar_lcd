@@ -5,8 +5,6 @@
 #include <ezButton.h> 
 #include "PrioRotary.h"
 #include "PrioDateTime.h"
-#include "PrioInputPanel.h"
-#include "PrioRfReceiver.h"
 #include "generalHelpers.h"
 #include "MyPreferences.h"
 #include "Task_Audio.h"
@@ -20,13 +18,8 @@
 #include "UrlManager.h"
 #include "PrioWebserver.h"
 #include "task_webServer.h"
+#include "globals.h" 
 
-/* touch is not used for this release */
-// #include <PRIO_GT911.h>
-// #define TOUCH_SDA 48
-// #define TOUCH_SCL 47
-// #define TOUCH_WIDTH 480
-// #define TOUCH_HEIGHT 320
 
 #define WEB_SERVER_PORT 80
 
@@ -47,25 +40,29 @@
 
 // Input panel
 #define INPUTPANEL_ADDRESS 0x20
-#define INPUTPANEL_INT_PIN 21
+#define INPUTPANEL_INT_PIN 45 //21
 #define INPUTPANEL_SDA 47
 #define INPUTPANEL_SCL 48
 
 // RF Receiver
-#define RF_RECEIVER_PIN 42
+#define RF_RECEIVER_PIN 1
 
 // Back light
-#define BACKLIGHT_PIN 1 // GPIO pin for backlight control
+#define BACKLIGHT_PIN 18 // GPIO pin for backlight control
 
-extern PrioInputPanel inputPanel;
-extern PrioRfReceiver rfReceiver;
+// RTC
+#define RTC_CLK_PIN 21
+#define RTC_DAT_PIN 14
+#define RTC_RST_PIN 13
+
+
 
 void checkVolume();
 void CreateAndSendDisplayData(int streamIndex);
 void CreateAndSendAudioData(int streamIndex, int last_volume);
 void printBinary(int v, int num_places);
-void onButtonPressed(int buttonIndex);
-void onRfButtonPressed(int KeyIndex);
 void usePreset(int presetNumber);
+void setup_backlight() ;
+void sync_time();
 
 
