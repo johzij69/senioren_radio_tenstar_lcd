@@ -26,24 +26,25 @@ QueueHandle_t DisplayQueue = xQueueCreate(3, sizeof(DisplayData));
 QueueHandle_t AudioQueue = xQueueCreate(3, sizeof(AudioData));
 
 // Maak een instantie van de PrioInputPanel class
-PrioInputPanel inputPanel(INPUTPANEL_ADDRESS, INPUTPANEL_INT_PIN, INPUTPANEL_SDA, INPUTPANEL_SCL);
+PrioInputPanel inputPanel(TOPPANEL_ADDRESS, TOPPANEL_INT_PIN, TOPPANEL_SDA, TOPPANEL_SCL);
 
 // Maak een event group
 EventGroupHandle_t taskEvents; // Event group handle for starting order of the tasks
 
 // Task handles
-TaskHandle_t displayTaskHandle;   // Task handle for the TFT task
-TaskHandle_t audioTaskHandle;     // Task handle for the audio task
-TaskHandle_t webServerTaskHandle; // Task handle for the webserver task
+TaskHandle_t displayTaskHandle = NULL;   // Task handle for the TFT task
+TaskHandle_t audioTaskHandle = NULL;     // Task handle for the audio task
+TaskHandle_t webServerTaskHandle = NULL; // Task handle for the webserver task
 
 PrioDateTime pDateTime(RTC_CLK_PIN, RTC_DAT_PIN, RTC_RST_PIN);
 
-// Configuratie voor backlight-PWM
-const int backlightPin = BACKLIGHT_PIN;           // GPIO voor backlight
-const ledc_channel_t pwmChannel = LEDC_CHANNEL_0; // Kanaal 0-7
-const ledc_timer_t pwmTimer = LEDC_TIMER_0;       // Timer 0-3 (nu wél gedefinieerd!)
-const int freq = 5000;                            // Frequentie (Hz)
-const int resolution = 8;
+// Semaphore voor ISR-communicatie
+SemaphoreHandle_t powerButtonSemaphore;
+
+// Flags used for power unctions
+volatile unsigned long lastInterruptTime = 0;
+const unsigned long debounceDelay = 200; // ms
+bool systemLowPower = false;
 
 void setup()
 {
@@ -66,6 +67,11 @@ void setup()
         Serial.println(WiFi.dnsIP());
         Serial.print("Gateway address: ");
         Serial.println(WiFi.gatewayIP());
+
+        // power button
+        pinMode(POWER_BUTTON_PIN, INPUT_PULLUP);
+        powerButtonSemaphore = xSemaphoreCreateBinary();
+        attachInterrupt(digitalPinToInterrupt(POWER_BUTTON_PIN), handlePowerButtonInterrupt, FALLING);
 
         myPrefs.begin();
         // Start de tijdservice
@@ -116,7 +122,6 @@ void setup()
 
         // Initialiseer het event group
         taskEvents = xEventGroupCreate();
-        setup_backlight();
 
         Serial.println("Starting tasks");
         //   Create the FreeRTOS task for the Display
@@ -152,7 +157,7 @@ void setup()
 void loop()
 {
 
-    ledc_set_duty(LEDC_LOW_SPEED_MODE, pwmChannel, 125);
+    //    ledc_set_duty(LEDC_LOW_SPEED_MODE, pwmChannel, 125);
     inputPanel.loop();     // Voer de loop van de input panel uit -> presets buttons and power led
     rfReceiver.loop();     // Voer de loop van de RF-ontvanger uit -> rf remote
     rotaryInstance.loop(); // Voer de loop van de rotary encoder uit -> volume
@@ -169,7 +174,38 @@ void loop()
         rotaryInstance.current_value_changed = false;
     }
 
-    sync_time(); 
+    sync_time();
+
+    if (xSemaphoreTake(powerButtonSemaphore, 0) == pdTRUE)
+    {
+        systemLowPower = !systemLowPower;
+
+        if (systemLowPower)
+        {
+            Serial.println("⏻ Naar slaapstand...");
+
+            if (webServerTaskHandle != NULL)
+            {
+                vTaskDelete(webServerTaskHandle);
+                webServerTaskHandle = NULL;
+                Serial.println("WebServer gestopt.");
+            }
+
+            if (audioTaskHandle != NULL)
+            {
+                vTaskDelete(audioTaskHandle);
+                audioTaskHandle = NULL;
+                Serial.println("Audio gestopt.");
+            }
+        }
+        else
+        {
+            Serial.println("⏻ Systeem hervatten...");
+
+            xTaskCreatePinnedToCore(webServerTask, "WebServer", 8192, NULL, 1, &webServerTaskHandle, 1);
+            xTaskCreatePinnedToCore(AudioTask, "Audio", 8192, NULL, 1, &audioTaskHandle, 1);
+        }
+    }
 
     vTaskDelay(1 / portTICK_PERIOD_MS); // Adjust the delay as needed (e.g., 10ms)
 }
@@ -178,6 +214,22 @@ void loop()
 void IRAM_ATTR checkVolume()
 {
     rotaryInstance.rotaryEncoder = true;
+}
+
+void IRAM_ATTR handlePowerButtonInterrupt()
+{
+    unsigned long currentTime = millis();
+    if (currentTime - lastInterruptTime > debounceDelay)
+    {
+        lastInterruptTime = currentTime;
+
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        xSemaphoreGiveFromISR(powerButtonSemaphore, &xHigherPriorityTaskWoken);
+        if (xHigherPriorityTaskWoken)
+        {
+            portYIELD_FROM_ISR();
+        }
+    }
 }
 
 /* Switching radio stream */
@@ -209,9 +261,17 @@ void CreateAndSendDisplayData(int streamIndex)
 /* Get data and send it to audio queue */
 void CreateAndSendAudioData(int streamIndex, int last_volume)
 {
-    audioData.volume = last_volume;
-    strncpy(audioData.url, UrlManagerInstance.Streams[streamIndex].url.c_str(), sizeof(audioData.url));
-    xQueueSend(AudioQueue, &audioData, portMAX_DELAY);
+
+    AudioData cmd = {};
+    cmd.command = CMD_PLAY;
+    cmd.volume = last_volume;
+    strncpy(cmd.url, UrlManagerInstance.Streams[streamIndex].url.c_str(), sizeof(cmd.url));
+    xQueueSend(AudioQueue, &cmd, portMAX_DELAY);
+
+
+    // audioData.volume = last_volume;
+    // strncpy(audioData.url, UrlManagerInstance.Streams[streamIndex].url.c_str(), sizeof(audioData.url));
+    // xQueueSend(AudioQueue, &audioData, portMAX_DELAY);
 }
 
 /* Audio events */
@@ -240,31 +300,4 @@ void sync_time()
         prevTime = displayData.currenTime;
         xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
     }
-}
-
-void setup_backlight()
-{
-    // Stap 1: Timer configureren
-    ledc_timer_config_t timer_cfg = {
-        .speed_mode = LEDC_LOW_SPEED_MODE,
-        .duty_resolution = LEDC_TIMER_8_BIT, // Resolutie
-        .timer_num = pwmTimer,               // Timer
-        .freq_hz = freq,                     // Frequentie
-        .clk_cfg = LEDC_AUTO_CLK             // Clock source
-    };
-    ledc_timer_config(&timer_cfg);
-
-    // Stap 2: Kanaal koppelen aan GPIO
-    ledc_channel_config_t channel_cfg = {
-        .gpio_num = backlightPin,
-        .speed_mode = LEDC_LOW_SPEED_MODE,
-        .channel = pwmChannel,
-        .timer_sel = pwmTimer,
-        .duty = 0, // Start bij 0% duty cycle
-        .hpoint = 0};
-    ledc_channel_config(&channel_cfg);
-
-    // Stap 3: Heldereheid instellen (bijv. 50%)
-    ledc_set_duty(LEDC_LOW_SPEED_MODE, pwmChannel, 128);
-    ledc_update_duty(LEDC_LOW_SPEED_MODE, pwmChannel);
 }

@@ -1,12 +1,18 @@
 #ifndef TaskDisplay_H
 #define TaskDisplay_H
 #include <Arduino.h>
-
+#include "globals.h"
+#include "Adafruit_VEML7700.h"
+#include "driver/ledc.h" // Include LEDC driver header for PWM functionality
 
 
 void DisplayTask(void *parameter);
 void spl(String mes);
 void cleanStreamTitle(struct DisplayData * data);
+void AdjustBackLight(Adafruit_VEML7700 veml);
+void SetBacklightPWM(int brightness);
+int mapLuxToPWM(float lux);
+void setup_backlight() ;
 struct DisplayData {
     char title[100];
     char logo[255];
@@ -21,7 +27,6 @@ struct DisplayData {
     char currenTime[5];
 
 };
-
 
 
 

@@ -3,6 +3,17 @@
 #include "Task_Shared.h"
 
 
+int huidigePWN=100; // beginwaarde
+const ledc_channel_t pwmChannel = LEDC_CHANNEL_0; // Kanaal 0-7
+float previousLux = 0.0;
+
+
+// Drempelinstelling in lux
+const float LUX_THRESHOLD = 0.5; 
+
+// Fade-instelling (hoe snel hij aanpast)
+const int FADE_STEP = 2;
+
 void DisplayTask(void *parameter)
 {
     Serial.println("Display task started");
@@ -13,12 +24,20 @@ void DisplayTask(void *parameter)
     {
         Serial.println("TFT-initialisatie mislukt. Controleer hardwareverbindingen.");
     }
+    //  setup_backlight(); // Initialiseer de backlight
+    Adafruit_VEML7700 veml = Adafruit_VEML7700();
 
-    // // Start de tijdservice
-    // Serial.println("Starting time service");
-    // //    PrioDateTime pDateTime;
-    // PrioDateTime pDateTime(RTC_CLK_PIN, RTC_DAT_PIN, RTC_RST_PIN); 
-    // pDateTime.begin();
+    if (!veml.begin())
+    {
+        Serial.println("Sensor not found");
+        while (1)
+            ;
+    }
+    Serial.println("Light Sensor found");
+    veml.setGain(VEML7700_GAIN_1);
+    veml.setIntegrationTime(VEML7700_IT_100MS);
+    setup_backlight(); // Initialiseer de backlight
+    static unsigned long lastBacklightUpdate = 0;
 
     QueueHandle_t DisplayQueue = static_cast<QueueHandle_t>(parameter);
 
@@ -84,13 +103,19 @@ void DisplayTask(void *parameter)
             }
         }
 
-  //      Serial.println("Display: currenTime" + String(_displayData.currenTime));
-         if (prevTime != _displayData.currenTime)
-         {
-             prioTft.showTime(_displayData.currenTime);
-             prevTime = _displayData.currenTime;
-         }
+        //      Serial.println("Display: currenTime" + String(_displayData.currenTime));
+        if (prevTime != _displayData.currenTime)
+        {
+            prioTft.showTime(_displayData.currenTime);
+            prevTime = _displayData.currenTime;
+        }
 
+        if (millis() - lastBacklightUpdate > 200) // 200 ms = 5x per seconde
+        {
+            AdjustBackLight(veml);
+            lastBacklightUpdate = millis();
+        }
+        //        AdjustBackLight(veml);                // Pas de helderheid aan op basis van de omgevingslichtsensor
         vTaskDelay(100 / portTICK_PERIOD_MS); // Adjust the delay as needed (e.g., 10ms)
     }
 }
@@ -118,4 +143,120 @@ void cleanStreamTitle(struct DisplayData *data)
                 data->streamtitle + title_len,
                 strlen(data->streamtitle) - title_len + 1); // +1 voor null-terminator
     }
+}
+
+void AdjustBackLight(Adafruit_VEML7700 veml)
+{
+    // Pas de helderheid aan op basis van de omgevingslichtsensor
+    float lux = veml.readLux();
+
+    // Serial.print("Lux: ");
+    // Serial.println(lux);
+
+    int brightness = mapLuxToPWM(lux);
+    // Serial.print("Backlight brightness: ");
+    // Serial.println(brightness);
+
+    SetBacklightPWM(brightness);
+}
+void SetBacklightPWM(int brightness)
+{
+    // Zet de helderheid van de backlight in (0-255)
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, pwmChannel, brightness);
+    ledc_update_duty(LEDC_LOW_SPEED_MODE, pwmChannel);
+}
+
+void setup_backlight()
+{
+
+    const int backlightPin = BACKLIGHT_PIN;     // GPIO voor backlight
+    const ledc_timer_t pwmTimer = LEDC_TIMER_0; // Timer 0-3 (nu wél gedefinieerd!)
+    const int freq = 5000;                      // Frequentie (Hz)
+    const int resolution = 8;
+
+    // Stap 1: Timer configureren
+    ledc_timer_config_t timer_cfg = {
+        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .duty_resolution = LEDC_TIMER_8_BIT, // Resolutie
+        .timer_num = pwmTimer,               // Timer
+        .freq_hz = freq,                     // Frequentie
+        .clk_cfg = LEDC_AUTO_CLK             // Clock source
+    };
+    ledc_timer_config(&timer_cfg);
+
+    // Stap 2: Kanaal koppelen aan GPIO
+    ledc_channel_config_t channel_cfg = {
+        .gpio_num = backlightPin,
+        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .channel = pwmChannel,
+        .timer_sel = pwmTimer,
+        .duty = 0, // Start bij 0% duty cycle
+        .hpoint = 0};
+    ledc_channel_config(&channel_cfg);
+
+    // Stap 3: We starten altijd met 50% helderheid
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, pwmChannel, 128);
+    ledc_update_duty(LEDC_LOW_SPEED_MODE, pwmChannel);
+}
+
+// Hulpfunctie: zet lux om naar PWM (0-255)
+// Hulpfunctie: zet lux om naar PWM (0-255)
+// int mapLuxToPWM(float lux)
+// {
+//     const float minLux = 1.0;
+//     const float maxLux = 10000.0;
+//     const int minPWM = 26;
+//     const int maxPWM = 255;
+
+//     // Lux afkappen binnen bereik
+//     lux = constrain(lux, minLux, maxLux);
+
+//     // Alleen aanpassen als verschil groot genoeg is
+//     if (abs(lux - previousLux) < LUX_THRESHOLD)
+//     {
+//         return huidigePWN; // te kleine verandering → niets doen
+//     }
+
+//     // Logaritmische schaal
+//     float logLux = log10(lux);
+//     float logMin = log10(minLux);
+//     float logMax = log10(maxLux);
+//     float scaled = (logLux - logMin) / (logMax - logMin);
+//     int targetPWM = round(minPWM + scaled * (maxPWM - minPWM));
+
+//     // Fade toepassen: geleidelijke aanpassing
+//     if (targetPWM > huidigePWN)
+//     huidigePWN = min(huidigePWN + FADE_STEP, targetPWM);
+//     else if (targetPWM < huidigePWN)
+//     huidigePWN = max(huidigePWN - FADE_STEP, targetPWM);
+
+//     previousLux = lux;
+//     return huidigePWN;
+// }
+
+int mapLuxToPWM(float lux)
+{
+    // Minimale en maximale lux-waarden in jouw omgeving
+    const float minLux = 20.0;     // Donkere kamer
+    const float maxLux = 1000.0;   // Zeer heldere ruimte / daglicht
+
+    // Beperk lux tot binnen bereik
+    if (lux < minLux) lux = minLux;
+    if (lux > maxLux) lux = maxLux;
+
+    // Inverse mapping: hoe meer licht, hoe minder backlight
+    // Minder lux = meer helderheid, dus PWM = 255 bij minLux, 0 bij maxLux
+    int targetPWM = map(lux, minLux, maxLux, 30, 255);  // 30 als minimum brightness voor zichtbaarheid
+
+    // Beperk PWM tot veilige grenzen
+    if (targetPWM < 30) targetPWM = 30;
+    if (targetPWM > 255) targetPWM = 255;
+    
+    if (targetPWM > huidigePWN)
+        huidigePWN = min(huidigePWN + FADE_STEP, targetPWM);
+        else if (targetPWM < huidigePWN)
+        huidigePWN = max(huidigePWN - FADE_STEP, targetPWM);
+    
+ //   previousLux = lux;
+    return huidigePWN;
 }
