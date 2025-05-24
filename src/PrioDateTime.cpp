@@ -13,6 +13,11 @@ void PrioDateTime::begin()
     // Initialiseer de RTC
     _rtc.Begin();
 
+if(debug)
+    {
+            Serial.println("RTC initialiseren...");
+            delay(5000); // Wacht 1 seconde voor de initialisatie
+    }   
     // Controleer of de RTC werkt en een geldige tijd heeft
     if (!_rtc.IsDateTimeValid())
     {

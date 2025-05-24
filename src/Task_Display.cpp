@@ -2,23 +2,24 @@
 #include "PrioTft.h"
 #include "Task_Shared.h"
 
-
-int huidigePWN=100; // beginwaarde
+int huidigePWN = 100;                             // beginwaarde
 const ledc_channel_t pwmChannel = LEDC_CHANNEL_0; // Kanaal 0-7
 float previousLux = 0.0;
 
-
 // Drempelinstelling in lux
-const float LUX_THRESHOLD = 0.5; 
+const float LUX_THRESHOLD = 0.5;
 
 // Fade-instelling (hoe snel hij aanpast)
 const int FADE_STEP = 2;
+
+bool fixedbacklight = false; // Zet deze op true om de backlight op een vaste waarde te zetten
 
 void DisplayTask(void *parameter)
 {
     Serial.println("Display task started");
 
     PrioTft prioTft;
+
     prioTft.begin(); // Initialiseer het TFT scherm
     if (!prioTft.isInitialized)
     {
@@ -26,17 +27,30 @@ void DisplayTask(void *parameter)
     }
     //  setup_backlight(); // Initialiseer de backlight
     Adafruit_VEML7700 veml = Adafruit_VEML7700();
-
-    if (!veml.begin())
+    Serial.println("Display task started3");
+    bool sensorFound = false;
+    for (int attempt = 0; attempt < 5; ++attempt)
     {
-        Serial.println("Sensor not found");
-        while (1)
-            ;
+        if (veml.begin())
+        {
+            sensorFound = true;
+            break;
+        }
+        Serial.println("Sensor not found, retrying...");
+        vTaskDelay(500 / portTICK_PERIOD_MS);
     }
-    Serial.println("Light Sensor found");
-    veml.setGain(VEML7700_GAIN_1);
-    veml.setIntegrationTime(VEML7700_IT_100MS);
+    if (!sensorFound)
+    {
+        Serial.println("Light sensor not found after 5 attempts, continuing without sensor.");
+    }
+    else
+    {
+        Serial.println("Light Sensor found");
+        veml.setGain(VEML7700_GAIN_1);
+        veml.setIntegrationTime(VEML7700_IT_100MS);
+    }
     setup_backlight(); // Initialiseer de backlight
+
     static unsigned long lastBacklightUpdate = 0;
 
     QueueHandle_t DisplayQueue = static_cast<QueueHandle_t>(parameter);
@@ -110,10 +124,24 @@ void DisplayTask(void *parameter)
             prevTime = _displayData.currenTime;
         }
 
-        if (millis() - lastBacklightUpdate > 200) // 200 ms = 5x per seconde
+        if (sensorFound)
         {
-            AdjustBackLight(veml);
-            lastBacklightUpdate = millis();
+
+            if (millis() - lastBacklightUpdate > 200) // 200 ms = 5x per seconde
+            {
+                AdjustBackLight(veml);
+                lastBacklightUpdate = millis();
+            }
+        }
+        else
+        {
+            if (!fixedbacklight)
+            {
+                fixedbacklight = true; // Zet de backlight op een vaste waarde
+                // Als de sensor niet gevonden is, gebruik een standaard helderheid
+                Serial.println("Light sensor not found, setting backlight to default brightness.");
+                SetBacklightPWM(128); // Zet backlight op 50% als de sensor niet beschikbaar is
+            }
         }
         //        AdjustBackLight(veml);                // Pas de helderheid aan op basis van de omgevingslichtsensor
         vTaskDelay(100 / portTICK_PERIOD_MS); // Adjust the delay as needed (e.g., 10ms)
@@ -237,26 +265,30 @@ void setup_backlight()
 int mapLuxToPWM(float lux)
 {
     // Minimale en maximale lux-waarden in jouw omgeving
-    const float minLux = 20.0;     // Donkere kamer
-    const float maxLux = 1000.0;   // Zeer heldere ruimte / daglicht
+    const float minLux = 20.0;   // Donkere kamer
+    const float maxLux = 1000.0; // Zeer heldere ruimte / daglicht
 
     // Beperk lux tot binnen bereik
-    if (lux < minLux) lux = minLux;
-    if (lux > maxLux) lux = maxLux;
+    if (lux < minLux)
+        lux = minLux;
+    if (lux > maxLux)
+        lux = maxLux;
 
     // Inverse mapping: hoe meer licht, hoe minder backlight
     // Minder lux = meer helderheid, dus PWM = 255 bij minLux, 0 bij maxLux
-    int targetPWM = map(lux, minLux, maxLux, 30, 255);  // 30 als minimum brightness voor zichtbaarheid
+    int targetPWM = map(lux, minLux, maxLux, 30, 255); // 30 als minimum brightness voor zichtbaarheid
 
     // Beperk PWM tot veilige grenzen
-    if (targetPWM < 30) targetPWM = 30;
-    if (targetPWM > 255) targetPWM = 255;
-    
+    if (targetPWM < 30)
+        targetPWM = 30;
+    if (targetPWM > 255)
+        targetPWM = 255;
+
     if (targetPWM > huidigePWN)
         huidigePWN = min(huidigePWN + FADE_STEP, targetPWM);
-        else if (targetPWM < huidigePWN)
+    else if (targetPWM < huidigePWN)
         huidigePWN = max(huidigePWN - FADE_STEP, targetPWM);
-    
- //   previousLux = lux;
+
+    //   previousLux = lux;
     return huidigePWN;
 }

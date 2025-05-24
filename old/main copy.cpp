@@ -1,8 +1,6 @@
 #include "main.h"
 #include "driver/ledc.h" // Include LEDC driver header for PWM functionality
 
-bool debug = true; // Set to true for debug output
-
 int max_volume = MAX_VOLUME; // set default max volume
 int last_volume = 10;
 int stream_index = -1;
@@ -48,42 +46,29 @@ volatile unsigned long lastInterruptTime = 0;
 const unsigned long debounceDelay = 200; // ms
 bool systemLowPower = false;
 
-void checkSavedWiFiCredentials()
-{
-    Preferences prefs;
-    prefs.begin("WiFiManager", true); // true = alleen-lezen modus
+void checkSavedWiFiCredentials() {
+  Preferences prefs;
+  prefs.begin("WiFiManager", true);  // true = alleen-lezen modus
 
-    // Lees SSID & wachtwoord
-    String savedSSID = prefs.getString("ssid", ""); // "ssid" is de standaard sleutel in WiFiManager
-    String savedPass = prefs.getString("pass", ""); // "pass" is de standaard sleutel
+  // Lees SSID & wachtwoord
+  String savedSSID = prefs.getString("ssid", "");  // "ssid" is de standaard sleutel in WiFiManager
+  String savedPass = prefs.getString("pass", "");  // "pass" is de standaard sleutel
 
-    // Log naar seriële monitor
-    Serial.println("[DEBUG] Opgeslagen WiFi-gegevens:");
-    Serial.println("SSID: " + savedSSID);
-    Serial.println("Wachtwoord: " + savedPass); // Let op: log geen echte wachtwoorden in productiecode!
+  // Log naar seriële monitor
+  Serial.println("[DEBUG] Opgeslagen WiFi-gegevens:");
+  Serial.println("SSID: " + savedSSID);
+  Serial.println("Wachtwoord: " + savedPass);  // Let op: log geen echte wachtwoorden in productiecode!
 
-    prefs.end(); // Sluit NVS
+  prefs.end();  // Sluit NVS
 }
 
 void setup()
 {
     Serial.begin(115200); // Initialize serial communication
-    if (debug)
-    {
-        Serial.println("Starting Prio Radio...");
-        delay(10000); // Wait for serial to initialize
-        if (!Serial)
-        {
-            Serial.println("Serial communication not initialized. Check your connections.");
-            return;
-        }
-        Serial.println("Debug mode is ON");
-    }
-
-    WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+    WiFi.mode(WIFI_STA);  // explicitly set mode, esp defaults to STA+AP
     WiFiManager wm;
     checkSavedWiFiCredentials(); // Controleer bij opstarten
-    wm.setDebugOutput(true);     // Debug-logging aan
+     wm.setDebugOutput(true); // Debug-logging aan
     bool res;
     res = wm.autoConnect("prio-radio");
     if (!res)
@@ -102,15 +87,14 @@ void setup()
         Serial.println(WiFi.gatewayIP());
 
         // power button
-        pinMode(POWER_BUTTON_PIN, INPUT_PULLUP);
-        powerButtonSemaphore = xSemaphoreCreateBinary();
-        attachInterrupt(digitalPinToInterrupt(POWER_BUTTON_PIN), handlePowerButtonInterrupt, FALLING);
+        // pinMode(POWER_BUTTON_PIN, INPUT_PULLUP);
+        // powerButtonSemaphore = xSemaphoreCreateBinary();
+        // attachInterrupt(digitalPinToInterrupt(POWER_BUTTON_PIN), handlePowerButtonInterrupt, FALLING);
 
         myPrefs.begin();
         // Start de tijdservice
         Serial.println("Starting time service");
         pDateTime.begin();
-        pDateTime.debug = true; // Zet debugmodus aan voor tijdservice
 
         /* Volume handling */
         last_volume = myPrefs.readValue("volume", DEF_VOLUME);
@@ -167,17 +151,17 @@ void setup()
             5,                    // Priority of the task
             &displayTaskHandle);  // Task handle
 
-        xTaskCreatePinnedToCore(
-            webServerTask,      // Task function
-            "webServerTask",    // Name of the task
-            4096,               // Stack size in words
-            (void *)&webServer, // Task parameter
-            5,                  // Priority of the task
-            &webServerTaskHandle,
-            1); // Task handle
+        // xTaskCreatePinnedToCore(
+        //     webServerTask,      // Task function
+        //     "webServerTask",    // Name of the task
+        //     4096,               // Stack size in words
+        //     (void *)&webServer, // Task parameter
+        //     5,                  // Priority of the task
+        //     &webServerTaskHandle,
+        //     1); // Task handle
 
         // Create the FreeRTOS task for the AudioTask
-        Serial.println("Starting audio task task");
+              Serial.println("Starting audio task task");
         xTaskCreatePinnedToCore(
             AudioTask,            // Task function
             "AudioTask",          // Name of the task
@@ -186,7 +170,7 @@ void setup()
             1,                    // Priority of the task
             &audioTaskHandle, 1); // Task handle
 
-        Serial.println("Audio task started");
+                  Serial.println("Audio task started");
     }
 }
 
@@ -304,6 +288,7 @@ void CreateAndSendAudioData(int streamIndex, int last_volume)
     cmd.volume = last_volume;
     strncpy(cmd.url, UrlManagerInstance.Streams[streamIndex].url.c_str(), sizeof(cmd.url));
     xQueueSend(AudioQueue, &cmd, portMAX_DELAY);
+
 
     // audioData.volume = last_volume;
     // strncpy(audioData.url, UrlManagerInstance.Streams[streamIndex].url.c_str(), sizeof(audioData.url));

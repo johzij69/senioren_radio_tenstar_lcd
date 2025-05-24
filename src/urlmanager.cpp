@@ -4,22 +4,21 @@
 UrlManager::UrlManager(MyPreferences &prefs) : myPreferences(prefs)
 {
     // Laad URL's vanuit Preferences bij het initialiseren
- //   urlCount = myPreferences.getUInt("url_count", 0);
+    //   urlCount = myPreferences.getUInt("url_count", 0);
     streamCount = myPreferences.getUInt("stream_count", 0);
     default_logo = "https://img.prio-ict.nl/api/images/webradio-default.jpg";
 }
 
 void UrlManager::begin()
 {
-  //  this->loadUrls();
+    //  this->loadUrls();
     this->loadStreams();
 
-// if no streams available, add default stream
+    // if no streams available, add default stream
     if (streamCount == 0)
     {
         this->addDefaultStream();
     }
-
 }
 
 void UrlManager::loadStreams()
@@ -44,13 +43,14 @@ void UrlManager::loadStreams()
 
 void UrlManager::addDefaultStream()
 {
-    
-    streamCount=0;
+
+    streamCount = 0;
     Streams[streamCount].id = streamCount;
     Streams[streamCount].name = "NPO Radio 1";
     Streams[streamCount].url = "https://icecast.omroep.nl/radio1-bb-mp3:443";
     Streams[streamCount].logo = "https://img.prio-ict.nl/api/images/NPO-Radio1.jpg";
     streamCount++;
+    Serial.println("default stream added");
 }
 void UrlManager::addStream(uint8_t *data)
 {
@@ -104,7 +104,7 @@ void UrlManager::saveStreams(uint8_t *data)
     {
         Serial.print("deserializeJson() returned ");
         Serial.println(error.c_str());
-        return ;
+        return;
     }
 
     for (JsonPair item : doc.as<JsonObject>())
@@ -115,8 +115,7 @@ void UrlManager::saveStreams(uint8_t *data)
 
         index = atoi(item_key + strlen("container-"));
 
-
-        const char *value_name = item.value()["name"]; 
+        const char *value_name = item.value()["name"];
         const char *value_url = item.value()["url"];
         const char *value_logo = item.value()["logo"];
 
@@ -130,7 +129,6 @@ void UrlManager::saveStreams(uint8_t *data)
         Serial.println(String(Streams[index].name));
         Serial.println(String(Streams[index].url));
         Serial.println(String(Streams[index].logo));
-   
     }
 
     this->saveToPreferences();
@@ -159,7 +157,6 @@ void UrlManager::deleteStream(int index)
     this->saveToPreferences();
 }
 
-
 void UrlManager::saveToPreferences()
 {
 
@@ -169,7 +166,7 @@ void UrlManager::saveToPreferences()
     for (int i = 0; i < streamCount; i++)
     {
 
-    Serial.println(String(streamCount));
+        Serial.println(String(streamCount));
         String keyId = "Id" + String(i);
         String keyName = "name" + String(i);
         String keyUrl = "url" + String(i);
@@ -187,8 +184,6 @@ void UrlManager::saveToPreferences()
     }
     myPreferences.putUInt("stream_count", streamCount);
 }
-
-
 
 void UrlManager::readAndPrintValue(const char *key)
 {

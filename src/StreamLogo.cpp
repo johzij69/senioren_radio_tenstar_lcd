@@ -24,6 +24,7 @@ void StreamLogo::begin()
     // LittleFS.remove("/StreamLogosNPO-Radio1.jpg");
   //  LittleFS.format();
 
+
     PrioLittleFS lFS;
     lFS.listLittleFS();
 

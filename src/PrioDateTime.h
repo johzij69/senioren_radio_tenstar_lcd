@@ -37,6 +37,8 @@ public:
 
     void setTimeZone(tm *timeinfo);
 
+    bool debug ; // Debugmodus (standaard uitgeschakeld)
+
 private:
     ThreeWire _threeWire; // ThreeWire-object voor communicatie met de RTC
     RtcDS1302<ThreeWire> _rtc; // RTC-object
