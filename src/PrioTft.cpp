@@ -127,3 +127,15 @@ String PrioTft::truncateStringToFit(const String &text, int maxWidth)
 
     return truncatedText;
 }
+
+void PrioTft::showLoadingState()
+{
+    tft.setTextFont(8);
+    tft.setTextSize(1);
+    tft.fillRect(10, 90, tft.width() - 10, tft.fontHeight(), TFT_BLACK);
+    tft.setCursor(10, 90);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.println("Loading....");
+    tft.setTextFont(4);
+    tft.setTextSize(1);
+}

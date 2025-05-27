@@ -39,6 +39,7 @@ public:
     void clearGreenLine(int lineNumber);
     void showTime(const String &time);
     void drawParaLine(const String &text, int startY);
+    void showLoadingState();
     String truncateStringToFit(const String &text, int maxWidth);
 };
 

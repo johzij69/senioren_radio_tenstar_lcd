@@ -8,6 +8,7 @@ void webServerTask(void *parameter)
 
     // Use the webserver object
     webserver->ip = WiFi.localIP().toString();
+    Serial.printf("[DEBUG] Webserver IP: %s\n", webserver->ip.c_str());
     webserver->begin();
     xEventGroupSetBits(taskEvents, WEBSERVER_TASK_STARTED_BIT);
     // Infinite loop for the task

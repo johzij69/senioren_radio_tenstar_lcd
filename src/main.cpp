@@ -1,7 +1,7 @@
 #include "main.h"
 #include "driver/ledc.h" // Include LEDC driver header for PWM functionality
 
-bool debug = true; // Set to true for debug output
+bool debug = false; // Set to true for debug output
 
 int max_volume = MAX_VOLUME; // set default max volume
 int last_volume = 10;
@@ -40,6 +40,8 @@ TaskHandle_t webServerTaskHandle = NULL; // Task handle for the webserver task
 
 PrioDateTime pDateTime(RTC_CLK_PIN, RTC_DAT_PIN, RTC_RST_PIN);
 
+WiFiManager wm;
+
 // Semaphore voor ISR-communicatie
 SemaphoreHandle_t powerButtonSemaphore;
 
@@ -48,51 +50,55 @@ volatile unsigned long lastInterruptTime = 0;
 const unsigned long debounceDelay = 200; // ms
 bool systemLowPower = false;
 
-void checkSavedWiFiCredentials()
-{
-    Preferences prefs;
-    prefs.begin("WiFiManager", true); // true = alleen-lezen modus
-
-    // Lees SSID & wachtwoord
-    String savedSSID = prefs.getString("ssid", ""); // "ssid" is de standaard sleutel in WiFiManager
-    String savedPass = prefs.getString("pass", ""); // "pass" is de standaard sleutel
-
-    // Log naar seriële monitor
-    Serial.println("[DEBUG] Opgeslagen WiFi-gegevens:");
-    Serial.println("SSID: " + savedSSID);
-    Serial.println("Wachtwoord: " + savedPass); // Let op: log geen echte wachtwoorden in productiecode!
-
-    prefs.end(); // Sluit NVS
-}
-
 void setup()
 {
     Serial.begin(115200); // Initialize serial communication
+    // WIFIR PROBLEMS DUE TO PIN21 EMI?
+    pinMode(21, OUTPUT);
+    digitalWrite(21, LOW); // Schakel LED/storing uit
+
     if (debug)
     {
         Serial.println("Starting Prio Radio...");
-        delay(10000); // Wait for serial to initialize
-        if (!Serial)
-        {
-            Serial.println("Serial communication not initialized. Check your connections.");
-            return;
-        }
+        delay(1000);             // Wait for serial to initialize
+        wm.setDebugOutput(true); // Debug-logging aan
         Serial.println("Debug mode is ON");
     }
 
+    Serial.println("Starting tasks");
+    startDisplayTask();
+    displayData.loadingState = true; // Set loading state to true initially
+    xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
+
+    // power button
+    pinMode(POWER_BUTTON_PIN, INPUT_PULLUP);
+    powerButtonSemaphore = xSemaphoreCreateBinary();
+    attachInterrupt(digitalPinToInterrupt(POWER_BUTTON_PIN), handlePowerButtonInterrupt, FALLING);
+
+    WiFi.mode(WIFI_MODE_NULL); // Zorg dat alles uitgezet is
+    delay(100);
     WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-    WiFiManager wm;
-    checkSavedWiFiCredentials(); // Controleer bij opstarten
-    wm.setDebugOutput(true);     // Debug-logging aan
-    bool res;
-    res = wm.autoConnect("prio-radio");
+    // Reduceer WiFi-zendvermogen (minder interferentie)
+    WiFi.setTxPower(WIFI_POWER_8_5dBm); // Experimenteer met lagere waarden
+    WiFi.mode(WIFI_STA);
+
+    wm.setConfigPortalTimeout(120); // Langere timeout
+
+    bool res = wm.autoConnect("prio-radio");
     if (!res)
     {
         Serial.println("Failed to connect");
+        Serial.println("[ERROR] Verbinden mislukt. Config portal gestart.");
+        // Maak een functie om de foutmelding weer te geven op het tft scherm
         return;
     }
     else
     {
+
+        Serial.println("[OK] Verbonden met WiFi");
+        Serial.println("SSID: " + WiFi.SSID());
+        Serial.println("IP: " + WiFi.localIP().toString());
+
         Serial.println("WiFi connected");
         Serial.print("IP address: ");
         Serial.println(WiFi.localIP());
@@ -100,11 +106,6 @@ void setup()
         Serial.println(WiFi.dnsIP());
         Serial.print("Gateway address: ");
         Serial.println(WiFi.gatewayIP());
-
-        // power button
-        pinMode(POWER_BUTTON_PIN, INPUT_PULLUP);
-        powerButtonSemaphore = xSemaphoreCreateBinary();
-        attachInterrupt(digitalPinToInterrupt(POWER_BUTTON_PIN), handlePowerButtonInterrupt, FALLING);
 
         myPrefs.begin();
         // Start de tijdservice
@@ -157,35 +158,12 @@ void setup()
         // Initialiseer het event group
         taskEvents = xEventGroupCreate();
 
-        Serial.println("Starting tasks");
-        //   Create the FreeRTOS task for the Display
-        xTaskCreate(
-            DisplayTask,          // Task function
-            "DisplayTask",        // Name of the task
-            8192,                 // Stack size in words
-            (void *)DisplayQueue, // Task parameter
-            5,                    // Priority of the task
-            &displayTaskHandle);  // Task handle
+        Serial.println("Starting webserver task");
+        startWebServerTask(); // Start de webserver taak
+        Serial.println("Webserver task started");
 
-        xTaskCreatePinnedToCore(
-            webServerTask,      // Task function
-            "webServerTask",    // Name of the task
-            4096,               // Stack size in words
-            (void *)&webServer, // Task parameter
-            5,                  // Priority of the task
-            &webServerTaskHandle,
-            1); // Task handle
-
-        // Create the FreeRTOS task for the AudioTask
-        Serial.println("Starting audio task task");
-        xTaskCreatePinnedToCore(
-            AudioTask,            // Task function
-            "AudioTask",          // Name of the task
-            8192,                 // Stack size in words
-            (void *)AudioQueue,   // Task parameter
-            1,                    // Priority of the task
-            &audioTaskHandle, 1); // Task handle
-
+        Serial.println("Starting audio task");
+        startAudioTask();
         Serial.println("Audio task started");
     }
 }
@@ -206,8 +184,8 @@ void loop()
         displayData.volume = rotaryInstance.current_value;
         audioData.volume = rotaryInstance.current_value;
         last_volume = rotaryInstance.current_value;
-        xQueueSend(AudioQueue, &audioData, portMAX_DELAY);
-        xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
+        CreateAndSendAudioData(stream_index, rotaryInstance.current_value);
+        CreateAndSendDisplayData(stream_index);
         rotaryInstance.current_value_changed = false;
     }
 
@@ -239,8 +217,10 @@ void loop()
         {
             Serial.println("⏻ Systeem hervatten...");
 
-            xTaskCreatePinnedToCore(webServerTask, "WebServer", 8192, NULL, 1, &webServerTaskHandle, 1);
-            xTaskCreatePinnedToCore(AudioTask, "Audio", 8192, NULL, 1, &audioTaskHandle, 1);
+            startWebServerTask(); // Start de webserver taak opnieuw
+            startAudioTask();     // Start de audio taak opnieuw
+                                  // xTaskCreatePinnedToCore(webServerTask, "WebServer", 8192, NULL, 1, &webServerTaskHandle, 1);
+                                  // xTaskCreatePinnedToCore(AudioTask, "Audio", 8192, NULL, 1, &audioTaskHandle, 1);
         }
     }
 
@@ -283,6 +263,8 @@ void usePreset(int preset)
 void CreateAndSendDisplayData(int streamIndex)
 {
     displayData.volume = last_volume;
+    displayData.syncTime = true;      // Reset syncTime flag
+    displayData.loadingState = false; // Set loading state to true
     strncpy(displayData.ip, WiFi.localIP().toString().c_str(), sizeof(displayData.ip));
     strncpy(displayData.title, UrlManagerInstance.Streams[streamIndex].name.c_str(), sizeof(displayData.title));
     strncpy(displayData.logo, UrlManagerInstance.Streams[streamIndex].logo.c_str(), sizeof(displayData.logo));
@@ -298,16 +280,11 @@ void CreateAndSendDisplayData(int streamIndex)
 /* Get data and send it to audio queue */
 void CreateAndSendAudioData(int streamIndex, int last_volume)
 {
-
     AudioData cmd = {};
     cmd.command = CMD_PLAY;
     cmd.volume = last_volume;
     strncpy(cmd.url, UrlManagerInstance.Streams[streamIndex].url.c_str(), sizeof(cmd.url));
     xQueueSend(AudioQueue, &cmd, portMAX_DELAY);
-
-    // audioData.volume = last_volume;
-    // strncpy(audioData.url, UrlManagerInstance.Streams[streamIndex].url.c_str(), sizeof(audioData.url));
-    // xQueueSend(AudioQueue, &audioData, portMAX_DELAY);
 }
 
 /* Audio events */
@@ -335,5 +312,45 @@ void sync_time()
     {
         prevTime = displayData.currenTime;
         xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
+    }
+}
+
+void startDisplayTask()
+{
+    if (displayTaskHandle == NULL)
+    {
+        xTaskCreate(
+            DisplayTask,          // Task function
+            "DisplayTask",        // Name of the task
+            8192,                 // Stack size in words
+            (void *)DisplayQueue, // Task parameter
+            5,                    // Priority of the task
+            &displayTaskHandle);  // Task handle
+    }
+}
+void startWebServerTask()
+{
+    if (webServerTaskHandle == NULL)
+    {
+        xTaskCreate(
+            webServerTask,         // Task function
+            "webServerTask",       // Name of the task
+            8192,                  // Stack size in words
+            (void *)&webServer,    // Task parameter
+            5,                     // Priority of the task
+            &webServerTaskHandle); // Task handle
+    }
+}
+void startAudioTask()
+{
+    if (audioTaskHandle == NULL)
+    {
+        xTaskCreate(
+            AudioTask,          // Task function
+            "AudioTask",        // Name of the task
+            8192,               // Stack size in words
+            (void *)AudioQueue, // Task parameter
+            1,                  // Priority of the task
+            &audioTaskHandle);  // Task handle
     }
 }

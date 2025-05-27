@@ -33,5 +33,8 @@ void printBinary(int v, int num_places);
 void usePreset(int presetNumber);
 void setup_backlight() ;
 void sync_time();
+void startDisplayTask();
+void startWebServerTask();
+void startAudioTask();
 
 
