@@ -13,11 +13,11 @@ void PrioDateTime::begin()
     // Initialiseer de RTC
     _rtc.Begin();
 
-if(debug)
+    if (debug)
     {
-            Serial.println("RTC initialiseren...");
-            delay(5000); // Wacht 1 seconde voor de initialisatie
-    }   
+        Serial.println("RTC initialiseren...");
+        delay(5000); // Wacht 1 seconde voor de initialisatie
+    }
     // Controleer of de RTC werkt en een geldige tijd heeft
     if (!_rtc.IsDateTimeValid())
     {
@@ -164,7 +164,6 @@ void PrioDateTime::setTimeZone(tm *timeinfo)
         // Zomertijd: UTC+2
         setenv("TZ", "UTC+2", 1);
         timeinfo->tm_hour += 2; // Voeg 2 uur toe voor zomertijd
-
     }
     else
     {
@@ -175,7 +174,6 @@ void PrioDateTime::setTimeZone(tm *timeinfo)
     }
     tzset(); // Pas de tijdzone-instelling toe
     // Converteer de tijd naar time_t en terug naar tm om de tijdzone correct toe te passen
-//    time_t time = mktime(timeinfo);
-//    localtime_r(&time, timeinfo);
-  
+    //    time_t time = mktime(timeinfo);
+    //    localtime_r(&time, timeinfo);
 }

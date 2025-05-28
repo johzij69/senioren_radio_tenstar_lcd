@@ -1,7 +1,7 @@
 #include "main.h"
 #include "driver/ledc.h" // Include LEDC driver header for PWM functionality
 
-bool debug = false; // Set to true for debug output
+bool debug = true; // Set to true for debug output
 
 int max_volume = MAX_VOLUME; // set default max volume
 int last_volume = 10;
@@ -50,24 +50,80 @@ volatile unsigned long lastInterruptTime = 0;
 const unsigned long debounceDelay = 200; // ms
 bool systemLowPower = false;
 
+Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
+
 void setup()
 {
     Serial.begin(115200); // Initialize serial communication
-    // WIFIR PROBLEMS DUE TO PIN21 EMI?
-    pinMode(21, OUTPUT);
-    digitalWrite(21, LOW); // Schakel LED/storing uit
+
+    // Zorg er voor dat de RGB led op board uit is en blijft
+    // Als je de pin laag zet is er altijd kans dat deze ruis opakt waardoor de led aan gaat!
+    strip.begin(); // Initialiseer de strip
+    strip.clear(); // Alle pixels op zwart zetten
+    strip.show();
+
+    // Om er zeker van te zijn dat de i2c bus voor de licht sensor en Top panel actief is
+    Wire.begin(TOPPANEL_SDA, TOPPANEL_SCL); // Initialize I2C bus for the top panel and light sensor
 
     if (debug)
     {
         Serial.println("Starting Prio Radio...");
-        delay(1000);             // Wait for serial to initialize
+        delay(10000);            // Wait for serial to initialize
         wm.setDebugOutput(true); // Debug-logging aan
         Serial.println("Debug mode is ON");
     }
 
+    // Initialiseer het event group
+    taskEvents = xEventGroupCreate();
+    if (taskEvents == NULL)
+    {
+        Serial.println("FOUT: Event group kon niet worden aangemaakt!");
+    }
+    else
+    {
+        Serial.println("Event group aangemaakt.");
+    }
     Serial.println("Starting tasks");
-    startDisplayTask();
+
     displayData.loadingState = true; // Set loading state to true initially
+    xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
+    startDisplayTask();
+
+    // ik wil hier een timestamp loggen
+    Serial.println("Waiting for display task to start...");
+    char timeBuffer[32];
+    time_t now = time(nullptr);
+    struct tm timeinfo;
+    localtime_r(&now, &timeinfo);
+    strftime(timeBuffer, sizeof(timeBuffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
+    Serial.print("Timestamp: ");
+    Serial.println(timeBuffer);
+    // Wacht op het event dat de display task is gestart
+
+    EventBits_t bits = xEventGroupWaitBits(
+        taskEvents,               // Event group handle
+        DISPLAY_TASK_STARTED_BIT, // Bits om op te wachten
+        pdFALSE,                  // CLEAR de bits na het wachten
+        pdTRUE,                   // Wacht op ALLE opgegeven bits
+        pdMS_TO_TICKS(55000)      // Timeout van 5000 ms
+    );
+
+    time_t nowe = time(nullptr);
+    struct tm timeinfoe;
+    localtime_r(&nowe, &timeinfoe);
+    strftime(timeBuffer, sizeof(timeBuffer), "%Y-%m-%d %H:%M:%S", &timeinfoe);
+    Serial.print("Timestamp eind: ");
+    Serial.println(timeBuffer);
+
+    if ((bits & DISPLAY_TASK_STARTED_BIT) == 0)
+    {
+        Serial.println("Error: Display task start timeout!");
+        while (1)
+            ; // Blokkeer als display niet start
+    }
+
+    displayData.loadingState = false;
+    strncpy(displayData.title, "Verbinden met WiFi...", sizeof(displayData.title));
     xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
 
     // power button
@@ -79,17 +135,19 @@ void setup()
     delay(100);
     WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
     // Reduceer WiFi-zendvermogen (minder interferentie)
-    WiFi.setTxPower(WIFI_POWER_8_5dBm); // Experimenteer met lagere waarden
+    WiFi.setTxPower(WIFI_POWER_21dBm); // Experimenteer met lagere waarden
     WiFi.mode(WIFI_STA);
 
     wm.setConfigPortalTimeout(120); // Langere timeout
-
+    wm.setConnectTimeout(30);       // Verbind timeout
     bool res = wm.autoConnect("prio-radio");
     if (!res)
     {
         Serial.println("Failed to connect");
         Serial.println("[ERROR] Verbinden mislukt. Config portal gestart.");
         // Maak een functie om de foutmelding weer te geven op het tft scherm
+        strncpy(displayData.title, "Verbinden met Failed...", sizeof(displayData.title));
+        xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
         return;
     }
     else
@@ -98,10 +156,6 @@ void setup()
         Serial.println("[OK] Verbonden met WiFi");
         Serial.println("SSID: " + WiFi.SSID());
         Serial.println("IP: " + WiFi.localIP().toString());
-
-        Serial.println("WiFi connected");
-        Serial.print("IP address: ");
-        Serial.println(WiFi.localIP());
         Serial.print("DNS address: ");
         Serial.println(WiFi.dnsIP());
         Serial.print("Gateway address: ");
@@ -148,15 +202,12 @@ void setup()
 
         // Set ip display data and volume
         strncpy(displayData.ip, WiFi.localIP().toString().c_str(), sizeof(displayData.ip));
-        displayData.syncTime = true; // Reset syncTime flag
+        // displayData.syncTime = true; // Reset syncTime flag
         displayData.volume = last_volume;
         audioData.volume = last_volume;
 
         // Play the last used stream
         usePreset(stream_index);
-
-        // Initialiseer het event group
-        taskEvents = xEventGroupCreate();
 
         Serial.println("Starting webserver task");
         startWebServerTask(); // Start de webserver taak
@@ -185,7 +236,7 @@ void loop()
         audioData.volume = rotaryInstance.current_value;
         last_volume = rotaryInstance.current_value;
         CreateAndSendAudioData(stream_index, rotaryInstance.current_value);
-        CreateAndSendDisplayData(stream_index);
+        SendDataToDisplay();
         rotaryInstance.current_value_changed = false;
     }
 
@@ -263,7 +314,7 @@ void usePreset(int preset)
 void CreateAndSendDisplayData(int streamIndex)
 {
     displayData.volume = last_volume;
-    displayData.syncTime = true;      // Reset syncTime flag
+    // displayData.syncTime = true;      // Reset syncTime flag
     displayData.loadingState = false; // Set loading state to true
     strncpy(displayData.ip, WiFi.localIP().toString().c_str(), sizeof(displayData.ip));
     strncpy(displayData.title, UrlManagerInstance.Streams[streamIndex].name.c_str(), sizeof(displayData.title));
@@ -272,11 +323,14 @@ void CreateAndSendDisplayData(int streamIndex)
     strncpy(displayData.station, "Loading...", sizeof(displayData.station));
     strncpy(displayData.icyurl, "Loading...", sizeof(displayData.icyurl));
     strncpy(displayData.lasthost, "Loading...", sizeof(displayData.lasthost));
-    strncpy(displayData.streamtitle, "Wachten op titel...", sizeof(displayData.streamtitle));
+    strncpy(displayData.streamtitle, "", sizeof(displayData.streamtitle));
     strncpy(displayData.currenTime, pDateTime.getTime(), sizeof(displayData.currenTime));
+    SendDataToDisplay();
+}
+void SendDataToDisplay()
+{
     xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
 }
-
 /* Get data and send it to audio queue */
 void CreateAndSendAudioData(int streamIndex, int last_volume)
 {
@@ -319,13 +373,22 @@ void startDisplayTask()
 {
     if (displayTaskHandle == NULL)
     {
-        xTaskCreate(
-            DisplayTask,          // Task function
-            "DisplayTask",        // Name of the task
-            8192,                 // Stack size in words
-            (void *)DisplayQueue, // Task parameter
-            5,                    // Priority of the task
-            &displayTaskHandle);  // Task handle
+        BaseType_t result = xTaskCreate(
+            DisplayTask,
+            "DisplayTask",
+            8192,
+            (void *)DisplayQueue,
+            5,
+            &displayTaskHandle);
+
+        if (result != pdPASS)
+        {
+            Serial.println("FOUT: DisplayTask kon niet worden gestart!");
+        }
+        else
+        {
+            Serial.println("DisplayTask is gestart.");
+        }
     }
 }
 void startWebServerTask()

@@ -19,6 +19,7 @@
 #include "UrlManager.h"
 #include "PrioWebserver.h"
 #include "task_webServer.h"
+#include <Adafruit_NeoPixel.h>
 #include "globals.h" 
 
 
@@ -36,5 +37,5 @@ void sync_time();
 void startDisplayTask();
 void startWebServerTask();
 void startAudioTask();
-
+void SendDataToDisplay();
 

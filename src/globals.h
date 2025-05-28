@@ -51,7 +51,9 @@
 
 #define WEB_SERVER_PORT 80
 
-
+// RGB LED on board
+#define LED_PIN     48     
+#define LED_COUNT   1
 
 
 

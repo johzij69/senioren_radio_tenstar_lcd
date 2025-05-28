@@ -16,7 +16,7 @@ void PrioTft::begin()
     pBar.begin(450, 0, 30, 320, TFT_LIGHTGREY, TFT_BLACK, max_volume);
     pBar.draw(last_volume);
     sLogo.begin();
-    sLogo.Show(kantline, 100, "https://img.prio-ict.nl/api/images/webradio-default.jpg");
+ //   sLogo.Show(kantline, 100, "https://img.prio-ict.nl/api/images/webradio-default.jpg");
     isInitialized = true; // Scherm is geïnitialiseerd
     cur_volume = last_volume;
     drawParaLine("Titel: ", 251);
@@ -24,6 +24,7 @@ void PrioTft::begin()
     //sTitle.begin();
     //  sTitle.setScrollerText("Dit is een lange tekst die zal scrollen, zodat je de hele tekst kunt lezen.");
     // sTitle.setScrollerText("Kort tekstje");
+    Serial.println("TFT scherm is geïnitialiseerd.");
 }
 
 void PrioTft::loop()

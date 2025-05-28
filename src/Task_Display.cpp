@@ -16,40 +16,12 @@ bool fixedbacklight = false; // Zet deze op true om de backlight op een vaste wa
 
 void DisplayTask(void *parameter)
 {
-    Serial.println("Display task started");
+    Serial.println("Display task starting...");
 
     PrioTft prioTft;
-
-    prioTft.begin(); // Initialiseer het TFT scherm
-    if (!prioTft.isInitialized)
-    {
-        Serial.println("TFT-initialisatie mislukt. Controleer hardwareverbindingen.");
-    }
-    //  setup_backlight(); // Initialiseer de backlight
     Adafruit_VEML7700 veml = Adafruit_VEML7700();
-    Serial.println("Display task started3");
+
     bool sensorFound = false;
-    for (int attempt = 0; attempt < 5; ++attempt)
-    {
-        if (veml.begin())
-        {
-            sensorFound = true;
-            break;
-        }
-        Serial.println("Sensor not found, retrying...");
-        vTaskDelay(500 / portTICK_PERIOD_MS);
-    }
-    if (!sensorFound)
-    {
-        Serial.println("Light sensor not found after 5 attempts, continuing without sensor.");
-    }
-    else
-    {
-        Serial.println("Light Sensor found");
-        veml.setGain(VEML7700_GAIN_1);
-        veml.setIntegrationTime(VEML7700_IT_100MS);
-    }
-    setup_backlight(); // Initialiseer de backlight
 
     static unsigned long lastBacklightUpdate = 0;
 
@@ -63,8 +35,46 @@ void DisplayTask(void *parameter)
     String prevStreamTitle = "";
     String prevTime = "";
 
+    prioTft.begin(); // Initialiseer het TFT scherm
+    Serial.println("DisplayTask: TFT scherm is geïnitialiseerd");
+    if (!prioTft.isInitialized)
+    {
+        Serial.println("TFT-initialisatie mislukt. Controleer hardwareverbindingen.");
+    }
+
+    Serial.println("DisplayTask: TFT scherm is klaar");
+
+    for (int attempt = 0; attempt < 5; ++attempt)
+    {
+        Serial.print("DisplayTask: Initializing light sensor, attempt ");
+        Serial.println(attempt + 1);
+        if (veml.begin())
+        {
+            sensorFound = true;
+            break;
+        }
+        Serial.println("Sensor not found, retrying...");
+        vTaskDelay(500 / portTICK_PERIOD_MS);
+    }
+
+  //  sensorFound = false; // Probeer de sensor te initialiseren
+    if (!sensorFound)
+    {
+        Serial.println("Light sensor not found after 5 attempts, continuing without sensor.");
+    }
+    else
+    {
+        Serial.println("Light Sensor found");
+        veml.setGain(VEML7700_GAIN_1);
+        veml.setIntegrationTime(VEML7700_IT_100MS);
+    }
+    setup_backlight(); // Initialiseer de backlight
+
     // Zet het event om aan te geven dat de DisplayTask is gestart
+
+    Serial.println("DisplayTask: zetten van DISPLAY_TASK_STARTED_BIT");
     xEventGroupSetBits(taskEvents, DISPLAY_TASK_STARTED_BIT);
+    Serial.println("DisplayTask: bit gezet");
     while (true)
     {
 
@@ -122,13 +132,13 @@ void DisplayTask(void *parameter)
                     prioTft.setLogo(_displayData.logo);
                     prevLogo = _displayData.logo;
                 }
-            }
 
-            //      Serial.println("Display: currenTime" + String(_displayData.currenTime));
-            if (prevTime != _displayData.currenTime)
-            {
-                prioTft.showTime(_displayData.currenTime);
-                prevTime = _displayData.currenTime;
+                //      Serial.println("Display: currenTime" + String(_displayData.currenTime));
+                if (prevTime != _displayData.currenTime)
+                {
+                    prioTft.showTime(_displayData.currenTime);
+                    prevTime = _displayData.currenTime;
+                }
             }
         }
 
