@@ -27,6 +27,20 @@ void PrioTft::begin()
     Serial.println("TFT scherm is geïnitialiseerd.");
 }
 
+void PrioTft::showStandbyState()
+{
+    tft.fillScreen(TFT_BLACK);
+    tft.setCursor(2, 2, 4);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.println("PRIO-WEBRADIO");
+    tft.setTextFont(8);
+    tft.setTextSize(1);
+    tft.setCursor(10, 90);
+    tft.println("Standby mode");
+    tft.setTextFont(4);
+    tft.setTextSize(1);
+}
+
 void PrioTft::loop()
 {
     // pBar.draw(cur_volume);
@@ -105,6 +119,19 @@ void PrioTft::showTime(const String &time)
     tft.setTextSize(1);
     tft.fillRect(185, 90, tft.width() - (pBar.width_set + 200), tft.fontHeight(), TFT_BLACK);
     tft.setCursor(185, 90);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.println(time);
+    tft.setTextFont(4);
+    tft.setTextSize(1);
+}
+
+void PrioTft::showStandbyTime(const String &time)
+{
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextFont(8);
+    tft.setTextSize(1);
+    tft.fillRect(0, 0, tft.width(), tft.fontHeight(), TFT_BLACK);
+    tft.setCursor(10, 10);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.println(time);
     tft.setTextFont(4);

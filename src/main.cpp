@@ -222,25 +222,28 @@ void setup()
 /* main loop ;-) */
 void loop()
 {
+    sync_time();
 
-    //    ledc_set_duty(LEDC_LOW_SPEED_MODE, pwmChannel, 125);
-    inputPanel.loop();     // Voer de loop van de input panel uit -> presets buttons and power led
-    rfReceiver.loop();     // Voer de loop van de RF-ontvanger uit -> rf remote
-    rotaryInstance.loop(); // Voer de loop van de rotary encoder uit -> volume
+    if (!inStandby)
+    {                          
+        inputPanel.loop();     // Voer de loop van de input panel uit -> presets buttons and power led
+        rfReceiver.loop();     // Voer de loop van de RF-ontvanger uit -> rf remote
+        rotaryInstance.loop(); // Voer de loop van de rotary encoder uit -> volume
 
-    if (rotaryInstance.current_value_changed)
-    {
-        Serial.println("Volume changed to: " + String(rotaryInstance.current_value));
-        myPrefs.writeValue("volume", rotaryInstance.current_value);
-        displayData.volume = rotaryInstance.current_value;
-        audioData.volume = rotaryInstance.current_value;
-        last_volume = rotaryInstance.current_value;
-        CreateAndSendAudioData(stream_index, rotaryInstance.current_value);
-        SendDataToDisplay();
-        rotaryInstance.current_value_changed = false;
+        if (rotaryInstance.current_value_changed)
+        {
+            Serial.println("Volume changed to: " + String(rotaryInstance.current_value));
+            myPrefs.writeValue("volume", rotaryInstance.current_value);
+            displayData.volume = rotaryInstance.current_value;
+            audioData.volume = rotaryInstance.current_value;
+            last_volume = rotaryInstance.current_value;
+            CreateAndSendAudioData(stream_index, rotaryInstance.current_value);
+            SendDataToDisplay();
+            rotaryInstance.current_value_changed = false;
+        }
     }
 
-    sync_time();
+
 
     if (xSemaphoreTake(powerButtonSemaphore, 0) == pdTRUE)
     {
@@ -248,6 +251,9 @@ void loop()
 
         if (systemLowPower)
         {
+            inStandby = true;                // Zet de standby status
+            displayData.standbyState = true; // Zet de standby state in display data
+            SendDataToDisplay();             // Stuur de display data naar de queue
             Serial.println("⏻ Naar slaapstand...");
 
             if (webServerTaskHandle != NULL)
@@ -266,6 +272,9 @@ void loop()
         }
         else
         {
+            inStandby = false;                // Zet de standby status uit
+            displayData.standbyState = false; // Zet de standby state uit in display data
+            SendDataToDisplay();
             Serial.println("⏻ Systeem hervatten...");
 
             startWebServerTask(); // Start de webserver taak opnieuw
@@ -315,7 +324,8 @@ void CreateAndSendDisplayData(int streamIndex)
 {
     displayData.volume = last_volume;
     // displayData.syncTime = true;      // Reset syncTime flag
-    displayData.loadingState = false; // Set loading state to true
+    displayData.loadingState = false;
+    displayData.standbyState = inStandby; // Set standby state
     strncpy(displayData.ip, WiFi.localIP().toString().c_str(), sizeof(displayData.ip));
     strncpy(displayData.title, UrlManagerInstance.Streams[streamIndex].name.c_str(), sizeof(displayData.title));
     strncpy(displayData.logo, UrlManagerInstance.Streams[streamIndex].logo.c_str(), sizeof(displayData.logo));

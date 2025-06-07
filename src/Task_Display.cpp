@@ -57,7 +57,7 @@ void DisplayTask(void *parameter)
         vTaskDelay(500 / portTICK_PERIOD_MS);
     }
 
-  //  sensorFound = false; // Probeer de sensor te initialiseren
+    //  sensorFound = false; // Probeer de sensor te initialiseren
     if (!sensorFound)
     {
         Serial.println("Light sensor not found after 5 attempts, continuing without sensor.");
@@ -89,55 +89,64 @@ void DisplayTask(void *parameter)
             }
             else
             {
-                spl("Data redceived for display task");
-                // spl("ip: " + String(_displayData.ip));
-                spl("tft_title: " + String(_displayData.title));
-                //           spl("volume: " + String(_displayData.volume));
-                // spl("logo: " + String(_displayData.logo));
-                // spl("bitrate: " + String(_displayData.bitrate));
-                spl("Tft_station: " + String(_displayData.station));
-                // spl("icyurl: " + String(_displayData.icyurl));
-                // spl("lasthost: " + String(_displayData.lasthost));
-                spl("tft_streamtitle: " + String(_displayData.streamtitle));
-                spl("currenTime: " + String(_displayData.currenTime));
+                if (_displayData.standbyState)
+                {
+                    prioTft.showStandbyTime(_displayData.currenTime);
+                    Serial.println("Display: Standby state active");
+                }
+                else
+                {
 
-                // Controleer en update alleen als de waarde is gewijzigd
-                if (prevIp != _displayData.ip)
-                {
-                    prioTft.showLocalIp(_displayData.ip);
-                    prevIp = _displayData.ip;
-                }
-                if (prevTitle != _displayData.title)
-                {
-                    cleanStreamTitle(&_displayData); // When title is changed check if streamtitle needs to be cleaned
-                    prioTft.setTitle(_displayData.title);
-                    prevTitle = _displayData.title;
-                }
-                if (prevStreamTitle != _displayData.streamtitle)
-                {
-                    cleanStreamTitle(&_displayData);
-                    prioTft.setStreamTitle(_displayData.streamtitle);
-                    prevStreamTitle = _displayData.streamtitle;
-                }
+                    spl("Data redceived for display task");
+                    // spl("ip: " + String(_displayData.ip));
+                    spl("tft_title: " + String(_displayData.title));
+                    //           spl("volume: " + String(_displayData.volume));
+                    // spl("logo: " + String(_displayData.logo));
+                    // spl("bitrate: " + String(_displayData.bitrate));
+                    spl("Tft_station: " + String(_displayData.station));
+                    // spl("icyurl: " + String(_displayData.icyurl));
+                    // spl("lasthost: " + String(_displayData.lasthost));
+                    spl("tft_streamtitle: " + String(_displayData.streamtitle));
+                    spl("currenTime: " + String(_displayData.currenTime));
 
-                Serial.println("Display: streamtitle" + String(_displayData.streamtitle));
+                    // Controleer en update alleen als de waarde is gewijzigd
+                    if (prevIp != _displayData.ip)
+                    {
+                        prioTft.showLocalIp(_displayData.ip);
+                        prevIp = _displayData.ip;
+                    }
+                    if (prevTitle != _displayData.title)
+                    {
+                        cleanStreamTitle(&_displayData); // When title is changed check if streamtitle needs to be cleaned
+                        prioTft.setTitle(_displayData.title);
+                        prevTitle = _displayData.title;
+                    }
+                    if (prevStreamTitle != _displayData.streamtitle)
+                    {
+                        cleanStreamTitle(&_displayData);
+                        prioTft.setStreamTitle(_displayData.streamtitle);
+                        prevStreamTitle = _displayData.streamtitle;
+                    }
 
-                if (prevVolume != _displayData.volume)
-                {
-                    prioTft.setVolume(_displayData.volume);
-                    prevVolume = _displayData.volume;
-                }
-                if (prevLogo != _displayData.logo)
-                {
-                    prioTft.setLogo(_displayData.logo);
-                    prevLogo = _displayData.logo;
-                }
+                    Serial.println("Display: streamtitle" + String(_displayData.streamtitle));
 
-                //      Serial.println("Display: currenTime" + String(_displayData.currenTime));
-                if (prevTime != _displayData.currenTime)
-                {
-                    prioTft.showTime(_displayData.currenTime);
-                    prevTime = _displayData.currenTime;
+                    if (prevVolume != _displayData.volume)
+                    {
+                        prioTft.setVolume(_displayData.volume);
+                        prevVolume = _displayData.volume;
+                    }
+                    if (prevLogo != _displayData.logo)
+                    {
+                        prioTft.setLogo(_displayData.logo);
+                        prevLogo = _displayData.logo;
+                    }
+
+                    //      Serial.println("Display: currenTime" + String(_displayData.currenTime));
+                    if (prevTime != _displayData.currenTime)
+                    {
+                        prioTft.showTime(_displayData.currenTime);
+                        prevTime = _displayData.currenTime;
+                    }
                 }
             }
         }

@@ -40,6 +40,8 @@ public:
     void showTime(const String &time);
     void drawParaLine(const String &text, int startY);
     void showLoadingState();
+    void showStandbyState();
+    void showStandbyTime(const String &time);
     String truncateStringToFit(const String &text, int maxWidth);
 };
 

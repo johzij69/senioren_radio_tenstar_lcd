@@ -24,7 +24,7 @@
 
 
 
-
+bool inStandby = false; // Flag to indicate if the system is in standby mode
 
 void checkVolume();
 void handlePowerButtonInterrupt() ;

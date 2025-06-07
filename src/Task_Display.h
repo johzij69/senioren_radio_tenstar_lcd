@@ -24,6 +24,7 @@ struct DisplayData {
     char streamtitle[255];
     int volume;
     bool loadingState;
+    bool standbyState;
     char currenTime[5];
 
 };
