@@ -34,16 +34,14 @@ void CreateAndSendAudioData(int streamIndex, int last_volume);
 void printBinary(int v, int num_places);
 
 void setup_backlight() ;
-void sync_time();
+void sync_time(bool forceSync = false);
 void startDisplayTask();
 void startWebServerTask();
 void startAudioTask();
 void SendDataToDisplay();
 void pauseAudioTask();
 void resumeAudioTask(); 
-void playAudio(int presetNumber);
-void pauseAudio();
-void resumeAudio();
-void stopAudio();
+void playStream(int presetNumber);
+
 
 

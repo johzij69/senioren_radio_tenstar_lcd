@@ -22,7 +22,8 @@ void DisplayTask(void *parameter)
     Adafruit_VEML7700 veml = Adafruit_VEML7700();
 
     bool sensorFound = false;
-
+    bool inStandby = false; // Flag to indicate if the system is in standby mode
+    bool fromStandby = false; // Flag to indicate if the system is coming from standby
     static unsigned long lastBacklightUpdate = 0;
 
     QueueHandle_t DisplayQueue = static_cast<QueueHandle_t>(parameter);
@@ -91,12 +92,29 @@ void DisplayTask(void *parameter)
             {
                 if (_displayData.standbyState)
                 {
+                    inStandby = true; // Zet de standby status
+                    fromStandby = true; // Zet de fromStandby status
                     prioTft.showStandbyTime(_displayData.currenTime);
                     Serial.println("Display: Standby state active");
                 }
                 else
                 {
 
+                    if(fromStandby){
+                        prioTft.init();
+                        fromStandby = false; // Reset fromStandby status
+                        Serial.println("Display: Coming from standby, showing standby state");
+                        prevIp = "";
+                        prevTitle = "";
+                        prevLogo = "";
+                        prevStreamTitle = "";
+                        prevTime = "";
+                        prevVolume = -1; // Reset previous values
+
+                    }
+                    
+                    
+                    
                     spl("Data redceived for display task");
                     // spl("ip: " + String(_displayData.ip));
                     spl("tft_title: " + String(_displayData.title));

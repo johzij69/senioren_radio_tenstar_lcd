@@ -10,6 +10,8 @@ extern EventGroupHandle_t taskEvents;
 
 void playAudio(const char *url, int volume)
 {
+    
+    
     AudioData data;
     data.command = CMD_PLAY;
     data.volume = volume;
@@ -55,3 +57,5 @@ void setAudioVolume(int volume)
     data.url[0] = '\0';  // Lege string betekent: zelfde stream
     xQueueSend(AudioQueue, &data, portMAX_DELAY);
 }
+
+

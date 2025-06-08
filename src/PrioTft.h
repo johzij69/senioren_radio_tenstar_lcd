@@ -9,6 +9,7 @@
 #include "TFTScroller.h"
 #include "StreamLogo.h"
 
+
 class PrioTft {
 private:
     TFT_eSPI tft; // TFT scherm object
@@ -26,6 +27,7 @@ public:
     
     PrioTft();
     void begin(); // Initialiseer het scherm
+    void init();
     void loop();  // Update het scherm
     void showLocalIp(const String &ip); // Toon het IP adres op het scherm
     void setVolume(int _cur_volume);

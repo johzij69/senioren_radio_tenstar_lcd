@@ -193,18 +193,21 @@ void setup()
         rotaryInstance.begin(MIN_VOLUME, max_volume, DEF_VOLUME);
         rotaryInstance.current_value = last_volume;
 
-        inputPanel.begin();                              // Initialiseer de input panel
-        inputPanel.setButtonPressedCallback(playStream); // Stel de callback in
+        inputPanel.begin();                             // Initialiseer de input panel
+        inputPanel.setButtonPressedCallback(playAudio); // Stel de callback in
 
         // Initialiseer de RF-ontvanger
         rfReceiver.begin();
-        rfReceiver.setKeyReceivedCallback(playStream); // Stel de callback-functie in
+        rfReceiver.setKeyReceivedCallback(playAudio); // Stel de callback-functie in
 
         // Set ip display data and volume
         strncpy(displayData.ip, WiFi.localIP().toString().c_str(), sizeof(displayData.ip));
         // displayData.syncTime = true; // Reset syncTime flag
         displayData.volume = last_volume;
         audioData.volume = last_volume;
+
+        // Play the last used stream
+        playAudio(stream_index);
 
         Serial.println("Starting webserver task");
         startWebServerTask(); // Start de webserver taak
@@ -213,10 +216,6 @@ void setup()
         Serial.println("Starting audio task");
         startAudioTask();
         Serial.println("Audio task started");
-
-        // Play the last used stream
-        playStream(stream_index);
-        sync_time(true); // Force sync time on startup
     }
 }
 
@@ -238,7 +237,7 @@ void loop()
             displayData.volume = rotaryInstance.current_value;
             audioData.volume = rotaryInstance.current_value;
             last_volume = rotaryInstance.current_value;
-            setAudioVolume(rotaryInstance.current_value);
+            CreateAndSendAudioData(stream_index, rotaryInstance.current_value);
             SendDataToDisplay();
             rotaryInstance.current_value_changed = false;
         }
@@ -259,15 +258,15 @@ void loop()
         }
         else
         {
-            inStandby = false; // Zet de standby status uit
-                               //           displayData.standbyState = false; // Zet de standby state uit in display data
-            CreateAndSendDisplayData(stream_index);
+            inStandby = false;                // Zet de standby status uit
+            displayData.standbyState = false; // Zet de standby state uit in display data
+            SendDataToDisplay();
             Serial.println("⏻ Systeem hervatten...");
             Serial.println("resuming audio task");
             resumeAudioTask();
+            //          vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for the audio task to resume
             Serial.println("resuming audio");
-            playStream(stream_index);
-            sync_time(true);
+            playAudio(stream_index);
         }
     }
 
@@ -318,6 +317,15 @@ void SendDataToDisplay()
 {
     xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
 }
+/* Get data and send it to audio queue */
+void CreateAndSendAudioData(int streamIndex, int last_volume)
+{
+    AudioData cmd = {};
+    cmd.command = CMD_PLAY;
+    cmd.volume = last_volume;
+    strncpy(cmd.url, UrlManagerInstance.Streams[streamIndex].url.c_str(), sizeof(cmd.url));
+    xQueueSend(AudioQueue, &cmd, portMAX_DELAY);
+}
 
 /* Audio events */
 void audio_showstation(const char *info)
@@ -336,17 +344,9 @@ void audio_bitrate(const char *info)
     xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
 }
 
-void sync_time(bool forceSync)
+void sync_time()
 {
-    if (forceSync)
-    {
-        pDateTime.syncTime();
-    }
-    else
-    {
-        pDateTime.checkSync();
-    }
-
+    pDateTime.checkSync(); // Controleer of synchronisatie nodig is at the moment ones every hour
     strncpy(displayData.currenTime, pDateTime.getTime(), sizeof(displayData.currenTime));
     if (prevTime != displayData.currenTime)
     {
@@ -442,12 +442,46 @@ void resumeAudioTask()
 }
 
 /* Switching radio stream */
-void playStream(int preset)
+void playAudio(int preset)
 {
-    Serial.println("Switching to stream: " + String(preset));
     stream_index = preset;
-    playAudio(UrlManagerInstance.Streams[stream_index].url.c_str(), rotaryInstance.current_value);
+    CreateAndSendAudioData(stream_index, rotaryInstance.current_value);
     CreateAndSendDisplayData(stream_index);
     /* Save last used stream, do it here so we know stream is working */
     myPrefs.putUInt("stream_index", stream_index);
+}
+
+void pauseAudio()
+{
+    audioData.command = CMD_PAUSE;
+    xQueueSend(AudioQueue, &audioData, portMAX_DELAY);
+
+    // Wacht hier tot de AudioTask bevestigt dat het gepauzeerd is
+    xEventGroupWaitBits(
+        taskEvents,
+        AUDIO_PAUSED_BIT,
+        pdTRUE, // Verwijder de bit na ontvangst
+        pdTRUE, // Wacht op ALLE vereiste bits (in dit geval 1)
+        portMAX_DELAY);
+}
+
+void resumeAudio()
+{
+    audioData.command = CMD_RESUME;
+    xQueueSend(AudioQueue, &audioData, portMAX_DELAY);
+}
+
+void stopAudio()
+{
+    audioData.command = CMD_STOP;
+    xQueueSend(AudioQueue, &audioData, portMAX_DELAY);
+
+    // Wacht hier tot de AudioTask bevestigt dat het gestopt is
+    xEventGroupWaitBits(
+        taskEvents,
+        AUDIO_STOPPED_BIT,
+        pdTRUE, // Verwijder de bit na ontvangst
+        pdTRUE, // Wacht op ALLE vereiste bits (in dit geval 1)
+        portMAX_DELAY);
+    Serial.println("Audio gestopt.");
 }

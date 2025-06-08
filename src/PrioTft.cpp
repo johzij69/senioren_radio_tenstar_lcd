@@ -9,6 +9,16 @@ void PrioTft::begin()
 {
     tft.init();         // Initialiseer het scherm
     tft.setRotation(3); // Pas rotatie aan indien nodig
+    init();
+
+    // sTitle.begin();
+    //   sTitle.setScrollerText("Dit is een lange tekst die zal scrollen, zodat je de hele tekst kunt lezen.");
+    //  sTitle.setScrollerText("Kort tekstje");
+    Serial.println("TFT scherm is geïnitialiseerd.");
+}
+
+void PrioTft::init()
+{
     tft.fillScreen(TFT_BLACK);
     tft.setCursor(2, 2, 4);
     tft.setTextColor(TFT_WHITE);
@@ -16,15 +26,9 @@ void PrioTft::begin()
     pBar.begin(450, 0, 30, 320, TFT_LIGHTGREY, TFT_BLACK, max_volume);
     pBar.draw(last_volume);
     sLogo.begin();
- //   sLogo.Show(kantline, 100, "https://img.prio-ict.nl/api/images/webradio-default.jpg");
     isInitialized = true; // Scherm is geïnitialiseerd
     cur_volume = last_volume;
     drawParaLine("Titel: ", 251);
-    
-    //sTitle.begin();
-    //  sTitle.setScrollerText("Dit is een lange tekst die zal scrollen, zodat je de hele tekst kunt lezen.");
-    // sTitle.setScrollerText("Kort tekstje");
-    Serial.println("TFT scherm is geïnitialiseerd.");
 }
 
 void PrioTft::showStandbyState()
@@ -33,7 +37,7 @@ void PrioTft::showStandbyState()
     tft.setCursor(2, 2, 4);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.println("PRIO-WEBRADIO");
-    tft.setTextFont(8);
+    tft.setTextFont(10);
     tft.setTextSize(1);
     tft.setCursor(10, 90);
     tft.println("Standby mode");
@@ -105,7 +109,7 @@ void PrioTft::clearLogoLine(int lineNumber)
 void PrioTft::clearGreenLine(int lineNumber)
 {
     int line = 25 * (lineNumber - 1);
-    tft.fillRect(0, line, tft.width() - pBar.width_set, tft.fontHeight()+2, TFT_GREYBLUE);
+    tft.fillRect(0, line, tft.width() - pBar.width_set, tft.fontHeight() + 2, TFT_GREYBLUE);
 }
 
 void PrioTft::setLogo(const String &url)
@@ -125,17 +129,48 @@ void PrioTft::showTime(const String &time)
     tft.setTextSize(1);
 }
 
+// void PrioTft::showStandbyTime(const String &time)
+// {
+
+//     File root = LittleFS.open("/fonts/");
+//     File file = root.openNextFile();
+//     while (file)
+//     {
+//         Serial.println(file.name());
+//         file = root.openNextFile();
+
+//     }
+
 void PrioTft::showStandbyTime(const String &time)
 {
+    String fontPath = "/fonts/Audiowide_Regular64.vlw";
+    
+    Serial.println("=== Font Loading Debug ===");
+    Serial.printf("Font path: %s\n", fontPath.c_str());
+    Serial.printf("File exists: %s\n", LittleFS.exists(fontPath) ? "YES" : "NO");
+    Serial.printf("Free heap: %d bytes\n", ESP.getFreeHeap());
+    
+    if (LittleFS.exists(fontPath)) {
+        File f = LittleFS.open(fontPath, "r");
+        if (f) {
+            Serial.printf("File size: %d bytes\n", f.size());
+            f.close();
+        }
+    }
+    
     tft.fillScreen(TFT_BLACK);
-    tft.setTextFont(8);
-    tft.setTextSize(1);
-    tft.fillRect(0, 0, tft.width(), tft.fontHeight(), TFT_BLACK);
-    tft.setCursor(10, 10);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    tft.println(time);
-    tft.setTextFont(4);
-    tft.setTextSize(1);
+    tft.unloadFont(); // Clear any existing font
+    
+    Serial.println("Attempting to load font...");
+    tft.loadFont(fontPath, LittleFS);
+    Serial.printf("Free heap after load: %d bytes\n", ESP.getFreeHeap());
+    
+    // Test of font geladen is door te tekenen
+    tft.setTextColor(TFT_WHITE);
+    tft.setTextDatum(MC_DATUM);
+    tft.drawString(time, tft.width() / 2, tft.height() / 2);
+    
+    Serial.println("Font load attempt completed");
 }
 
 String PrioTft::truncateStringToFit(const String &text, int maxWidth)
