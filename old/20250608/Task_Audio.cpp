@@ -5,6 +5,7 @@
 
 void AudioTask(void *parameter)
 {
+
     Audio audio;
     String current_url = "";
     int current_volume = MIN_VOLUME;
@@ -17,18 +18,20 @@ void AudioTask(void *parameter)
     audio.setVolume(DEF_VOLUME);
     audio.setVolumeSteps(VOLUME_STEPS);
 
+    // Wacht totdat zowel de DisplayTask als de webServerTask zijn gestart
     xEventGroupWaitBits(
-        taskEvents,
-        DISPLAY_TASK_STARTED_BIT | WEBSERVER_TASK_STARTED_BIT,
-        pdTRUE,
-        pdTRUE,
-        portMAX_DELAY);
+        taskEvents,                                            // Event group
+        DISPLAY_TASK_STARTED_BIT | WEBSERVER_TASK_STARTED_BIT, // Bits om op te wachten
+        pdTRUE,                                                // Clear de bits na het wachten
+        pdTRUE,                                                // Wacht op ALLE bits
+        portMAX_DELAY);                                        // Wacht oneindig lang
 
     while (true)
     {
         AudioData audioData;
         if (xQueueReceive(AudioQueue, &audioData, 0) == pdTRUE)
         {
+
             switch (audioData.command)
             {
             case CMD_PLAY:
@@ -46,105 +49,60 @@ void AudioTask(void *parameter)
                     current_url = String(audioData.url);
                     paused = false;
                 }
+                xEventGroupSetBits(taskEvents, AUDIO_STARTED_BIT); // Meld dat audio gestart is
 
-                // Bevestig dat audio gestart is (wordt ook bevestigd in loop via isRunning)
-                xEventGroupSetBits(taskEvents, AUDIO_STARTED_BIT);
                 break;
 
             case CMD_STOP:
                 Serial.println("Audio STOP commando ontvangen");
                 audio.stopSong();
+                xEventGroupSetBits(taskEvents, AUDIO_STOPPED_BIT); // Meld dat audio gestopt is
                 current_url = "";
                 paused = false;
-                xEventGroupSetBits(taskEvents, AUDIO_STOPPED_BIT);
                 break;
 
             case CMD_PAUSE:
                 Serial.println("Audio PAUSE commando ontvangen");
-                if (!paused)
+                paused = true;
+                // Toggle pause/resume state
+                if (paused)
                 {
+                    Serial.println("Audio is paused");
                     audio.pauseResume();
-                    paused = true;
-                    Serial.println("Audio is gepauzeerd");
-                    xEventGroupSetBits(taskEvents, AUDIO_PAUSED_BIT);
+                }
+                else
+                {
+                    Serial.println("Audio is resumed");
+                    audio.pauseResume();
                 }
                 break;
 
             case CMD_RESUME:
                 Serial.println("Audio RESUME commando ontvangen");
-                if (paused)
-                {
-                    audio.pauseResume();
-                    paused = false;
-                    Serial.println("Audio hervat");
-                    xEventGroupSetBits(taskEvents, AUDIO_STARTED_BIT);
-                }
+                paused = false;
+                audio.pauseResume();
                 break;
 
             default:
                 break;
             }
         }
-
         audio.loop();
-
         bool isNowRunning = audio.isRunning();
-
-        if (wasRunning && !isNowRunning && !paused)
+        if (wasRunning && !isNowRunning)
         {
-            Serial.println("Audio is vanzelf gestopt");
-            xEventGroupSetBits(taskEvents, AUDIO_STOPPED_BIT);
+            Serial.println("Audio is paused");
+            xEventGroupSetBits(taskEvents, AUDIO_PAUSED_BIT); // Meld dat pauze voltooid is
+            // Hier kun je je eigen event triggeren
+        }
+
+        if (!wasRunning && isNowRunning)
+        {
+            Serial.println("Audio is begonnen");
+            // Eventueel je eigen "onPlay" event hier
         }
 
         wasRunning = isNowRunning;
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        vTaskDelay(10);
     }
-}
-
-void playAudio(int preset)
-{
-    stream_index = preset;
-    CreateAndSendAudioData(stream_index, rotaryInstance.current_value);
-    CreateAndSendDisplayData(stream_index);
-    myPrefs.putUInt("stream_index", stream_index);
-}
-
-void pauseAudio()
-{
-    audioData.command = CMD_PAUSE;
-    xQueueSend(AudioQueue, &audioData, portMAX_DELAY);
-
-    xEventGroupWaitBits(
-        taskEvents,
-        AUDIO_PAUSED_BIT,
-        pdTRUE,
-        pdTRUE,
-        portMAX_DELAY);
-}
-
-void resumeAudio()
-{
-    audioData.command = CMD_RESUME;
-    xQueueSend(AudioQueue, &audioData, portMAX_DELAY);
-
-    xEventGroupWaitBits(
-        taskEvents,
-        AUDIO_STARTED_BIT,
-        pdTRUE,
-        pdTRUE,
-        portMAX_DELAY);
-}
-
-void stopAudio()
-{
-    audioData.command = CMD_STOP;
-    xQueueSend(AudioQueue, &audioData, portMAX_DELAY);
-
-    xEventGroupWaitBits(
-        taskEvents,
-        AUDIO_STOPPED_BIT,
-        pdTRUE,
-        pdTRUE,
-        portMAX_DELAY);
-    Serial.println("Audio gestopt.");
 }

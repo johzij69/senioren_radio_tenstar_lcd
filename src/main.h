@@ -21,6 +21,7 @@
 #include "task_webServer.h"
 #include <Adafruit_NeoPixel.h>
 #include "globals.h" 
+#include "AudioControl.h"
 
 
 
@@ -31,11 +32,18 @@ void handlePowerButtonInterrupt() ;
 void CreateAndSendDisplayData(int streamIndex);
 void CreateAndSendAudioData(int streamIndex, int last_volume);
 void printBinary(int v, int num_places);
-void usePreset(int presetNumber);
+
 void setup_backlight() ;
 void sync_time();
 void startDisplayTask();
 void startWebServerTask();
 void startAudioTask();
 void SendDataToDisplay();
+void pauseAudioTask();
+void resumeAudioTask(); 
+void playAudio(int presetNumber);
+void pauseAudio();
+void resumeAudio();
+void stopAudio();
+
 
