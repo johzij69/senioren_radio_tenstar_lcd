@@ -1,7 +1,6 @@
 // see https://github.com/Bodmer/TFT_eSPI/blob/master/examples/Sprite/Sprite_scroll_4bit/Sprite_scroll_4bit.ino
 
 #include "PrioScrollText.h"
-#include "arrow.h"
 #include "Free_Fonts.h"
 
 ScrollText::ScrollText(TFT_eSPI &_tft, const String &_text, int16_t _xPos, int16_t _yPos, uint16_t _width, uint16_t _height, const GFXfont *_font)
