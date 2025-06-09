@@ -1,5 +1,6 @@
 #include "PrioTft.h"
 
+
 PrioTft::PrioTft() : tft(), pBar(&tft), sLogo(&tft), max_volume(30), last_volume(10), cur_volume(0), isInitialized(false), sTitle(tft, 20, 60, 100, 450, FM12)
 {
     // Constructor body (indien nodig)
@@ -143,34 +144,36 @@ void PrioTft::showTime(const String &time)
 
 void PrioTft::showStandbyTime(const String &time)
 {
-    String fontPath = "/fonts/Audiowide_Regular64.vlw";
+    // String fontPath = "/Oswald124.vlw";
     
-    Serial.println("=== Font Loading Debug ===");
-    Serial.printf("Font path: %s\n", fontPath.c_str());
-    Serial.printf("File exists: %s\n", LittleFS.exists(fontPath) ? "YES" : "NO");
-    Serial.printf("Free heap: %d bytes\n", ESP.getFreeHeap());
+    // Serial.println("=== Font Loading Debug ===");
+    // Serial.printf("Font path: %s\n", fontPath.c_str());
+    // Serial.printf("File exists: %s\n", LittleFS.exists(fontPath) ? "YES" : "NO");
+    // Serial.printf("Free heap: %d bytes\n", ESP.getFreeHeap());
     
-    if (LittleFS.exists(fontPath)) {
-        File f = LittleFS.open(fontPath, "r");
-        if (f) {
-            Serial.printf("File size: %d bytes\n", f.size());
-            f.close();
-        }
-    }
+    // if (LittleFS.exists(fontPath)) {
+    //     File f = LittleFS.open(fontPath, "r");
+    //     if (f) {
+    //         Serial.printf("File size: %d bytes\n", f.size());
+    //         f.close();
+    //     }
+    // }
     
     tft.fillScreen(TFT_BLACK);
     tft.unloadFont(); // Clear any existing font
     
-    Serial.println("Attempting to load font...");
-    tft.loadFont(fontPath, LittleFS);
-    Serial.printf("Free heap after load: %d bytes\n", ESP.getFreeHeap());
-    
+ //   Serial.println("Attempting to load font...");
+    tft.loadFont(TIME_FONT_LARGE, LittleFS);
+ //   Serial.printf("Free heap after load: %d bytes\n", ESP.getFreeHeap());
+   
     // Test of font geladen is door te tekenen
     tft.setTextColor(TFT_WHITE);
     tft.setTextDatum(MC_DATUM);
     tft.drawString(time, tft.width() / 2, tft.height() / 2);
-    
-    Serial.println("Font load attempt completed");
+    tft.unloadFont();
+    tft.setTextFont(4);
+    tft.setTextSize(1);
+ //   Serial.println("Font load attempt completed");
 }
 
 String PrioTft::truncateStringToFit(const String &text, int maxWidth)
