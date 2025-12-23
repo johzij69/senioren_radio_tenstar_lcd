@@ -1,6 +1,8 @@
 #include "Arduino.h"
 #include <SPI.h>
 #include <TFT_eSPI.h>
+#include <FS.h>
+using FS = fs::FS;
 #include <WiFiManager.h>
 #include <ezButton.h> 
 #include "PrioRotary.h"

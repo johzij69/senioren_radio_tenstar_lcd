@@ -25,20 +25,20 @@ void PrioWebServer::begin()
             { request->send(200, "image/x-icon", (const unsigned char *)favicon, sizeof(favicon)); });
 
   /* root page , which handles overzicht */
-  server.on("/", HTTP_GET, std::bind(&PrioWebServer::handleRoot, this, std::placeholders::_1));
+  server.on("/", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleRoot(request); });
 
     /* instellingen page , which handles instellingen */
-    server.on("/instellingen", HTTP_GET, std::bind(&PrioWebServer::handleInstellingen, this, std::placeholders::_1));
+    server.on("/instellingen", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleInstellingen(request); });
 
   /* deliver the streams in json format */
-  server.on("/api/streams", HTTP_GET, std::bind(&PrioWebServer::handleApi, this, std::placeholders::_1));
+  server.on("/api/streams", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleApi(request); });
 
-  server.on("/api/deletestream", HTTP_GET, std::bind(&PrioWebServer::handleDeleteStream, this, std::placeholders::_1));
+  server.on("/api/deletestream", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleDeleteStream(request); });
 
-  server.on("/api/synctime", HTTP_GET, std::bind(&PrioWebServer::handleSynctime, this, std::placeholders::_1));
+  server.on("/api/synctime", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleSynctime(request); });
 
   /* serves the html page to add a stream */
-  server.on("/inpustream", HTTP_GET, std::bind(&PrioWebServer::handleInputStream, this, std::placeholders::_1));
+  server.on("/inpustream", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleInputStream(request); });
 
       // Voeg een handler toe voor POST-verzoeken naar /updateurls
       server.on(
