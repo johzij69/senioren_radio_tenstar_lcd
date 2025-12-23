@@ -2,6 +2,7 @@
 #include "Audio.h"
 #include "task_shared.h"
 #include "globals.h"
+#include "SlimprotoClient.h"
 
 void AudioTask(void *parameter)
 {
@@ -10,6 +11,9 @@ void AudioTask(void *parameter)
     int current_volume = MIN_VOLUME;
     bool paused = false;
     bool wasRunning = false;
+    SlimprotoClient* squeezebox = nullptr; // Pointer to SlimprotoClient instance
+    const char* lmsServer = "192.168.1.120";  // IP van je LMS server
+    const uint16_t lmsPort = 3483;
 
     QueueHandle_t AudioQueue = static_cast<QueueHandle_t>(parameter);
 
@@ -17,6 +21,26 @@ void AudioTask(void *parameter)
     audio.setVolume(DEF_VOLUME);
     audio.setVolumeSteps(VOLUME_STEPS);
     Serial.println("AudioTask: Audio object is initialized");
+
+        // Maak Slimproto client aan
+    squeezebox = new SlimprotoClient(&audio);
+    
+    // Optioneel: custom player naam    
+    squeezebox->setPlayerName("ESP32 Woonkamer");
+    
+    // Verbind met LMS server
+    Serial.printf("\nVerbinden met LMS server: %s:%d\n", lmsServer, lmsPort);
+    
+    if (squeezebox->begin(lmsServer, lmsPort)) {
+        Serial.println("Slimproto client gestart!");
+        Serial.println("\nPlayer is nu zichtbaar in LMS/Music Assistant");
+        Serial.println("Je kunt nu muziek naar deze player streamen\n");
+    } else {
+        Serial.println("FOUT: Kon niet verbinden met LMS server");
+        Serial.println("Check IP adres en of LMS draait");
+    }
+
+
     xEventGroupWaitBits(
         taskEvents,
         DISPLAY_TASK_STARTED_BIT | WEBSERVER_TASK_STARTED_BIT,

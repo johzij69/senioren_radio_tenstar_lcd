@@ -1,5 +1,6 @@
 #include "main.h"
 #include "driver/ledc.h" // Include LEDC driver header for PWM functionality
+#include "SlimprotoClient.h"
 
 bool debug = true; // Set to true for debug output
 
@@ -19,6 +20,8 @@ UrlManager UrlManagerInstance(myPrefs);
 PrioWebServer webServer(UrlManagerInstance, WEB_SERVER_PORT);
 PrioRotary rotaryInstance(ROT_CLK_PIN, ROT_DT_PIN);
 PrioRfReceiver rfReceiver(RF_RECEIVER_PIN);
+
+
 
 /* Buttons */
 ezButton rotary_button(ROT_SW_PIN);
@@ -217,7 +220,11 @@ void setup()
         // Play the last used stream
         playStream(stream_index);
         sync_time(true); // Force sync time on startup
+
     }
+
+
+    
 }
 
 /* main loop ;-) */
