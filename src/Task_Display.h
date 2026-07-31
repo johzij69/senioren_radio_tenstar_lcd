@@ -22,6 +22,7 @@ struct DisplayData {
     char icyurl[255];
     char lasthost[255];
     char streamtitle[255];
+    char alarmState[32];
     int volume;
     bool loadingState;
     bool standbyState;

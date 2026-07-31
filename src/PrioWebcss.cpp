@@ -34,6 +34,28 @@ String getStyling()
         background-color: #ddd;
         color: black;
       }
+
+      .alarm-badge {
+        float: right;
+        margin: 10px 12px;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: bold;
+        color: #fff;
+      }
+
+      .alarm-uit {
+        background: #777;
+      }
+
+      .alarm-snooze {
+        background: #d48a00;
+      }
+
+      .alarm-actief {
+        background: #0a8f3c;
+      }
       /* content */
       .content {
         margin-top: 10px;
@@ -195,6 +217,66 @@ String getStyling()
 
       #numberofStreams {
         margin-left: auto;
+      }
+
+      .alarm-header {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+
+      .alarm-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-width: 900px;
+      }
+
+      .alarm-item {
+        border: 1px solid #d1d1d1;
+        border-radius: 8px;
+        padding: 12px;
+        background: #fafafa;
+      }
+
+      .alarm-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 10px;
+        align-items: end;
+      }
+
+      .alarm-grid label {
+        display: block;
+        font-size: 12px;
+        margin-bottom: 4px;
+      }
+
+      .alarm-grid input,
+      .alarm-grid select {
+        width: 100%;
+        padding: 6px;
+      }
+
+      .alarm-days {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+      }
+
+      .alarm-day {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 13px;
+      }
+
+      .alarm-actions {
+        margin-top: 8px;
+        display: flex;
+        justify-content: flex-end;
       }
     </style>
     )";

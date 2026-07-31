@@ -24,6 +24,7 @@ using FS = fs::FS;
 #include <Adafruit_NeoPixel.h>
 #include "globals.h" 
 #include "AudioControl.h"
+#include "AlarmManager.h"
 
 
 
@@ -44,6 +45,10 @@ void SendDataToDisplay();
 void pauseAudioTask();
 void resumeAudioTask(); 
 void playStream(int presetNumber);
+void handleInputPanelButton(int buttonIndex);
+void checkAndRunAlarms();
+void triggerAlarmPlayback(const AlarmManager::AlarmEntry &alarm, bool fromSnooze);
+void snoozeActiveAlarm();
 
 
 

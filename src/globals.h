@@ -71,5 +71,6 @@
 extern PrioDateTime pDateTime;  // Declareer als extern (definitie komt elders)
 extern PrioInputPanel inputPanel;
 extern PrioRfReceiver rfReceiver;
+extern uint8_t alarmSnoozeButtonIndex;
 
 #endif

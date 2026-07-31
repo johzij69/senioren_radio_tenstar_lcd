@@ -1,8 +1,8 @@
 #include "main.h"
 #include "driver/ledc.h" // Include LEDC driver header for PWM functionality
-#include "SlimprotoClient.h"
 
 bool debug = true; // Set to true for debug output
+uint8_t alarmSnoozeButtonIndex = 10;
 
 int max_volume = MAX_VOLUME; // set default max volume
 int last_volume = 10;
@@ -17,7 +17,8 @@ AudioData audioData;
 DisplayData displayData;
 MyPreferences myPrefs("myRadio");
 UrlManager UrlManagerInstance(myPrefs);
-PrioWebServer webServer(UrlManagerInstance, WEB_SERVER_PORT);
+AlarmManager alarmManager(myPrefs);
+PrioWebServer webServer(UrlManagerInstance, alarmManager, myPrefs, WEB_SERVER_PORT);
 PrioRotary rotaryInstance(ROT_CLK_PIN, ROT_DT_PIN);
 PrioRfReceiver rfReceiver(RF_RECEIVER_PIN);
 
@@ -89,6 +90,7 @@ void setup()
     Serial.println("Starting tasks");
 
     displayData.loadingState = true; // Set loading state to true initially
+    strncpy(displayData.alarmState, "Geen alarm", sizeof(displayData.alarmState));
     xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
     startDisplayTask();
 
@@ -165,6 +167,12 @@ void setup()
         Serial.println(WiFi.gatewayIP());
 
         myPrefs.begin();
+        alarmManager.begin();
+        alarmSnoozeButtonIndex = (uint8_t)myPrefs.getUInt("snooze_btn_idx", 10);
+        if (alarmSnoozeButtonIndex > 15)
+        {
+            alarmSnoozeButtonIndex = 10;
+        }
         // Start de tijdservice
         Serial.println("Starting time service");
         pDateTime.begin();
@@ -196,8 +204,8 @@ void setup()
         rotaryInstance.begin(MIN_VOLUME, max_volume, DEF_VOLUME);
         rotaryInstance.current_value = last_volume;
 
-        inputPanel.begin();                              // Initialiseer de input panel
-        inputPanel.setButtonPressedCallback(playStream); // Stel de callback in
+        inputPanel.begin();                                       // Initialiseer de input panel
+        inputPanel.setButtonPressedCallback(handleInputPanelButton); // Stel de callback in
 
         // Initialiseer de RF-ontvanger
         rfReceiver.begin();
@@ -231,6 +239,7 @@ void setup()
 void loop()
 {
     sync_time();
+    checkAndRunAlarms();
 
     if (!inStandby)
     {
@@ -279,6 +288,91 @@ void loop()
     }
 
     vTaskDelay(1 / portTICK_PERIOD_MS); // Adjust the delay as needed (e.g., 10ms)
+}
+
+void handleInputPanelButton(int buttonIndex)
+{
+    if (buttonIndex == alarmSnoozeButtonIndex)
+    {
+        snoozeActiveAlarm();
+        return;
+    }
+
+    if (buttonIndex >= 0 && buttonIndex < (int)UrlManagerInstance.streamCount)
+    {
+        playStream(buttonIndex);
+    }
+    else
+    {
+        Serial.println("Onbekende button index: " + String(buttonIndex));
+    }
+}
+
+void checkAndRunAlarms()
+{
+    static unsigned long lastAlarmCheck = 0;
+    unsigned long nowMs = millis();
+    if (nowMs - lastAlarmCheck < 1000)
+    {
+        return;
+    }
+    lastAlarmCheck = nowMs;
+
+    time_t now = time(nullptr);
+    AlarmManager::AlarmEntry alarm;
+    bool fromSnooze = false;
+    if (alarmManager.poll(now, alarm, fromSnooze))
+    {
+        triggerAlarmPlayback(alarm, fromSnooze);
+    }
+}
+
+void triggerAlarmPlayback(const AlarmManager::AlarmEntry &alarm, bool fromSnooze)
+{
+    if (alarm.streamIndex >= UrlManagerInstance.streamCount)
+    {
+        Serial.println("Alarm genegeerd: ongeldige streamIndex");
+        return;
+    }
+
+    Serial.println(String("Alarm actief: id=") + alarm.id + (fromSnooze ? " (snooze)" : ""));
+    strncpy(displayData.alarmState, fromSnooze ? "Snooze actief" : "Alarm actief", sizeof(displayData.alarmState));
+
+    systemLowPower = false;
+    inStandby = false;
+    displayData.standbyState = false;
+    resumeAudioTask();
+
+    int alarmVolume = alarm.volume;
+    if (alarmVolume > max_volume)
+    {
+        alarmVolume = max_volume;
+    }
+
+    stream_index = alarm.streamIndex;
+    last_volume = alarmVolume;
+    rotaryInstance.current_value = alarmVolume;
+    displayData.volume = alarmVolume;
+    audioData.volume = alarmVolume;
+    myPrefs.writeValue("volume", alarmVolume);
+
+    playAudio(UrlManagerInstance.Streams[stream_index].url.c_str(), alarmVolume);
+    CreateAndSendDisplayData(stream_index);
+}
+
+void snoozeActiveAlarm()
+{
+    time_t snoozeUntil = 0;
+    if (!alarmManager.snoozeCurrentAlarm(time(nullptr), snoozeUntil))
+    {
+        Serial.println("Geen actief alarm om te snoozen.");
+        return;
+    }
+
+    stopAudio();
+    strncpy(displayData.alarmState, "Snooze wacht", sizeof(displayData.alarmState));
+    SendDataToDisplay();
+    Serial.println("Alarm gesnoozed tot epoch: " + String((uint32_t)snoozeUntil));
 }
 
 // Interrupt routine just sets a flag when rotation is detected
@@ -451,6 +545,8 @@ void resumeAudioTask()
 /* Switching radio stream */
 void playStream(int preset)
 {
+    alarmManager.stopRinging();
+    strncpy(displayData.alarmState, "Geen alarm", sizeof(displayData.alarmState));
     Serial.println("Switching to stream: " + String(preset));
     stream_index = preset;
     playAudio(UrlManagerInstance.Streams[stream_index].url.c_str(), rotaryInstance.current_value);

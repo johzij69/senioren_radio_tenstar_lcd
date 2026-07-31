@@ -34,6 +34,7 @@ public:
     void setVolume(int _cur_volume);
     void setTitle(const String &title);
     void setLogo(const String &url);
+    void setAlarmState(const String &state);
     void setStreamTitle(const String &streamName);
     void clearLine(int lineNumber);
     void clearLogoLine(int lineNumber);

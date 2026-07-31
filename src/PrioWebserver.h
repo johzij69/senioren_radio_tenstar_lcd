@@ -8,13 +8,15 @@
 #include "PrioWebjavascript.h"
 #include "PrioWebcss.h"
 #include "globals.h" 
+#include "AlarmManager.h"
+#include "MyPreferences.h"
 
 
 
 class PrioWebServer
 {
 public:
-  PrioWebServer(UrlManager &urlManager, int port);
+  PrioWebServer(UrlManager &urlManager, AlarmManager &alarmManager, MyPreferences &preferences, int port);
 
   void begin();
   String ip;
@@ -23,6 +25,8 @@ public:
 private:
   AsyncWebServer server;
   UrlManager &urlManager;
+  AlarmManager &alarmManager;
+  MyPreferences &preferences;
 
   String htmlPage;
 
@@ -41,6 +45,12 @@ private:
   void handleDeleteStream(AsyncWebServerRequest *request);
   void handleInstellingen(AsyncWebServerRequest *request);
   void handleSynctime(AsyncWebServerRequest *request);
+  void handleAlarmPage(AsyncWebServerRequest *request);
+  void handleApiAlarms(AsyncWebServerRequest *request);
+  void handleApiAlarmStatus(AsyncWebServerRequest *request);
+  void handleSaveAlarms(AsyncWebServerRequest *request, uint8_t *data, size_t len);
+  void handleApiSettings(AsyncWebServerRequest *request);
+  void handleSaveSettings(AsyncWebServerRequest *request, uint8_t *data, size_t len);
   void onBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
 
 

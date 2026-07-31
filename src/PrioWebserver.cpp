@@ -1,7 +1,7 @@
 #include "PrioWebServer.h"
 
-PrioWebServer::PrioWebServer(UrlManager &urlManager, int port)
-    : urlManager(urlManager), server(port)
+PrioWebServer::PrioWebServer(UrlManager &urlManager, AlarmManager &alarmManager, MyPreferences &preferences, int port)
+  : urlManager(urlManager), alarmManager(alarmManager), preferences(preferences), server(port)
 {
 }
 
@@ -30,12 +30,21 @@ void PrioWebServer::begin()
     /* instellingen page , which handles instellingen */
     server.on("/instellingen", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleInstellingen(request); });
 
+  /* alarm configuration page */
+  server.on("/alarmen", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleAlarmPage(request); });
+
   /* deliver the streams in json format */
   server.on("/api/streams", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleApi(request); });
 
   server.on("/api/deletestream", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleDeleteStream(request); });
 
   server.on("/api/synctime", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleSynctime(request); });
+
+  server.on("/api/alarms", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleApiAlarms(request); });
+
+  server.on("/api/alarmstatus", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleApiAlarmStatus(request); });
+
+  server.on("/api/settings", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleApiSettings(request); });
 
   /* serves the html page to add a stream */
   server.on("/inpustream", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleInputStream(request); });
@@ -65,6 +74,28 @@ void PrioWebServer::begin()
         [this](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) {
           urlManager.addStream(data);
           request->send(200);
+      });
+
+      server.on(
+        "/api/alarms",
+        HTTP_POST,
+        [](AsyncWebServerRequest * request){},
+        NULL,
+        [this](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) {
+          (void)index;
+          (void)total;
+          this->handleSaveAlarms(request, data, len);
+      });
+
+      server.on(
+        "/api/settings",
+        HTTP_POST,
+        [](AsyncWebServerRequest * request){},
+        NULL,
+        [this](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) {
+          (void)index;
+          (void)total;
+          this->handleSaveSettings(request, data, len);
       });
      
   server.begin();
@@ -209,19 +240,19 @@ void PrioWebServer::handleRoot(AsyncWebServerRequest *request)
 
 void PrioWebServer::handleInstellingen(AsyncWebServerRequest *request)
 {
- //TODO!!!!!
- 
   String body PROGMEM = R"(<div id="content-container" class="content"></div>)";
-   String mybigString = "";
+  String mybigString = "";
 
-  // String h_start PROGMEM = getHtmlStart();
-  // String h_script PROGMEM = getMainScript(this->ip);
-  // String h_body PROGMEM = setHtmlBody(body, h_script);
-  // String h_end PROGMEM = getHtmlEnd();
+  int snoozeButtonIndex = (int)preferences.getUInt("snooze_btn_idx", 10);
 
-  // mybigString.concat(h_start);
-  // mybigString.concat(h_body);
-  // mybigString.concat(h_end);
+  String h_start PROGMEM = getHtmlStart();
+  String h_script PROGMEM = getSettingsScript(this->ip, snoozeButtonIndex);
+  String h_body PROGMEM = setHtmlBody(body, h_script);
+  String h_end PROGMEM = getHtmlEnd();
+
+  mybigString.concat(h_start);
+  mybigString.concat(h_body);
+  mybigString.concat(h_end);
 
   request->send(200, "text/html", mybigString.c_str());
   mybigString = "";
@@ -239,6 +270,24 @@ void PrioWebServer::handleInputStream(AsyncWebServerRequest *request)
 
   String h_start PROGMEM = getHtmlStart();
   String h_script PROGMEM = getAddScript(this->ip);
+  String h_body PROGMEM = setHtmlBody(body, h_script);
+  String h_end PROGMEM = getHtmlEnd();
+
+  mybigString.concat(h_start);
+  mybigString.concat(h_body);
+  mybigString.concat(h_end);
+
+  request->send(200, "text/html", mybigString.c_str());
+  mybigString = "";
+}
+
+void PrioWebServer::handleAlarmPage(AsyncWebServerRequest *request)
+{
+  String body PROGMEM = R"(<div id="content-container" class="content"></div>)";
+  String mybigString = "";
+
+  String h_start PROGMEM = getHtmlStart();
+  String h_script PROGMEM = getAlarmScript(this->ip);
   String h_body PROGMEM = setHtmlBody(body, h_script);
   String h_end PROGMEM = getHtmlEnd();
 
@@ -270,6 +319,81 @@ void PrioWebServer::handleSynctime(AsyncWebServerRequest *request)
   Serial.println("Sync time requested" + String(pDateTime.getTime()));
   pDateTime.syncTime(); 
   request->send(200, "text/plain", "ok");
+}
+
+void PrioWebServer::handleApiAlarms(AsyncWebServerRequest *request)
+{
+  JsonDocument doc;
+
+  JsonArray streamsArray = doc["streams"].to<JsonArray>();
+  for (uint32_t i = 0; i < urlManager.streamCount; i++)
+  {
+    JsonObject stream = streamsArray.add<JsonObject>();
+    stream["id"] = i;
+    stream["name"] = urlManager.Streams[i].name;
+  }
+
+  JsonArray alarmsArray = doc["alarms"].to<JsonArray>();
+  alarmManager.appendAlarmsJson(alarmsArray);
+  doc["maxAlarmsPerDay"] = AlarmManager::MAX_ALARMS_PER_DAY;
+
+  String response;
+  serializeJson(doc, response);
+  request->send(200, "application/json", response);
+}
+
+void PrioWebServer::handleApiAlarmStatus(AsyncWebServerRequest *request)
+{
+  JsonDocument doc;
+  doc["status"] = alarmManager.getRuntimeStatusLabel();
+
+  String response;
+  serializeJson(doc, response);
+  request->send(200, "application/json", response);
+}
+
+void PrioWebServer::handleSaveAlarms(AsyncWebServerRequest *request, uint8_t *data, size_t len)
+{
+  String error;
+  if (!alarmManager.updateFromJson(data, len, urlManager.streamCount, error))
+  {
+    request->send(400, "application/json", "{\"ok\":false,\"message\":\"" + error + "\"}");
+    return;
+  }
+
+  request->send(200, "application/json", "{\"ok\":true}");
+}
+
+void PrioWebServer::handleApiSettings(AsyncWebServerRequest *request)
+{
+  JsonDocument doc;
+  doc["snoozeButtonIndex"] = preferences.getUInt("snooze_btn_idx", 10);
+
+  String response;
+  serializeJson(doc, response);
+  request->send(200, "application/json", response);
+}
+
+void PrioWebServer::handleSaveSettings(AsyncWebServerRequest *request, uint8_t *data, size_t len)
+{
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, data, len);
+  if (error)
+  {
+    request->send(400, "application/json", "{\"ok\":false,\"message\":\"Invalid JSON\"}");
+    return;
+  }
+
+  int snoozeButtonIndex = doc["snoozeButtonIndex"].is<int>() ? doc["snoozeButtonIndex"].as<int>() : 10;
+  if (snoozeButtonIndex < 0 || snoozeButtonIndex > 15)
+  {
+    request->send(400, "application/json", "{\"ok\":false,\"message\":\"snoozeButtonIndex moet 0..15 zijn\"}");
+    return;
+  }
+
+  preferences.putUInt("snooze_btn_idx", (uint32_t)snoozeButtonIndex);
+  alarmSnoozeButtonIndex = (uint8_t)snoozeButtonIndex;
+  request->send(200, "application/json", "{\"ok\":true}");
 }
 
 String PrioWebServer::createHtmlPage(String body)
@@ -305,9 +429,52 @@ String PrioWebServer::getTopMenu()
   <div class='top-menu'>
     <a href='/'>Overzicht</a>
     <a href='/inpustream'>Voeg toe</a>
+    <a href='/alarmen'>Alarmen</a>
     <a href='/instellingen'>Instellingen</a>
     <a href='#'>Contact</a>
+    <span class='alarm-badge alarm-uit' id='alarm-status-badge'>Alarm: uit</span>
   </div>
+  <script>
+    (function () {
+      const badge = document.getElementById("alarm-status-badge");
+
+      function setBadge(status) {
+        const normalized = (status || "uit").toLowerCase();
+        badge.classList.remove("alarm-actief", "alarm-snooze", "alarm-uit");
+
+        if (normalized === "actief") {
+          badge.classList.add("alarm-actief");
+          badge.textContent = "Alarm: actief";
+          return;
+        }
+
+        if (normalized === "snooze") {
+          badge.classList.add("alarm-snooze");
+          badge.textContent = "Alarm: snooze";
+          return;
+        }
+
+        badge.classList.add("alarm-uit");
+        badge.textContent = "Alarm: uit";
+      }
+
+      async function refreshAlarmStatus() {
+        try {
+          const response = await fetch("/api/alarmstatus", { method: "GET" });
+          if (!response.ok) {
+            return;
+          }
+          const data = await response.json();
+          setBadge(data.status);
+        } catch (e) {
+          // keep previous badge status when request fails
+        }
+      }
+
+      refreshAlarmStatus();
+      setInterval(refreshAlarmStatus, 5000);
+    })();
+  </script>
   )";
 
   return html;

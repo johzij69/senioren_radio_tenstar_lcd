@@ -56,7 +56,7 @@ void PrioInputPanel::readPresetButtons() {
     // Controleer welke button is ingedrukt met een while-loop
     int i = 0;                // Initialiseer de teller
     bool buttonFound = false; // Boolean om bij te houden of een button is gevonden
-    while (i < 10 && !buttonFound) { // Ga door zolang i < 10 en geen button is gevonden
+    while (i < 16 && !buttonFound) { // 0..15 beschikbaar op PCF8575
       int buttonState = (buttonStates & (1 << i));
       if (buttonState != 0) { // Als de pin hoog is (button ingedrukt)
         Serial.println("Button pressed: " + String(i));

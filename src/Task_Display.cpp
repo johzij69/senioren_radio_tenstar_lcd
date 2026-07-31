@@ -34,6 +34,7 @@ void DisplayTask(void *parameter)
     String prevTitle = "";
     String prevLogo = "";
     String prevStreamTitle = "";
+    String prevAlarmState = "";
     String prevTime = "";
 
     prioTft.begin(); // Initialiseer het TFT scherm
@@ -108,6 +109,7 @@ void DisplayTask(void *parameter)
                         prevTitle = "";
                         prevLogo = "";
                         prevStreamTitle = "";
+                        prevAlarmState = "";
                         prevTime = "";
                         prevVolume = -1; // Reset previous values
 
@@ -144,6 +146,12 @@ void DisplayTask(void *parameter)
                         cleanStreamTitle(&_displayData);
                         prioTft.setStreamTitle(_displayData.streamtitle);
                         prevStreamTitle = _displayData.streamtitle;
+                    }
+
+                    if (prevAlarmState != _displayData.alarmState)
+                    {
+                        prioTft.setAlarmState(_displayData.alarmState);
+                        prevAlarmState = _displayData.alarmState;
                     }
 
                     Serial.println("Display: streamtitle" + String(_displayData.streamtitle));

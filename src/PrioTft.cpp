@@ -80,6 +80,14 @@ void PrioTft::setTitle(const String &title)
     clearLine(12);
 }
 
+void PrioTft::setAlarmState(const String &state)
+{
+    prepLine(11);
+    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+    String truncatedState = truncateStringToFit("Alarm: " + state, tft.width() - (pBar.width_set + kantline));
+    tft.println(truncatedState);
+}
+
 void PrioTft::setStreamTitle(const String &streamTitle)
 {
     prepLine(12);
