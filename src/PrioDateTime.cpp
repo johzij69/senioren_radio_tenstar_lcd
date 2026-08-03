@@ -35,8 +35,8 @@ void PrioDateTime::syncTime()
 {
     Serial.println("Synchroniseren met NTP-server...");
 
-    // Stel de tijdzone in op UTC (zonder zomer/wintertijdcorrectie)
-    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+    // Gebruik een volledige TZ-regel voor Nederland (CET/CEST met DST)
+    configTzTime("CET-1CEST,M3.5.0/2,M10.5.0/3", "pool.ntp.org", "time.nist.gov");
 
     // Wachten op tijdsynchronisatie (max 20 sec)
     int timeout = 20;
@@ -64,9 +64,6 @@ void PrioDateTime::syncTime()
         struct tm timeinfo;
         if (getLocalTime(&timeinfo))
         {
-            // Pas de tijdzone aan op basis van zomer/wintertijd
-            setTimeZone(&timeinfo);
-
             RtcDateTime compiledDateTime(
                 timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
                 timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
@@ -158,22 +155,7 @@ bool PrioDateTime::isSummerTime(tm *timeinfo)
 }
 void PrioDateTime::setTimeZone(tm *timeinfo)
 {
-    if (isSummerTime(timeinfo))
-    {
-        Serial.println("Zomertijd: " + String(timeinfo->tm_mon));
-        // Zomertijd: UTC+2
-        setenv("TZ", "UTC+2", 1);
-        timeinfo->tm_hour += 2; // Voeg 2 uur toe voor zomertijd
-    }
-    else
-    {
-        Serial.println("Wintertijd: " + String(timeinfo->tm_mon));
-        // Wintertijd: UTC+1
-        setenv("TZ", "UTC+1", 1);
-        timeinfo->tm_hour += 1; // Voeg 1 uur toe voor wintertijd
-    }
-    tzset(); // Pas de tijdzone-instelling toe
-    // Converteer de tijd naar time_t en terug naar tm om de tijdzone correct toe te passen
-    //    time_t time = mktime(timeinfo);
-    //    localtime_r(&time, timeinfo);
+    (void)timeinfo;
+    setenv("TZ", "CET-1CEST,M3.5.0/2,M10.5.0/3", 1);
+    tzset();
 }

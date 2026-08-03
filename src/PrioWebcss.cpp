@@ -56,6 +56,10 @@ String getStyling()
       .alarm-actief {
         background: #0a8f3c;
       }
+
+      .alarm-ingesteld {
+        background: #2c6fb7;
+      }
       /* content */
       .content {
         margin-top: 10px;

@@ -57,6 +57,7 @@ public:
     bool isRinging() const;
     RuntimeStatus getRuntimeStatus() const;
     const char *getRuntimeStatusLabel() const;
+    const char *getDisplayStatusLabel() const;
 
     uint8_t getCount() const;
     const AlarmEntry *getAlarms() const;
@@ -80,6 +81,7 @@ private:
     static bool isDayActiveForAlarm(const AlarmEntry &alarm, uint8_t weekday);
     static int32_t buildMinuteKey(const tm &timeInfo);
     static RepeatMode modeFromString(const String &modeString);
+    static const char *modeDebugLabel(RepeatMode mode);
     static String modeToString(RepeatMode mode);
     static uint8_t normalizeDayMask(RepeatMode mode, uint8_t dayMask);
     static bool validateAlarm(const AlarmEntry &alarm, uint32_t streamCount, String &errorMessage);

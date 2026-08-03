@@ -168,20 +168,34 @@ void PrioTft::showStandbyTime(const String &time)
     // }
     
     tft.fillScreen(TFT_BLACK);
-    tft.unloadFont(); // Clear any existing font
-    
- //   Serial.println("Attempting to load font...");
-    tft.loadFont(TIME_FONT_LARGE, LittleFS);
- //   Serial.printf("Free heap after load: %d bytes\n", ESP.getFreeHeap());
-   
-    // Test of font geladen is door te tekenen
     tft.setTextColor(TFT_WHITE);
     tft.setTextDatum(MC_DATUM);
-    tft.drawString(time, tft.width() / 2, tft.height() / 2);
-    tft.unloadFont();
+
+    bool fontAvailable = LittleFS.exists(TIME_FONT_LARGE_PATH);
+    if (fontAvailable)
+    {
+        tft.unloadFont(); // Clear any existing font
+        tft.loadFont(TIME_FONT_LARGE_PATH, LittleFS);
+        tft.drawString(time, tft.width() / 2, tft.height() / 2);
+        tft.unloadFont();
+    }
+    else
+    {
+        // Fallback keeps standby clock visible even when smooth font is missing.
+        static bool fontWarningShown = false;
+        if (!fontWarningShown)
+        {
+            Serial.println(String("Standby font ontbreekt: ") + TIME_FONT_LARGE_PATH + ". Gebruik fallback font.");
+            fontWarningShown = true;
+        }
+
+        tft.setTextFont(8);
+        tft.setTextSize(2);
+        tft.drawString(time, tft.width() / 2, tft.height() / 2);
+    }
+
     tft.setTextFont(4);
     tft.setTextSize(1);
- //   Serial.println("Font load attempt completed");
 }
 
 String PrioTft::truncateStringToFit(const String &text, int maxWidth)

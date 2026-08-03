@@ -43,7 +43,7 @@ void AudioTask(void *parameter)
                     Serial.println("Volume aangepast naar: " + String(current_volume));
                 }
 
-                if (String(audioData.url) != current_url)
+                if (audioData.url[0] != '\0' && String(audioData.url) != current_url)
                 {
                     Serial.println("Switching to stream: " + String(audioData.url));
                     audio.connecttohost(audioData.url);
@@ -82,6 +82,15 @@ void AudioTask(void *parameter)
                     paused = false;
                     Serial.println("Audio hervat");
                     xEventGroupSetBits(taskEvents, AUDIO_STARTED_BIT);
+                }
+                break;
+
+            case CMD_SET_VOLUME:
+                if (audioData.volume != current_volume)
+                {
+                    audio.setVolume(audioData.volume);
+                    current_volume = audioData.volume;
+                    Serial.println("Volume aangepast naar: " + String(current_volume));
                 }
                 break;
 

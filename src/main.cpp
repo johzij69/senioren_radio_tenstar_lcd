@@ -88,6 +88,7 @@ void setup()
         Serial.println("Event group aangemaakt.");
     }
     Serial.println("Starting tasks");
+        refreshAlarmDisplayState();
 
     displayData.loadingState = true; // Set loading state to true initially
     strncpy(displayData.alarmState, "Geen alarm", sizeof(displayData.alarmState));
@@ -335,7 +336,7 @@ void triggerAlarmPlayback(const AlarmManager::AlarmEntry &alarm, bool fromSnooze
         return;
     }
 
-    Serial.println(String("Alarm actief: id=") + alarm.id + (fromSnooze ? " (snooze)" : ""));
+        refreshAlarmDisplayState();
     strncpy(displayData.alarmState, fromSnooze ? "Snooze actief" : "Alarm actief", sizeof(displayData.alarmState));
 
     systemLowPower = false;
@@ -370,9 +371,19 @@ void snoozeActiveAlarm()
     }
 
     stopAudio();
-    strncpy(displayData.alarmState, "Snooze wacht", sizeof(displayData.alarmState));
-    SendDataToDisplay();
+    refreshAlarmDisplayState(true);
     Serial.println("Alarm gesnoozed tot epoch: " + String((uint32_t)snoozeUntil));
+}
+
+void refreshAlarmDisplayState(bool sendToDisplay)
+{
+    strncpy(displayData.alarmState, alarmManager.getDisplayStatusLabel(), sizeof(displayData.alarmState));
+    displayData.alarmState[sizeof(displayData.alarmState) - 1] = '\0';
+
+    if (sendToDisplay)
+    {
+        SendDataToDisplay();
+    }
 }
 
 // Interrupt routine just sets a flag when rotation is detected

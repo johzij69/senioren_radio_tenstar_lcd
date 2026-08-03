@@ -49,6 +49,7 @@ void handleInputPanelButton(int buttonIndex);
 void checkAndRunAlarms();
 void triggerAlarmPlayback(const AlarmManager::AlarmEntry &alarm, bool fromSnooze);
 void snoozeActiveAlarm();
+void refreshAlarmDisplayState(bool sendToDisplay = false);
 
 
 

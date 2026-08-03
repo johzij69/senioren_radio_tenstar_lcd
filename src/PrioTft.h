@@ -9,7 +9,7 @@
 #include "TFTScroller.h"
 #include "StreamLogo.h"
 
-#define TIME_FONT_LARGE "Oswald124"
+#define TIME_FONT_LARGE_PATH "/Oswald124.vlw"
 
 class PrioTft {
 private:

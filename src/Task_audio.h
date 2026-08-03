@@ -9,7 +9,8 @@ enum AudioCommandType {
     CMD_PLAY,
     CMD_STOP,
     CMD_PAUSE,
-    CMD_RESUME
+    CMD_RESUME,
+    CMD_SET_VOLUME
 };
 
 struct AudioData {

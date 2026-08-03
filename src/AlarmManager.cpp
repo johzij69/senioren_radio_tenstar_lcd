@@ -65,6 +65,22 @@ bool AlarmManager::updateFromJson(uint8_t *data, size_t len, uint32_t streamCoun
     }
 
     saveToPreferences();
+
+    Serial.println(String("AlarmManager: alarms opgeslagen, count=") + alarmCount);
+    for (uint8_t i = 0; i < alarmCount; i++)
+    {
+        const AlarmEntry &a = alarms[i];
+        Serial.println(
+            String("  [") + i + "] id=" + a.id +
+            " enabled=" + (a.enabled ? "1" : "0") +
+            " time=" + (a.hour < 10 ? "0" : "") + String(a.hour) + ":" + (a.minute < 10 ? "0" : "") + String(a.minute) +
+            " mode=" + modeDebugLabel(a.mode) +
+            " dayMask=0x" + String(a.dayMask, HEX) +
+            " stream=" + a.streamIndex +
+            " vol=" + a.volume +
+            " snooze=" + a.snoozeMinutes);
+    }
+
     return true;
 }
 
@@ -182,6 +198,43 @@ bool AlarmManager::poll(time_t now, AlarmEntry &triggeredAlarm, bool &fromSnooze
     localtime_r(&now, &timeInfo);
     int32_t minuteKey = buildMinuteKey(timeInfo);
 
+    static int32_t lastPollLogMinuteKey = -1;
+    if (lastPollLogMinuteKey != minuteKey)
+    {
+        lastPollLogMinuteKey = minuteKey;
+
+        Serial.println(
+            String("Alarm poll: ") +
+            (timeInfo.tm_year + 1900) + "-" +
+            (timeInfo.tm_mon + 1 < 10 ? "0" : "") + String(timeInfo.tm_mon + 1) + "-" +
+            (timeInfo.tm_mday < 10 ? "0" : "") + String(timeInfo.tm_mday) + " " +
+            (timeInfo.tm_hour < 10 ? "0" : "") + String(timeInfo.tm_hour) + ":" +
+            (timeInfo.tm_min < 10 ? "0" : "") + String(timeInfo.tm_min) +
+            " wday=" + String(timeInfo.tm_wday) +
+            " count=" + String(alarmCount) +
+            " ringing=" + (alarmRinging ? "1" : "0") +
+            " snoozePending=" + (snoozePending ? "1" : "0"));
+
+        for (uint8_t i = 0; i < alarmCount; i++)
+        {
+            const AlarmEntry &a = alarms[i];
+            bool timeMatch = (a.hour == timeInfo.tm_hour && a.minute == timeInfo.tm_min);
+            bool dayActive = isDayActiveForAlarm(a, static_cast<uint8_t>(timeInfo.tm_wday));
+            bool alreadyTriggeredThisMinute = (a.lastTriggeredMinuteKey == minuteKey);
+
+            Serial.println(
+                String("  alarm id=") + a.id +
+                " en=" + (a.enabled ? "1" : "0") +
+                " t=" + (a.hour < 10 ? "0" : "") + String(a.hour) + ":" + (a.minute < 10 ? "0" : "") + String(a.minute) +
+                " mode=" + modeDebugLabel(a.mode) +
+                " mask=0x" + String(a.dayMask, HEX) +
+                " timeMatch=" + (timeMatch ? "1" : "0") +
+                " dayActive=" + (dayActive ? "1" : "0") +
+                " already=" + (alreadyTriggeredThisMinute ? "1" : "0") +
+                " stream=" + a.streamIndex);
+        }
+    }
+
     if (snoozePending && now >= snoozeUntil)
     {
         for (uint8_t i = 0; i < alarmCount; i++)
@@ -190,6 +243,7 @@ bool AlarmManager::poll(time_t now, AlarmEntry &triggeredAlarm, bool &fromSnooze
             {
                 if (alarms[i].lastTriggeredMinuteKey != minuteKey)
                 {
+                    Serial.println(String("Alarm trigger (snooze): id=") + alarms[i].id + " minuteKey=" + minuteKey);
                     alarms[i].lastTriggeredMinuteKey = minuteKey;
                     alarmRinging = true;
                     currentAlarmId = alarms[i].id;
@@ -231,6 +285,7 @@ bool AlarmManager::poll(time_t now, AlarmEntry &triggeredAlarm, bool &fromSnooze
             continue;
         }
 
+        Serial.println(String("Alarm trigger: id=") + alarm.id + " stream=" + alarm.streamIndex + " volume=" + alarm.volume + " minuteKey=" + minuteKey);
         alarm.lastTriggeredMinuteKey = minuteKey;
         alarmRinging = true;
         currentAlarmId = alarm.id;
@@ -315,6 +370,29 @@ const char *AlarmManager::getRuntimeStatusLabel() const
     return "uit";
 }
 
+const char *AlarmManager::getDisplayStatusLabel() const
+{
+    if (alarmRinging)
+    {
+        return "Alarm actief";
+    }
+
+    if (snoozePending)
+    {
+        return "Snooze wacht";
+    }
+
+    for (uint8_t i = 0; i < alarmCount; i++)
+    {
+        if (alarms[i].enabled)
+        {
+            return "Ingesteld";
+        }
+    }
+
+    return "Geen alarm";
+}
+
 uint8_t AlarmManager::getCount() const
 {
     return alarmCount;
@@ -361,6 +439,24 @@ AlarmManager::RepeatMode AlarmManager::modeFromString(const String &modeString)
         return REPEAT_CUSTOM;
     }
     return REPEAT_DAILY;
+}
+
+const char *AlarmManager::modeDebugLabel(RepeatMode mode)
+{
+    switch (mode)
+    {
+    case REPEAT_WEEKDAYS:
+        return "weekdays";
+    case REPEAT_WEEKEND:
+        return "weekend";
+    case REPEAT_WEEKLY:
+        return "weekly";
+    case REPEAT_CUSTOM:
+        return "custom";
+    case REPEAT_DAILY:
+    default:
+        return "daily";
+    }
 }
 
 String AlarmManager::modeToString(RepeatMode mode)

@@ -1,5 +1,7 @@
 #include "PrioWebServer.h"
 
+void refreshAlarmDisplayState(bool sendToDisplay);
+
 PrioWebServer::PrioWebServer(UrlManager &urlManager, AlarmManager &alarmManager, MyPreferences &preferences, int port)
   : urlManager(urlManager), alarmManager(alarmManager), preferences(preferences), server(port)
 {
@@ -345,7 +347,7 @@ void PrioWebServer::handleApiAlarms(AsyncWebServerRequest *request)
 void PrioWebServer::handleApiAlarmStatus(AsyncWebServerRequest *request)
 {
   JsonDocument doc;
-  doc["status"] = alarmManager.getRuntimeStatusLabel();
+  doc["status"] = alarmManager.getDisplayStatusLabel();
 
   String response;
   serializeJson(doc, response);
@@ -361,6 +363,7 @@ void PrioWebServer::handleSaveAlarms(AsyncWebServerRequest *request, uint8_t *da
     return;
   }
 
+  refreshAlarmDisplayState(true);
   request->send(200, "application/json", "{\"ok\":true}");
 }
 
@@ -440,17 +443,23 @@ String PrioWebServer::getTopMenu()
 
       function setBadge(status) {
         const normalized = (status || "uit").toLowerCase();
-        badge.classList.remove("alarm-actief", "alarm-snooze", "alarm-uit");
+        badge.classList.remove("alarm-actief", "alarm-snooze", "alarm-ingesteld", "alarm-uit");
 
-        if (normalized === "actief") {
+        if (normalized === "alarm actief" || normalized === "actief") {
           badge.classList.add("alarm-actief");
           badge.textContent = "Alarm: actief";
           return;
         }
 
-        if (normalized === "snooze") {
+        if (normalized === "snooze wacht" || normalized === "snooze") {
           badge.classList.add("alarm-snooze");
           badge.textContent = "Alarm: snooze";
+          return;
+        }
+
+        if (normalized === "ingesteld") {
+          badge.classList.add("alarm-ingesteld");
+          badge.textContent = "Alarm: ingesteld";
           return;
         }
 
@@ -471,6 +480,7 @@ String PrioWebServer::getTopMenu()
         }
       }
 
+      window.refreshAlarmStatusBadge = refreshAlarmStatus;
       refreshAlarmStatus();
       setInterval(refreshAlarmStatus, 5000);
     })();

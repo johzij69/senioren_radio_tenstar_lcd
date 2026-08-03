@@ -52,9 +52,9 @@ void stopAudio()
 void setAudioVolume(int volume)
 {
     AudioData data;
-    data.command = CMD_PLAY; // Zelfde als play, maar met lege URL = alleen volume wijziging
+    data.command = CMD_SET_VOLUME;
     data.volume = volume;
-    data.url[0] = '\0';  // Lege string betekent: zelfde stream
+    data.url[0] = '\0';
     xQueueSend(AudioQueue, &data, portMAX_DELAY);
 }
 

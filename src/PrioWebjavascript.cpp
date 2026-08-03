@@ -685,6 +685,9 @@ String getAlarmScript(String ip)
           }
 
           alert("Alarmen opgeslagen");
+          if (typeof window.refreshAlarmStatusBadge === "function") {
+            await window.refreshAlarmStatusBadge();
+          }
           await loadAlarms();
         } catch (error) {
           console.error(error);
