@@ -448,6 +448,11 @@ void audio_bitrate(const char *info)
     xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
 }
 
+void audio_info(const char *info)
+{
+    Serial.printf("[AUDIO_LIB] %s\n", info);
+}
+
 void sync_time(bool forceSync)
 {
     if (forceSync)
@@ -511,7 +516,7 @@ void startAudioTask()
             "AudioTask",        // Name of the task
             8192,               // Stack size in words
             (void *)AudioQueue, // Task parameter
-            1,                  // Priority of the task
+            6,                  // Priority of the task (HIGHER than DisplayTask)
             &audioTaskHandle);  // Task handle
     }
 }
@@ -534,7 +539,7 @@ void resumeAudioTask()
             "AudioTask",
             8192,
             (void *)AudioQueue,
-            1,
+            6,                  // Priority (HIGHER than DisplayTask)
             &audioTaskHandle);
 
         if (result != pdPASS)

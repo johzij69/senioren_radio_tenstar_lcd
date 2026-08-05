@@ -36,6 +36,9 @@ void AudioTask(void *parameter)
             switch (audioData.command)
             {
             case CMD_PLAY:
+                Serial.printf("[AUDIO] CMD_PLAY received - URL: '%s', Volume: %d\n", audioData.url, audioData.volume);
+                Serial.printf("[AUDIO] Current URL: '%s', Current Volume: %d\n", current_url.c_str(), current_volume);
+                
                 if (audioData.volume != current_volume)
                 {
                     audio.setVolume(audioData.volume);
@@ -43,12 +46,35 @@ void AudioTask(void *parameter)
                     Serial.println("Volume aangepast naar: " + String(current_volume));
                 }
 
-                if (audioData.url[0] != '\0' && String(audioData.url) != current_url)
+                if (audioData.url[0] != '\0')
                 {
-                    Serial.println("Switching to stream: " + String(audioData.url));
-                    audio.connecttohost(audioData.url);
+                    // ALWAYS reconnect on CMD_PLAY to ensure stream starts properly
+                    // This fixes stuck streams and ensures fresh connection
+                    Serial.println("[AUDIO] Starting/restarting stream: " + String(audioData.url));
+                    Serial.printf("[AUDIO] Free heap before: %d bytes\n", ESP.getFreeHeap());
+                    
+                    // Stop current stream if playing
+                    if (current_url.length() > 0) {
+                        Serial.println("[AUDIO] Stopping current stream first");
+                        audio.stopSong();
+                        vTaskDelay(500 / portTICK_PERIOD_MS); // Give it time to stop and free buffers
+                    }
+                    
+                    Serial.printf("[AUDIO] Calling connecttohost: %s\n", audioData.url);
+                    bool connected = audio.connecttohost(audioData.url);
+                    Serial.printf("[AUDIO] connecttohost returned: %d\n", connected);
+                    Serial.printf("[AUDIO] Free heap after: %d bytes\n", ESP.getFreeHeap());
+                    
                     current_url = String(audioData.url);
                     paused = false;
+                    
+                    // Give audio.loop() time to start connection
+                    vTaskDelay(100 / portTICK_PERIOD_MS);
+                    Serial.printf("[AUDIO] audio.isRunning(): %d\n", audio.isRunning());
+                }
+                else
+                {
+                    Serial.println("[AUDIO] ERROR: Empty URL received!");
                 }
 
 
@@ -110,6 +136,6 @@ void AudioTask(void *parameter)
         }
 
         wasRunning = isNowRunning;
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        vTaskDelay(5 / portTICK_PERIOD_MS); // Shorter delay for faster audio.loop() calls
     }
 }

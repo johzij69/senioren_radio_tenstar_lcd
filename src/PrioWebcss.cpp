@@ -282,6 +282,88 @@ String getStyling()
         display: flex;
         justify-content: flex-end;
       }
+
+      /* File upload styling */
+      .file-upload-container {
+        margin-top: 10px;
+        padding: 10px;
+        border: 1px dashed #ccc;
+        border-radius: 4px;
+        background-color: #f9f9f9;
+      }
+
+      .file-upload-label {
+        display: block;
+        padding: 8px 12px;
+        background-color: #4CAF50;
+        color: white;
+        border-radius: 4px;
+        cursor: pointer;
+        text-align: center;
+        margin-bottom: 8px;
+      }
+
+      .file-upload-label:hover {
+        background-color: #45a049;
+      }
+
+      #file_logo {
+        display: none;
+      }
+
+      .file-info {
+        font-size: 12px;
+        color: #666;
+        margin-top: 4px;
+      }
+
+      .logo-preview {
+        max-width: 100px;
+        max-height: 100px;
+        margin-top: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        display: none;
+      }
+
+      .logo-action-buttons {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .refresh-logo-btn, .upload-logo-btn {
+        padding: 6px 12px;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+        text-align: center;
+      }
+
+      .refresh-logo-btn {
+        background-color: #2196F3;
+        flex: 1;
+      }
+
+      .refresh-logo-btn:hover {
+        background-color: #0b7dda;
+      }
+      
+      .upload-logo-btn {
+        background-color: #4CAF50;
+        flex: 1;
+        display: inline-block;
+      }
+      
+      .upload-logo-btn:hover {
+        background-color: #45a049;
+      }
+      
+      .upload-logo-input {
+        display: none;
+      }
     </style>
     )";
   return Style;

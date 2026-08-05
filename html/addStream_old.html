@@ -44,7 +44,7 @@
         border-radius: 8px;
         margin-bottom: 5px;
         max-width: 50vh;
-        cursor: move;
+        cursor: move; /* Add cursor style */
       }
       .content input {
         padding: 5px;
@@ -95,41 +95,6 @@
         align-items: center;
       }
 
-      /* File upload styling */
-      .file-upload-container {
-        margin-top: 10px;
-        padding: 10px;
-        border: 2px dashed #ccc;
-        border-radius: 5px;
-        background-color: #f9f9f9;
-        text-align: center;
-      }
-      
-      .file-upload-label {
-        display: block;
-        padding: 10px;
-        cursor: pointer;
-        color: #333;
-      }
-      
-      #file_logo {
-        display: none;
-      }
-      
-      .file-info {
-        margin-top: 5px;
-        font-size: 12px;
-        color: #666;
-      }
-
-      .logo-preview {
-        max-width: 100px;
-        max-height: 100px;
-        margin-top: 10px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-      }
-
       /* animated saver loader */
       #saving {
         position: absolute;
@@ -162,6 +127,20 @@
           transform: rotate(360deg);
         }
       }
+
+      /* drag and Drop */
+      .drop-zone {
+        border: 2px dashed lightgray; /* Border style for drop zone */
+        border-radius: 8px;
+      }
+      .drag-over {
+        background-color: rgba(
+          0,
+          0,
+          0,
+          0.1
+        ); /* Background color for drag-over */
+      }
     
     </style>
   </head>
@@ -177,64 +156,22 @@
     <script>
       const streamContainer = document.getElementById("stream-container");
       const contentContainer = document.getElementById("content-container");
-      let selectedFile = null;
-
-      // Upload logo file to ESP32
-      async function uploadLogo(streamName, file) {
-        try {
-          // Sanitize stream name for filename
-          const sanitizedName = streamName.replace(/[^a-zA-Z0-9-_]/g, '_');
-          const fileExtension = file.name.split('.').pop();
-          const filename = `${sanitizedName}.${fileExtension}`;
-          
-          const formData = new FormData();
-          formData.append('file', file, filename);
-          
-          const response = await fetch('/api/uploadlogo', {
-            method: 'POST',
-            body: formData
-          });
-          
-          if (!response.ok) {
-            throw new Error('Logo upload failed');
-          }
-          
-          const result = await response.json();
-          return result.path; // Returns /StreamLogos/filename
-        } catch (error) {
-          console.error('Error uploading logo:', error);
-          throw error;
-        }
-      }
-
       async function saveStream() {
         try {
+          // Verzamel de gegevens van het formulier
           document.getElementById("saving").style.display = "block";
-          
+          const formData = {};
           const streamNaam = document.getElementById("input_naam").value;
           const streamUrl = document.getElementById("input_url").value;
-          let streamLogo = document.getElementById("input_logo").value;
+          const streamLogo = document.getElementById("input_logo").value;
 
-          // If a file was selected, upload it first
-          if (selectedFile) {
-            try {
-              streamLogo = await uploadLogo(streamNaam, selectedFile);
-              console.log('Logo uploaded to:', streamLogo);
-            } catch (error) {
-              alert('Fout bij uploaden logo: ' + error.message);
-              document.getElementById("saving").style.display = "none";
-              return;
-            }
-          }
-
-          const formData = {
-            json_settings: {
-              name: streamNaam,
-              url: streamUrl,
-              logo: streamLogo
-            }
+          formData["json_settings"] = {
+            name: streamNaam,
+            url: streamUrl,
+            logo: streamLogo,
           };
 
+          // Maak een POST-verzoek met fetch
           const url = "/addstream";
           const options = {
             method: "POST",
@@ -249,60 +186,9 @@
             throw new Error("Network response was not ok");
           }
 
-          alert('Stream succesvol toegevoegd!');
           document.getElementById("saving").style.display = "none";
-          
-          // Reset form
-          document.getElementById("input_naam").value = '';
-          document.getElementById("input_url").value = '';
-          document.getElementById("input_logo").value = '';
-          selectedFile = null;
-          document.getElementById("file_info").textContent = 'Geen bestand geselecteerd';
-          const preview = document.getElementById("logo_preview");
-          if (preview) preview.style.display = 'none';
-          
         } catch (error) {
           console.error("Er is een fout opgetreden:", error);
-          alert('Fout bij opslaan: ' + error.message);
-          document.getElementById("saving").style.display = "none";
-        }
-      }
-
-      function handleFileSelect(event) {
-        const file = event.target.files[0];
-        if (file) {
-          // Check file type
-          if (!file.type.startsWith('image/')) {
-            alert('Selecteer een afbeelding (JPG, PNG, GIF)');
-            event.target.value = '';
-            return;
-          }
-          
-          // Check file size (max 200KB)
-          if (file.size > 200 * 1024) {
-            alert('Bestand te groot! Maximum 200KB');
-            event.target.value = '';
-            return;
-          }
-          
-          selectedFile = file;
-          document.getElementById("file_info").textContent = 
-            `Geselecteerd: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
-          
-          // Show preview
-          const reader = new FileReader();
-          reader.onload = function(e) {
-            let preview = document.getElementById("logo_preview");
-            if (!preview) {
-              preview = document.createElement('img');
-              preview.id = 'logo_preview';
-              preview.className = 'logo-preview';
-              document.querySelector('.file-upload-container').appendChild(preview);
-            }
-            preview.src = e.target.result;
-            preview.style.display = 'block';
-          };
-          reader.readAsDataURL(file);
         }
       }
 
@@ -325,47 +211,28 @@
                               <div class="edit-label">Stream naam:</div>
                               <input
                                 class="input_naam"
-                                id="input_naam"
                                 type="text"
                                 name="naam"
                                 value=""
-                                required
                               />
                             </div>
                             <div id="url" class="url-container">
                               <div class="edit-label">Stream url:</div>
                               <input
                                 class="input_url"
-                                id="input_url"
                                 type="text"
                                 name="newurl"
                                 value=""
-                                required
                               />
                             </div>
                             <div id="logo" class="url-container">
-                              <div class="edit-label">Logo (kies één optie):</div>
+                              <div class="edit-label">Logo url:</div>
                               <input
                                 class="input_url"
-                                id="input_logo"
                                 type="text"
                                 name="logo"
                                 value=""
-                                placeholder="Logo URL (optioneel)"
                               />
-                              <div class="file-upload-container">
-                                <label for="file_logo" class="file-upload-label">
-                                  📁 Klik om logo te uploaden
-                                </label>
-                                <input
-                                  type="file"
-                                  id="file_logo"
-                                  accept="image/*"
-                                  onchange="handleFileSelect(event)"
-                                />
-                                <div id="file_info" class="file-info">Geen bestand geselecteerd</div>
-                                <div class="file-info">Max 200KB, JPG/PNG/GIF</div>
-                              </div>
                             </div>
                         </div>
                      `;

@@ -99,6 +99,37 @@ void PrioWebServer::begin()
           (void)total;
           this->handleSaveSettings(request, data, len);
       });
+
+      // Logo upload endpoint
+      server.on(
+        "/api/uploadlogo",
+        HTTP_POST,
+        [](AsyncWebServerRequest *request) {
+          // Response after upload completes
+        },
+        [this](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+          this->handleUploadLogo(request, filename, index, data, len, final);
+        }
+      );
+      
+      // Logo upload replace endpoint - replaces existing logo
+      server.on(
+        "/api/uploadlogo-replace",
+        HTTP_POST,
+        [](AsyncWebServerRequest *request) {
+          // Response after upload completes
+        },
+        [this](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+          this->handleUploadLogoReplace(request, filename, index, data, len, final);
+        }
+      );
+      
+      // Logo refresh endpoint - trigger download from URL
+      server.on("/api/refreshlogo", HTTP_POST, [this](AsyncWebServerRequest *request){}, NULL,
+        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+          this->handleRefreshLogo(request, data, len);
+        }
+      );
      
   server.begin();
 }
@@ -397,6 +428,154 @@ void PrioWebServer::handleSaveSettings(AsyncWebServerRequest *request, uint8_t *
   preferences.putUInt("snooze_btn_idx", (uint32_t)snoozeButtonIndex);
   alarmSnoozeButtonIndex = (uint8_t)snoozeButtonIndex;
   request->send(200, "application/json", "{\"ok\":true}");
+}
+
+void PrioWebServer::handleUploadLogo(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final)
+{
+  static File uploadFile;
+  static String uploadPath;
+  
+  // First chunk - open file
+  if (index == 0) {
+    Serial.printf("[UPLOAD] Start: %s\n", filename.c_str());
+    
+    // Create /StreamLogos directory if it doesn't exist
+    if (!LittleFS.exists("/StreamLogos")) {
+      if (!LittleFS.mkdir("/StreamLogos")) {
+        Serial.println("[UPLOAD] Failed to create /StreamLogos directory");
+        request->send(500, "application/json", "{\"error\":\"Failed to create directory\"}");
+        return;
+      }
+    }
+    
+    // Build full path
+    uploadPath = "/StreamLogos/" + filename;
+    
+    // Check if file already exists and delete it
+    if (LittleFS.exists(uploadPath)) {
+      LittleFS.remove(uploadPath);
+      Serial.printf("[UPLOAD] Removed existing file: %s\n", uploadPath.c_str());
+    }
+    
+    // Open file for writing
+    uploadFile = LittleFS.open(uploadPath, "w");
+    if (!uploadFile) {
+      Serial.println("[UPLOAD] Failed to open file for writing");
+      request->send(500, "application/json", "{\"error\":\"Failed to open file\"}");
+      return;
+    }
+    
+    Serial.printf("[UPLOAD] Free heap: %d bytes\n", ESP.getFreeHeap());
+  }
+  
+  // Write chunk
+  if (uploadFile && len) {
+    size_t written = uploadFile.write(data, len);
+    if (written != len) {
+      Serial.printf("[UPLOAD] Write failed: expected %d, wrote %d\n", len, written);
+    }
+  }
+  
+  // Last chunk - close file and send response
+  if (final) {
+    if (uploadFile) {
+      uploadFile.close();
+      Serial.printf("[UPLOAD] Complete: %s (%d bytes)\n", uploadPath.c_str(), index + len);
+      
+      // Send success response with file path
+      String response = "{\"ok\":true,\"path\":\"" + uploadPath + "\",\"size\":" + String(index + len) + "}";
+      request->send(200, "application/json", response);
+    } else {
+      Serial.println("[UPLOAD] Failed - file not open");
+      request->send(500, "application/json", "{\"error\":\"Upload failed\"}");
+    }
+  }
+}
+
+void PrioWebServer::handleUploadLogoReplace(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final)
+{
+  static File uploadFile;
+  static String uploadPath;
+  static String oldLogoPath;
+  
+  // First chunk - open file and handle old logo deletion
+  if (index == 0) {
+    Serial.printf("[UPLOAD-REPLACE] Start: %s\n", filename.c_str());
+    
+    // Get oldLogoPath parameter from request
+    if (request->hasParam("oldLogoPath", true)) {
+      oldLogoPath = request->getParam("oldLogoPath", true)->value();
+      Serial.printf("[UPLOAD-REPLACE] Old logo path: %s\n", oldLogoPath.c_str());
+      
+      // Delete old logo file if it exists
+      if (oldLogoPath.length() > 0 && LittleFS.exists(oldLogoPath)) {
+        if (LittleFS.remove(oldLogoPath)) {
+          Serial.printf("[UPLOAD-REPLACE] Removed old logo: %s\n", oldLogoPath.c_str());
+        } else {
+          Serial.printf("[UPLOAD-REPLACE] Failed to remove old logo: %s\n", oldLogoPath.c_str());
+        }
+      }
+    }
+    
+    // Create /StreamLogos directory if it doesn't exist
+    if (!LittleFS.exists("/StreamLogos")) {
+      if (!LittleFS.mkdir("/StreamLogos")) {
+        Serial.println("[UPLOAD-REPLACE] Failed to create /StreamLogos directory");
+        request->send(500, "application/json", "{\"error\":\"Failed to create directory\"}");
+        return;
+      }
+    }
+    
+    // Build full path
+    uploadPath = "/StreamLogos/" + filename;
+    
+    // Check if file already exists and delete it
+    if (LittleFS.exists(uploadPath)) {
+      LittleFS.remove(uploadPath);
+      Serial.printf("[UPLOAD-REPLACE] Removed existing file: %s\n", uploadPath.c_str());
+    }
+    
+    // Open file for writing
+    uploadFile = LittleFS.open(uploadPath, "w");
+    if (!uploadFile) {
+      Serial.println("[UPLOAD-REPLACE] Failed to open file for writing");
+      request->send(500, "application/json", "{\"error\":\"Failed to open file\"}");
+      return;
+    }
+    
+    Serial.printf("[UPLOAD-REPLACE] Free heap: %d bytes\n", ESP.getFreeHeap());
+  }
+  
+  // Write chunk
+  if (uploadFile && len) {
+    size_t written = uploadFile.write(data, len);
+    if (written != len) {
+      Serial.printf("[UPLOAD-REPLACE] Write failed: expected %d, wrote %d\n", len, written);
+    }
+  }
+  
+  // Last chunk - close file and send response
+  if (final) {
+    if (uploadFile) {
+      uploadFile.close();
+      Serial.printf("[UPLOAD-REPLACE] Complete: %s (%d bytes)\n", uploadPath.c_str(), index + len);
+      
+      // Send success response with file path
+      String response = "{\"ok\":true,\"path\":\"" + uploadPath + "\",\"size\":" + String(index + len) + "}";
+      request->send(200, "application/json", response);
+    } else {
+      Serial.println("[UPLOAD-REPLACE] Failed - file not open");
+      request->send(500, "application/json", "{\"error\":\"Upload failed\"}");
+    }
+  }
+}
+
+void PrioWebServer::handleRefreshLogo(AsyncWebServerRequest *request, uint8_t *data, size_t len)
+{
+  // DISABLED: Logo download conflicts with Audio library SSL
+  Serial.println("[REFRESH] Logo download is disabled - use upload instead");
+  String response = "{\"ok\":false,\"error\":\"Logo download is uitgeschakeld. Gebruik de upload functie.\"}";
+  request->send(503, "application/json", response);
 }
 
 String PrioWebServer::createHtmlPage(String body)

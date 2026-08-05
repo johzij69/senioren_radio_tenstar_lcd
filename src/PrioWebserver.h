@@ -10,6 +10,8 @@
 #include "globals.h" 
 #include "AlarmManager.h"
 #include "MyPreferences.h"
+#include "LittleFS.h"
+#include "fetchImage.h"
 
 
 
@@ -51,6 +53,9 @@ private:
   void handleSaveAlarms(AsyncWebServerRequest *request, uint8_t *data, size_t len);
   void handleApiSettings(AsyncWebServerRequest *request);
   void handleSaveSettings(AsyncWebServerRequest *request, uint8_t *data, size_t len);
+  void handleUploadLogo(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final);
+  void handleUploadLogoReplace(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final);
+  void handleRefreshLogo(AsyncWebServerRequest *request, uint8_t *data, size_t len);
   void onBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
 
 

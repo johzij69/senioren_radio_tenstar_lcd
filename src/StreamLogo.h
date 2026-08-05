@@ -28,6 +28,14 @@ private:
     bool LoadImage(String url, String filename);
     void renderJPEG(int xpos, int ypos);
     void drawJpeg(const char *filename, int xpos, int ypos);
+    
+    // PNG Support
+    void drawPng(const char *filename, int xpos, int ypos);
+    static int pngDraw(PNGDRAW *pDraw);
+    void renderPNG(int xpos, int ypos);
+    
+    // Static line buffer for PNG decode (in PSRAM to prevent stack overflow)
+    static uint16_t* s_png_line_buffer;
 
 };
 

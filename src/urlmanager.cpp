@@ -47,7 +47,7 @@ void UrlManager::addDefaultStream()
     streamCount = 0;
     Streams[streamCount].id = streamCount;
     Streams[streamCount].name = "NPO Radio 1";
-    Streams[streamCount].url = "https://icecast.omroep.nl/radio1-bb-mp3:443";
+    Streams[streamCount].url = "http://icecast.omroep.nl/radio1-bb-mp3";
     Streams[streamCount].logo = "https://img.prio-ict.nl/api/images/NPO-Radio1.jpg";
     streamCount++;
     Serial.println("default stream added");

@@ -30,22 +30,66 @@ String putInstellingenSyncTimeButton(String ip)
 
 String getAddScript(String ip)
 {
-  String script PROGMEM = R"(
+  String script PROGMEM = R"RAWSTR(
      <script>
       const streamContainer = document.getElementById("stream-container");
       const contentContainer = document.getElementById("content-container");
+      let selectedFile = null;
+
+      // Upload logo file to ESP32
+      async function uploadLogo(streamName, file) {
+        try {
+          // Sanitize stream name for filename
+          const sanitizedName = streamName.replace(/[^a-zA-Z0-9-_]/g, '_');
+          const fileExtension = file.name.split('.').pop();
+          const filename = `${sanitizedName}.${fileExtension}`;
+          
+          const formData = new FormData();
+          formData.append('file', file, filename);
+          
+          const response = await fetch('/api/uploadlogo', {
+            method: 'POST',
+            body: formData
+          });
+          
+          if (!response.ok) {
+            throw new Error('Logo upload failed');
+          }
+          
+          const result = await response.json();
+          return result.path; // Returns /StreamLogos/filename
+        } catch (error) {
+          console.error('Error uploading logo:', error);
+          throw error;
+        }
+      }
+
       async function saveStream() {
         try {
           document.getElementById("saving").style.display = "block";
-          const formData = {};
+          
           const streamNaam = document.getElementById("input_naam").value;
           const streamUrl = document.getElementById("input_url").value;
-          const streamLogo = document.getElementById("input_logo").value;
+          let streamLogo = document.getElementById("input_logo").value;
 
-          formData["json_settings"] = {
-            name: streamNaam,
-            url: streamUrl,
-            logo: streamLogo,
+          // If a file was selected, upload it first
+          if (selectedFile) {
+            try {
+              streamLogo = await uploadLogo(streamNaam, selectedFile);
+              console.log('Logo uploaded to:', streamLogo);
+            } catch (error) {
+              alert('Fout bij uploaden logo: ' + error.message);
+              document.getElementById("saving").style.display = "none";
+              return;
+            }
+          }
+
+          const formData = {
+            json_settings: {
+              name: streamNaam,
+              url: streamUrl,
+              logo: streamLogo
+            }
           };
 
           // Maak een POST-verzoek met fetch
@@ -63,9 +107,60 @@ String getAddScript(String ip)
             throw new Error("Network response was not ok");
           }
 
+          alert('Stream succesvol toegevoegd!');
           document.getElementById("saving").style.display = "none";
+          
+          // Reset form
+          document.getElementById("input_naam").value = '';
+          document.getElementById("input_url").value = '';
+          document.getElementById("input_logo").value = '';
+          selectedFile = null;
+          document.getElementById("file_info").textContent = 'Geen bestand geselecteerd';
+          const preview = document.getElementById("logo_preview");
+          if (preview) preview.style.display = 'none';
+          
         } catch (error) {
           console.error("Er is een fout opgetreden:", error);
+          alert('Fout bij opslaan: ' + error.message);
+          document.getElementById("saving").style.display = "none";
+        }
+      }
+
+      function handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (file) {
+          // Check file type
+          if (!file.type.startsWith('image/')) {
+            alert('Selecteer een afbeelding (JPG, PNG, GIF)');
+            event.target.value = '';
+            return;
+          }
+          
+          // Check file size (max 200KB)
+          if (file.size > 200 * 1024) {
+            alert('Bestand te groot! Maximum 200KB');
+            event.target.value = '';
+            return;
+          }
+          
+          selectedFile = file;
+          document.getElementById("file_info").textContent = 
+            `Geselecteerd: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+          
+          // Show preview
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            let preview = document.getElementById("logo_preview");
+            if (!preview) {
+              preview = document.createElement('img');
+              preview.id = 'logo_preview';
+              preview.className = 'logo-preview';
+              document.querySelector('.file-upload-container').appendChild(preview);
+            }
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+          };
+          reader.readAsDataURL(file);
         }
       }
 
@@ -76,7 +171,7 @@ String getAddScript(String ip)
                             class="input_button"
                             type="button"
                             value="Opslaan"
-                            onclick='saveStream()'
+                            onclick="saveStream()"
                           />`;
         const streamForm = document.createElement("form");
         streamForm.setAttribute("method", "post");
@@ -92,6 +187,7 @@ String getAddScript(String ip)
                                 type="text"
                                 name="naam"
                                 value=""
+                                required
                               />
                             </div>
                             <div id="url" class="url-container">
@@ -102,17 +198,32 @@ String getAddScript(String ip)
                                 type="text"
                                 name="newurl"
                                 value=""
+                                required
                               />
                             </div>
                             <div id="logo" class="url-container">
-                              <div class="edit-label">Logo url:</div>
+                              <div class="edit-label">Logo (kies één optie):</div>
                               <input
-                                id="input_logo"	
+                                id="input_logo"
                                 class="input_long"
                                 type="text"
                                 name="logo"
                                 value=""
+                                placeholder="Logo URL (optioneel)"
                               />
+                              <div class="file-upload-container">
+                                <label for="file_logo" class="file-upload-label">
+                                  📁 Klik om logo te uploaden
+                                </label>
+                                <input
+                                  type="file"
+                                  id="file_logo"
+                                  accept="image/*"
+                                  onchange="handleFileSelect(event)"
+                                />
+                                <div id="file_info" class="file-info">Geen bestand geselecteerd</div>
+                                <div class="file-info">Max 200KB, JPG/PNG/GIF</div>
+                              </div>
                             </div>
                         </div>
                      `;
@@ -120,7 +231,7 @@ String getAddScript(String ip)
         contentContainer.appendChild(spanSubmit);
       }
       displayStream();
-          </script>)";
+          </script>)RAWSTR";
   searchAndReplace(&script, String("@ip"), ip);
   return script;
 }
@@ -128,7 +239,7 @@ String getAddScript(String ip)
 String getMainScript(String ip)
 {
 
-  String script PROGMEM = R"(
+  String script PROGMEM = R"RAWSTR(
      <script>
       let currentPage = 1;
       let pagesize = 5;
@@ -310,9 +421,23 @@ String getMainScript(String ip)
                     <input
                       class="input_long input_logo"
                       type="text"
-                      name="newurl_logo_${stream.id}"S
+                      name="newurl_logo_${stream.id}"
                       value="${stream.logo}"
                     />
+                    <div class="logo-action-buttons">
+                      <!-- Download disabled - conflicts with Audio SSL -->
+                      <label class="upload-logo-btn" for="upload_logo_${stream.id}" style="flex: 1;">
+                        📁 Upload nieuw logo
+                      </label>
+                      <input 
+                        type="file" 
+                        id="upload_logo_${stream.id}" 
+                        class="upload-logo-input"
+                        accept="image/*"
+                        onchange="handleLogoUploadForStream(${stream.id}, '${stream.logo}', this)"
+                        style="display: none;"
+                      />
+                    </div>
                   </div>
                `;
           streamContainer.appendChild(streamItem);
@@ -374,6 +499,99 @@ String getMainScript(String ip)
         }
       }
 
+      async function refreshLogo(streamId, logoUrl) {
+        if (!logoUrl || logoUrl.trim() === '') {
+          alert('Geen logo URL beschikbaar om te downloaden');
+          return;
+        }
+        
+        if (!logoUrl.startsWith('http://') && !logoUrl.startsWith('https://')) {
+          alert('Logo URL moet beginnen met http:// of https://');
+          return;
+        }
+        
+        if (!confirm('Logo opnieuw downloaden van: ' + logoUrl + '?')) {
+          return;
+        }
+        
+        try {
+          const response = await fetch('/api/refreshlogo', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ logoUrl: logoUrl })
+          });
+          
+          const result = await response.json();
+          
+          if (response.ok && result.ok) {
+            alert('Logo succesvol gedownload! ✓\n\nHet logo wordt direct gebruikt.');
+          } else {
+            const errorMsg = result.error || 'Onbekende fout';
+            alert('Fout bij downloaden logo:\n' + errorMsg);
+          }
+        } catch (error) {
+          console.error('Error refreshing logo:', error);
+          alert('Fout bij downloaden logo:\n' + error.message);
+        }
+      }
+
+      async function handleLogoUploadForStream(streamId, oldLogoPath, inputElement) {
+        const file = inputElement.files[0];
+        if (!file) return;
+        
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+          alert('Alleen afbeeldingen zijn toegestaan');
+          inputElement.value = '';
+          return;
+        }
+        
+        // Validate file size (max 500KB)
+        if (file.size > 500 * 1024) {
+          alert('Bestand is te groot! Maximum 500KB.');
+          inputElement.value = '';
+          return;
+        }
+        
+        if (!confirm(`Nieuw logo uploaden: ${file.name}?\n\nDit vervangt het huidige logo.`)) {
+          inputElement.value = '';
+          return;
+        }
+        
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('oldLogoPath', oldLogoPath);
+          
+          const response = await fetch('/api/uploadlogo-replace', {
+            method: 'POST',
+            body: formData
+          });
+          
+          const result = await response.json();
+          
+          if (response.ok && result.ok) {
+            alert(`Logo succesvol vervangen! ✓\n\nNieuw bestand: ${result.path}\nGrootte: ${result.size} bytes`);
+            
+            // Update the logo URL input field with the new path
+            const logoInput = document.querySelector(`input[name="newurl_logo_${streamId}"]`);
+            if (logoInput) {
+              logoInput.value = result.path;
+            }
+          } else {
+            const errorMsg = result.error || 'Onbekende fout';
+            alert('Fout bij uploaden logo:\n' + errorMsg);
+          }
+        } catch (error) {
+          console.error('Error uploading logo:', error);
+          alert('Fout bij uploaden logo:\n' + error.message);
+        } finally {
+          inputElement.value = '';
+        }
+      }
+
       // Behandel dragstart event
       function handleDragStart(event) {
         // Identificeer het te verplaatsen element
@@ -423,14 +641,14 @@ String getMainScript(String ip)
       }
 
       fetchStreams(currentPage, pagesize);
-    </script>)";
+    </script>)RAWSTR";
   searchAndReplace(&script, String("@ip"), ip);
   return script;
 }
 
 String getAlarmScript(String ip)
 {
-  String script PROGMEM = R"(
+  String script PROGMEM = R"RAWSTR(
     <script>
       const dayNames = ["Zo", "Ma", "Di", "Wo", "Do", "Vr", "Za"];
       const modeOptions = [
@@ -729,7 +947,7 @@ String getAlarmScript(String ip)
         console.error(error);
         alert("Kon alarmgegevens niet laden");
       });
-    </script>)";
+    </script>)RAWSTR";
 
   searchAndReplace(&script, String("@ip"), ip);
   return script;
