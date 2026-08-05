@@ -27,6 +27,7 @@ struct DisplayData {
     bool loadingState;
     bool standbyState;
     char currenTime[5];
+    char currenDate[20];
 
 };
 

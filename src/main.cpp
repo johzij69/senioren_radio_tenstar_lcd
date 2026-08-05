@@ -424,6 +424,7 @@ void CreateAndSendDisplayData(int streamIndex)
     strncpy(displayData.lasthost, "Loading...", sizeof(displayData.lasthost));
     strncpy(displayData.streamtitle, "", sizeof(displayData.streamtitle));
     strncpy(displayData.currenTime, pDateTime.getTime(), sizeof(displayData.currenTime));
+   // strncpy(displayData.currenDate, pDateTime.getDayDate(), sizeof(displayData.currenDate));
     SendDataToDisplay();
 }
 void SendDataToDisplay()
@@ -465,6 +466,7 @@ void sync_time(bool forceSync)
     }
 
     strncpy(displayData.currenTime, pDateTime.getTime(), sizeof(displayData.currenTime));
+   // strncpy(displayData.currenDate, pDateTime.getDayDate(), sizeof(displayData.currenDate));
     if (prevTime != displayData.currenTime)
     {
         prevTime = displayData.currenTime;

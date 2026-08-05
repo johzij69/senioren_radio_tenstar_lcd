@@ -364,6 +364,25 @@ String getStyling()
       .upload-logo-input {
         display: none;
       }
+
+      .import-export-status {
+        padding: 8px 10px;
+        border-radius: 6px;
+        max-width: 700px;
+        font-size: 14px;
+      }
+
+      .import-export-status.ok {
+        background: #e8f6ec;
+        border: 1px solid #8ec9a0;
+        color: #165a2e;
+      }
+
+      .import-export-status.error {
+        background: #fdebec;
+        border: 1px solid #e39b9f;
+        color: #8d1f26;
+      }
     </style>
     )";
   return Style;

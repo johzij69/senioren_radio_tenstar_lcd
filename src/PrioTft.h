@@ -9,7 +9,8 @@
 #include "TFTScroller.h"
 #include "StreamLogo.h"
 
-#define TIME_FONT_LARGE_PATH "/Oswald124.vlw"
+#define TIME_FONT_LARGE_PATH "Oswald124"
+#define TIME_FONT_SMALL_PATH "Oswald24"
 
 class PrioTft {
 private:
@@ -45,7 +46,7 @@ public:
     void drawParaLine(const String &text, int startY);
     void showLoadingState();
     void showStandbyState();
-    void showStandbyTime(const String &time);
+    void showStandbyTime(const String &time, const String &dayDate);
     String truncateStringToFit(const String &text, int maxWidth);
 };
 

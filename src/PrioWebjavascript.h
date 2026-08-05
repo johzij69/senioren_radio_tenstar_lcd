@@ -7,5 +7,6 @@ String getMainScript(String ip);
 String getAddScript(String ip);
 String getAlarmScript(String ip);
 String getSettingsScript(String ip, int snoozeButtonIndex);
+String getImportExportScript(String ip);
 
 #endif

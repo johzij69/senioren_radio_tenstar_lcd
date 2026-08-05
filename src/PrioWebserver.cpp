@@ -32,6 +32,9 @@ void PrioWebServer::begin()
     /* instellingen page , which handles instellingen */
     server.on("/instellingen", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleInstellingen(request); });
 
+  /* import / export page */
+  server.on("/importexport", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleImportExportPage(request); });
+
   /* alarm configuration page */
   server.on("/alarmen", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleAlarmPage(request); });
 
@@ -47,6 +50,8 @@ void PrioWebServer::begin()
   server.on("/api/alarmstatus", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleApiAlarmStatus(request); });
 
   server.on("/api/settings", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleApiSettings(request); });
+
+  server.on("/api/config/export", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleApiExportConfig(request); });
 
   /* serves the html page to add a stream */
   server.on("/inpustream", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleInputStream(request); });
@@ -98,6 +103,17 @@ void PrioWebServer::begin()
           (void)index;
           (void)total;
           this->handleSaveSettings(request, data, len);
+      });
+
+      server.on(
+        "/api/config/import",
+        HTTP_POST,
+        [](AsyncWebServerRequest * request){},
+        NULL,
+        [this](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) {
+          (void)index;
+          (void)total;
+          this->handleApiImportConfig(request, data, len);
       });
 
       // Logo upload endpoint
@@ -291,6 +307,24 @@ void PrioWebServer::handleInstellingen(AsyncWebServerRequest *request)
   mybigString = "";
 }
 
+void PrioWebServer::handleImportExportPage(AsyncWebServerRequest *request)
+{
+  String body PROGMEM = R"(<div id="content-container" class="content"></div>)";
+  String mybigString = "";
+
+  String h_start PROGMEM = getHtmlStart();
+  String h_script PROGMEM = getImportExportScript(this->ip);
+  String h_body PROGMEM = setHtmlBody(body, h_script);
+  String h_end PROGMEM = getHtmlEnd();
+
+  mybigString.concat(h_start);
+  mybigString.concat(h_body);
+  mybigString.concat(h_end);
+
+  request->send(200, "text/html", mybigString.c_str());
+  mybigString = "";
+}
+
 void PrioWebServer::handleAddStream(AsyncWebServerRequest *request, uint8_t *data)
 {
   urlManager.addStream(data);
@@ -402,10 +436,156 @@ void PrioWebServer::handleApiSettings(AsyncWebServerRequest *request)
 {
   JsonDocument doc;
   doc["snoozeButtonIndex"] = preferences.getUInt("snooze_btn_idx", 10);
+  doc["volume"] = preferences.readValue("volume", DEF_VOLUME);
+  doc["streamIndex"] = preferences.getUInt("stream_index", 0);
 
   String response;
   serializeJson(doc, response);
   request->send(200, "application/json", response);
+}
+
+void PrioWebServer::handleApiExportConfig(AsyncWebServerRequest *request)
+{
+  JsonDocument doc;
+  doc["format"] = "senioren_radio_backup";
+  doc["version"] = 1;
+  doc["exportedAtMs"] = millis();
+
+  JsonObject settings = doc["settings"].to<JsonObject>();
+  settings["snoozeButtonIndex"] = preferences.getUInt("snooze_btn_idx", 10);
+  settings["volume"] = preferences.readValue("volume", DEF_VOLUME);
+  settings["streamIndex"] = preferences.getUInt("stream_index", 0);
+
+  JsonArray streams = doc["streams"].to<JsonArray>();
+  for (uint32_t i = 0; i < urlManager.streamCount; i++)
+  {
+    JsonObject stream = streams.add<JsonObject>();
+    stream["id"] = i;
+    stream["name"] = urlManager.Streams[i].name;
+    stream["url"] = urlManager.Streams[i].url;
+    stream["logo"] = urlManager.Streams[i].logo;
+  }
+
+  JsonArray alarms = doc["alarms"].to<JsonArray>();
+  alarmManager.appendAlarmsJson(alarms);
+
+  String response;
+  serializeJson(doc, response);
+  request->send(200, "application/json", response);
+}
+
+void PrioWebServer::handleApiImportConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len)
+{
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, data, len);
+  if (error)
+  {
+    request->send(400, "application/json", "{\"ok\":false,\"message\":\"Invalid JSON\"}");
+    return;
+  }
+
+  if (!doc["streams"].is<JsonArray>())
+  {
+    request->send(400, "application/json", "{\"ok\":false,\"message\":\"streams array ontbreekt\"}");
+    return;
+  }
+
+  JsonArray incomingStreams = doc["streams"].as<JsonArray>();
+  if (incomingStreams.size() > 40)
+  {
+    request->send(400, "application/json", "{\"ok\":false,\"message\":\"Maximaal 40 streams toegestaan\"}");
+    return;
+  }
+
+  uint32_t newStreamCount = 0;
+  for (JsonVariant streamVar : incomingStreams)
+  {
+    if (!streamVar.is<JsonObject>())
+    {
+      request->send(400, "application/json", "{\"ok\":false,\"message\":\"Ongeldig stream item\"}");
+      return;
+    }
+
+    JsonObject streamObj = streamVar.as<JsonObject>();
+    String name = streamObj["name"].is<const char *>() ? String((const char *)streamObj["name"]) : String("");
+    String url = streamObj["url"].is<const char *>() ? String((const char *)streamObj["url"]) : String("");
+    String logo = streamObj["logo"].is<const char *>() ? String((const char *)streamObj["logo"]) : String("");
+
+    if (name.length() == 0 || url.length() == 0)
+    {
+      request->send(400, "application/json", "{\"ok\":false,\"message\":\"Elke stream moet naam en url hebben\"}");
+      return;
+    }
+
+    urlManager.Streams[newStreamCount].id = newStreamCount;
+    urlManager.Streams[newStreamCount].name = name;
+    urlManager.Streams[newStreamCount].url = url;
+    urlManager.Streams[newStreamCount].logo = logo;
+    newStreamCount++;
+  }
+
+  for (uint32_t i = newStreamCount; i < 40; i++)
+  {
+    UrlManager::StreamItem emptyItem;
+    urlManager.Streams[i] = emptyItem;
+  }
+
+  urlManager.streamCount = newStreamCount;
+  urlManager.saveToPreferences();
+
+  JsonDocument alarmPayload;
+  JsonArray alarmArray = alarmPayload["alarms"].to<JsonArray>();
+  if (doc["alarms"].is<JsonArray>())
+  {
+    for (JsonVariant alarmVar : doc["alarms"].as<JsonArray>())
+    {
+      alarmArray.add(alarmVar);
+    }
+  }
+
+  String alarmBuffer;
+  serializeJson(alarmPayload, alarmBuffer);
+  String alarmError;
+  if (!alarmManager.updateFromJson((uint8_t *)alarmBuffer.c_str(), alarmBuffer.length(), urlManager.streamCount, alarmError))
+  {
+    String errorResponse = String("{\"ok\":false,\"message\":\"Alarm import mislukt: ") + alarmError + "\"}";
+    request->send(400, "application/json", errorResponse);
+    return;
+  }
+
+  if (doc["settings"].is<JsonObject>())
+  {
+    JsonObject settings = doc["settings"].as<JsonObject>();
+
+    int snoozeButtonIndex = settings["snoozeButtonIndex"].is<int>() ? settings["snoozeButtonIndex"].as<int>() : 10;
+    if (snoozeButtonIndex < 0) snoozeButtonIndex = 0;
+    if (snoozeButtonIndex > 15) snoozeButtonIndex = 15;
+    preferences.putUInt("snooze_btn_idx", (uint32_t)snoozeButtonIndex);
+    alarmSnoozeButtonIndex = (uint8_t)snoozeButtonIndex;
+
+    int volume = settings["volume"].is<int>() ? settings["volume"].as<int>() : DEF_VOLUME;
+    if (volume < MIN_VOLUME) volume = MIN_VOLUME;
+    if (volume > MAX_VOLUME) volume = MAX_VOLUME;
+    preferences.writeValue("volume", volume);
+
+    int streamIndex = settings["streamIndex"].is<int>() ? settings["streamIndex"].as<int>() : 0;
+    if (streamIndex < 0)
+    {
+      streamIndex = 0;
+    }
+    if (urlManager.streamCount == 0)
+    {
+      streamIndex = 0;
+    }
+    else if (streamIndex >= (int)urlManager.streamCount)
+    {
+      streamIndex = (int)urlManager.streamCount - 1;
+    }
+    preferences.putUInt("stream_index", (uint32_t)streamIndex);
+  }
+
+  refreshAlarmDisplayState(true);
+  request->send(200, "application/json", "{\"ok\":true}");
 }
 
 void PrioWebServer::handleSaveSettings(AsyncWebServerRequest *request, uint8_t *data, size_t len)
@@ -613,6 +793,7 @@ String PrioWebServer::getTopMenu()
     <a href='/inpustream'>Voeg toe</a>
     <a href='/alarmen'>Alarmen</a>
     <a href='/instellingen'>Instellingen</a>
+    <a href='/importexport'>Import/Export</a>
     <a href='#'>Contact</a>
     <span class='alarm-badge alarm-uit' id='alarm-status-badge'>Alarm: uit</span>
   </div>

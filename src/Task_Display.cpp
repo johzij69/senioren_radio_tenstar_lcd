@@ -95,7 +95,7 @@ void DisplayTask(void *parameter)
                 {
                     inStandby = true; // Zet de standby status
                     fromStandby = true; // Zet de fromStandby status
-                    prioTft.showStandbyTime(_displayData.currenTime);
+                    prioTft.showStandbyTime(_displayData.currenTime, _displayData.currenDate);
                     Serial.println("Display: Standby state active");
                 }
                 else
@@ -128,6 +128,7 @@ void DisplayTask(void *parameter)
                     // spl("lasthost: " + String(_displayData.lasthost));
                     spl("tft_streamtitle: " + String(_displayData.streamtitle));
                     spl("currenTime: " + String(_displayData.currenTime));
+                    spl("currenDate: " + String(_displayData.currenDate));
 
                     // Controleer en update alleen als de waarde is gewijzigd
                     if (prevIp != _displayData.ip)

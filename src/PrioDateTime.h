@@ -29,6 +29,9 @@ public:
     // Haal de huidige datum op (formaat: "DD-MM-JJJJ")
     char* getDate();
 
+    // Haal de huidige dag+datum op (formaat: "Wo DD-MM-JJJJ")
+    char* getDayDate();
+
     // Haal de huidige datum en tijd op (formaat: "DD-MM-JJJJ HH:MM")
     char* getDateTime();
 

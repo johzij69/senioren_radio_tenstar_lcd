@@ -46,10 +46,13 @@ private:
   void handleSettings(AsyncWebServerRequest *request, uint8_t *data);//, size_t len);
   void handleDeleteStream(AsyncWebServerRequest *request);
   void handleInstellingen(AsyncWebServerRequest *request);
+  void handleImportExportPage(AsyncWebServerRequest *request);
   void handleSynctime(AsyncWebServerRequest *request);
   void handleAlarmPage(AsyncWebServerRequest *request);
   void handleApiAlarms(AsyncWebServerRequest *request);
   void handleApiAlarmStatus(AsyncWebServerRequest *request);
+  void handleApiExportConfig(AsyncWebServerRequest *request);
+  void handleApiImportConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len);
   void handleSaveAlarms(AsyncWebServerRequest *request, uint8_t *data, size_t len);
   void handleApiSettings(AsyncWebServerRequest *request);
   void handleSaveSettings(AsyncWebServerRequest *request, uint8_t *data, size_t len);

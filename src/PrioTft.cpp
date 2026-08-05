@@ -150,7 +150,7 @@ void PrioTft::showTime(const String &time)
 
 //     }
 
-void PrioTft::showStandbyTime(const String &time)
+void PrioTft::showStandbyTime(const String &time, const String &dayDate)
 {
     // String fontPath = "/Oswald124.vlw";
     
@@ -171,13 +171,28 @@ void PrioTft::showStandbyTime(const String &time)
     tft.setTextColor(TFT_WHITE);
     tft.setTextDatum(MC_DATUM);
 
-    bool fontAvailable = LittleFS.exists(TIME_FONT_LARGE_PATH);
+    const int centerX = tft.width() / 2;
+    const int centerY = tft.height() / 2;
+    const int timeY = centerY - 18;
+    const int dateY = tft.height() - 8;
+
+    const String fontFilePath = String("/") + TIME_FONT_LARGE_PATH + ".vlw";
+    const String smallFontFilePath = String("/") + TIME_FONT_SMALL_PATH + ".vlw";
+    bool fontAvailable = LittleFS.exists(fontFilePath);
     if (fontAvailable)
     {
         tft.unloadFont(); // Clear any existing font
         tft.loadFont(TIME_FONT_LARGE_PATH, LittleFS);
-        tft.drawString(time, tft.width() / 2, tft.height() / 2);
+        tft.drawString(time, centerX, timeY);
         tft.unloadFont();
+
+        tft.setTextDatum(BC_DATUM);
+        if (LittleFS.exists(smallFontFilePath)) {
+            tft.loadFont(TIME_FONT_SMALL_PATH, LittleFS);
+            String compactDayDate = truncateStringToFit(dayDate, tft.width() - 20);
+            tft.drawString(compactDayDate, centerX, dateY);
+            tft.unloadFont();
+        } 
     }
     else
     {
@@ -185,15 +200,22 @@ void PrioTft::showStandbyTime(const String &time)
         static bool fontWarningShown = false;
         if (!fontWarningShown)
         {
-            Serial.println(String("Standby font ontbreekt: ") + TIME_FONT_LARGE_PATH + ". Gebruik fallback font.");
+            Serial.println(String("Standby font ontbreekt: ") + fontFilePath + ". Gebruik fallback font.");
             fontWarningShown = true;
         }
 
         tft.setTextFont(8);
         tft.setTextSize(2);
-        tft.drawString(time, tft.width() / 2, tft.height() / 2);
+        tft.drawString(time, centerX, timeY);
+
+        tft.setTextDatum(BC_DATUM);
+        tft.setTextFont(2);
+        tft.setTextSize(1);
+        String compactDayDate = truncateStringToFit(dayDate, tft.width() - 20);
+        tft.drawString(compactDayDate, centerX, dateY);
     }
 
+    tft.setTextDatum(MC_DATUM);
     tft.setTextFont(4);
     tft.setTextSize(1);
 }

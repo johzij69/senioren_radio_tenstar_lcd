@@ -110,6 +110,28 @@ char *PrioDateTime::getDate()
     return buffer;
 }
 
+char *PrioDateTime::getDayDate()
+{
+    RtcDateTime now = _rtc.GetDateTime();
+
+    tm timeinfo = {};
+    timeinfo.tm_year = now.Year() - 1900;
+    timeinfo.tm_mon = now.Month() - 1;
+    timeinfo.tm_mday = now.Day();
+    timeinfo.tm_hour = now.Hour();
+    timeinfo.tm_min = now.Minute();
+    timeinfo.tm_sec = now.Second();
+    timeinfo.tm_isdst = -1;
+    mktime(&timeinfo);
+
+    static const char* dayNames[] = {"Zo", "Ma", "Di", "Wo", "Do", "Vr", "Za"};
+    uint8_t dayIndex = (timeinfo.tm_wday >= 0 && timeinfo.tm_wday <= 6) ? (uint8_t)timeinfo.tm_wday : 0;
+
+    snprintf(buffer, sizeof(buffer), "%s %02d-%02d-%04d",
+             dayNames[dayIndex], now.Day(), now.Month(), now.Year());
+    return buffer;
+}
+
 char *PrioDateTime::getDateTime()
 {
     RtcDateTime now = _rtc.GetDateTime(); // Lees datum en tijd van de RTC

@@ -1021,3 +1021,127 @@ String getSettingsScript(String ip, int snoozeButtonIndex)
   searchAndReplace(&script, String("@SNOOZE_BTN@"), String(snoozeButtonIndex));
   return script;
 }
+
+String getImportExportScript(String ip)
+{
+  String script PROGMEM = R"IMPORTEXPORT(
+    <script>
+      const contentContainer = document.getElementById("content-container");
+
+      function setStatus(message, isError = false) {
+        const status = document.getElementById("import-export-status");
+        if (!status) return;
+        status.textContent = message;
+        status.className = isError ? "import-export-status error" : "import-export-status ok";
+      }
+
+      function renderImportExportPage() {
+        contentContainer.innerHTML = `
+          <h2>Import / Export</h2>
+          <p>Exporteer of importeer alle opgeslagen configuraties in JSON-formaat.</p>
+
+          <div class="stream_item" style="max-width:700px;">
+            <div class="edit-label">Export configuratie</div>
+            <div style="margin-top:8px;">Bevat streams (naam, url, logo), alarmen en instellingen.</div>
+            <div style="margin-top:12px;">
+              <button type="button" onclick="exportConfigJson()">Exporteer JSON</button>
+            </div>
+          </div>
+
+          <div class="stream_item" style="max-width:700px; margin-top:12px;">
+            <div class="edit-label">Import configuratie</div>
+            <div style="margin-top:8px;">Kies een eerder geëxporteerd JSON-bestand.</div>
+            <div style="margin-top:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              <input type="file" id="importConfigFile" accept="application/json,.json" />
+              <button type="button" onclick="importConfigJson()">Importeer JSON</button>
+            </div>
+          </div>
+
+          <div id="import-export-status" class="import-export-status" style="margin-top:12px;"></div>
+        `;
+      }
+
+      async function exportConfigJson() {
+        try {
+          setStatus("Export bezig...");
+          const response = await fetch("http://@ip/api/config/export", {
+            method: "GET",
+            redirect: "follow",
+          });
+
+          if (!response.ok) {
+            throw new Error("Export mislukt");
+          }
+
+          const payload = await response.json();
+          const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          const now = new Date();
+          const stamp = now.toISOString().replace(/[:.]/g, "-");
+          a.href = url;
+          a.download = `senior-webradio-backup-${stamp}.json`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          setStatus("Export voltooid. JSON-bestand is gedownload.");
+        } catch (error) {
+          console.error(error);
+          setStatus("Export mislukt: " + error.message, true);
+        }
+      }
+
+      async function importConfigJson() {
+        const fileInput = document.getElementById("importConfigFile");
+        const file = fileInput && fileInput.files ? fileInput.files[0] : null;
+        let fileText = "";
+
+        if (!file) {
+          setStatus("Selecteer eerst een JSON-bestand.", true);
+          return;
+        }
+
+        try {
+          fileText = await file.text();
+          JSON.parse(fileText);
+        } catch (error) {
+          setStatus("Geselecteerd bestand is geen geldige JSON.", true);
+          return;
+        }
+
+        if (!confirm("Deze import overschrijft de huidige streams, alarmen en instellingen. Doorgaan?")) {
+          return;
+        }
+
+        try {
+          setStatus("Import bezig...");
+          const response = await fetch("/api/config/import", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: fileText,
+          });
+
+          const responseData = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(responseData.message || "Import mislukt");
+          }
+
+          setStatus("Import voltooid. Configuratie is opgeslagen.");
+          if (typeof window.refreshAlarmStatusBadge === "function") {
+            await window.refreshAlarmStatusBadge();
+          }
+        } catch (error) {
+          console.error(error);
+          setStatus("Import mislukt: " + error.message, true);
+        }
+      }
+
+      renderImportExportPage();
+    </script>)IMPORTEXPORT";
+
+  searchAndReplace(&script, String("@ip"), ip);
+  return script;
+}
