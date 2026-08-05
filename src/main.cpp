@@ -271,6 +271,7 @@ void loop()
             inStandby = true;                // Zet de standby status
             displayData.standbyState = true; // Zet de standby state in display data
             SendDataToDisplay();             // Stuur de display data naar de queue
+            // Webserver blijft actief in standby; alleen audio wordt gepauzeerd.
             stopAudio();
             pauseAudioTask(); // Pause the audio task
         }
