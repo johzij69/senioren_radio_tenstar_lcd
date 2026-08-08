@@ -4,8 +4,20 @@
 #include "globals.h"
 #include "Adafruit_VEML7700.h"
 #include "driver/ledc.h" // Include LEDC driver header for PWM functionality
+#include "PrioTft.h"
+#include "PrioRotary.h"
+#include "PrioRotaryMenu.h"
+#include "MyPreferences.h"
+#include "AudioControl.h"
+#include <ezButton.h> 
+#include "globals.h"
 
 
+void onMenuAction(const char* action);
+void onMenuOpen();
+void onMenuClose();
+
+void checkVolume();
 void DisplayTask(void *parameter);
 void spl(String mes);
 void cleanStreamTitle(struct DisplayData * data);

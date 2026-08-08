@@ -1,6 +1,6 @@
 #include "Task_Audio.h"
 #include "Audio.h"
-#include "task_shared.h"
+#include "Task_Shared.h"
 #include "globals.h"
 
 void AudioTask(void *parameter)

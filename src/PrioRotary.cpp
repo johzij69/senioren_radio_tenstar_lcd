@@ -6,8 +6,8 @@ PrioRotary::PrioRotary(int pin1, int pin2)
 {
     _pin1 = pin1;
     _pin2 = pin2;
-    pinMode(pin1, INPUT);
-    pinMode(pin2, INPUT);
+    pinMode(pin1, INPUT_PULLUP);
+    pinMode(pin2, INPUT_PULLUP);
 }
 
 void PrioRotary::begin(int _min_value, int _max_value)
@@ -74,8 +74,14 @@ void PrioRotary::loop()
 {
     if (rotaryEncoder)
     {
+        
+        
+        // Serial.println("Rotary encoder movement detected");
         // Get the movement (if valid)
         int8_t rotationValue = checkRotaryEncoder();
+
+        // Serial.print("Rotation value: ");
+        // Serial.println(rotationValue);
 
         // If valid movement, do something
         if (rotationValue != 0)
@@ -86,7 +92,7 @@ void PrioRotary::loop()
                 rotationValue < 1 ? current_value-- : current_value++;
                 current_value_changed = true;
             }
-            Serial.println(String(current_value));
+ //           Serial.println(String(current_value));
         }
     }
 }

@@ -14,10 +14,11 @@
 
 class PrioTft {
 private:
-    TFT_eSPI tft; // TFT scherm object
+
 
 
 public:
+    TFT_eSPI tft; // TFT scherm object
     PrioBar pBar; // Volume balk object
     TFTScroller sTitle; // Scrollende titel object
     StreamLogo sLogo;

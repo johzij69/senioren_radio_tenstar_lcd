@@ -1,9 +1,10 @@
 #pragma once
 
 #include "Arduino.h"
+#include "globals.h"
 
 // Deze functies kunnen vanuit main.cpp of andere onderdelen worden aangeroepen
-void playAudio(const char *url, int volume);
+void playAudio(const char *url );
 void pauseAudio();
 void resumeAudio();
 void stopAudio();

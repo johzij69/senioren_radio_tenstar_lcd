@@ -1,7 +1,7 @@
 #include "AudioControl.h"
-#include "task_shared.h"
+#include "Task_Shared.h"
 #include "globals.h"
-#include "Task_audio.h"  // Voor CMD_PLAY etc.
+#include "Task_Audio.h"  // Voor CMD_PLAY etc.
 #include "freertos/queue.h"
 #include "freertos/event_groups.h"
 #include <WiFiClientSecure.h>
@@ -155,7 +155,7 @@ static String resolveStreamUrl(const char *url)
     return inputUrl;
 }
 
-void playAudio(const char *url, int volume)
+void playAudio(const char *url)
 {
     String resolvedUrl = resolveStreamUrl(url);
 
@@ -164,10 +164,11 @@ void playAudio(const char *url, int volume)
         resolvedUrl = String(url == nullptr ? "" : url);
     }
     
-    
+    //todo
     AudioData data;
     data.command = CMD_PLAY;
-    data.volume = volume;
+ //   data.volume = volume;
+    data.volume = last_volume;
     strncpy(data.url, resolvedUrl.c_str(), sizeof(data.url));
     data.url[sizeof(data.url) - 1] = '\0';
     xQueueSend(AudioQueue, &data, portMAX_DELAY);

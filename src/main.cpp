@@ -1,11 +1,13 @@
 #include "main.h"
 #include "driver/ledc.h" // Include LEDC driver header for PWM functionality
+#include "PrioRotaryMenu.h"
+
 
 bool debug = true; // Set to true for debug output
 uint8_t alarmSnoozeButtonIndex = 10;
 
-int max_volume = MAX_VOLUME; // set default max volume
-int last_volume = 10;
+// int max_volume = MAX_VOLUME; // set default max volume
+// int last_volume = 10;
 int stream_index = -1;
 int next_button_state = 0;
 
@@ -19,13 +21,10 @@ MyPreferences myPrefs("myRadio");
 UrlManager UrlManagerInstance(myPrefs);
 AlarmManager alarmManager(myPrefs);
 PrioWebServer webServer(UrlManagerInstance, alarmManager, myPrefs, WEB_SERVER_PORT);
-PrioRotary rotaryInstance(ROT_CLK_PIN, ROT_DT_PIN);
 PrioRfReceiver rfReceiver(RF_RECEIVER_PIN);
 
-
-
 /* Buttons */
-ezButton rotary_button(ROT_SW_PIN);
+// ezButton rotary_button(ROT_SW_PIN);
 
 // Queues
 QueueHandle_t DisplayQueue = xQueueCreate(3, sizeof(DisplayData));
@@ -42,7 +41,7 @@ TaskHandle_t displayTaskHandle = NULL;   // Task handle for the TFT task
 TaskHandle_t audioTaskHandle = NULL;     // Task handle for the audio task
 TaskHandle_t webServerTaskHandle = NULL; // Task handle for the webserver task
 
-PrioDateTime pDateTime(RTC_CLK_PIN, RTC_DAT_PIN, RTC_RST_PIN);
+
 
 WiFiManager wm;
 
@@ -179,13 +178,10 @@ void setup()
         pDateTime.begin();
         pDateTime.debug = true; // Zet debugmodus aan voor tijdservice
 
-        /* Volume handling */
-        last_volume = myPrefs.readValue("volume", DEF_VOLUME);
-        if (last_volume > max_volume)
-        {
-            last_volume = max_volume;
-        }
 
+
+
+        
         /* Url handling */
         UrlManagerInstance.begin();
 
@@ -196,14 +192,14 @@ void setup()
             stream_index = 0;
         }
 
-        /* Rotary button */
-        pinMode(ROT_CLK_PIN, INPUT);
-        pinMode(ROT_DT_PIN, INPUT);
-        rotary_button.setDebounceTime(50); // set debounce time to 50 milliseconds
-        attachInterrupt(digitalPinToInterrupt(ROT_CLK_PIN), checkVolume, CHANGE);
-        attachInterrupt(digitalPinToInterrupt(ROT_DT_PIN), checkVolume, CHANGE);
-        rotaryInstance.begin(MIN_VOLUME, max_volume, DEF_VOLUME);
-        rotaryInstance.current_value = last_volume;
+        // /* Rotary button */
+        // pinMode(ROT_CLK_PIN, INPUT);
+        // pinMode(ROT_DT_PIN, INPUT);
+        // rotary_button.setDebounceTime(50); // set debounce time to 50 milliseconds
+        // attachInterrupt(digitalPinToInterrupt(ROT_CLK_PIN), checkVolume, CHANGE);
+        // attachInterrupt(digitalPinToInterrupt(ROT_DT_PIN), checkVolume, CHANGE);
+ //       rotaryInstance.begin(MIN_VOLUME, max_volume, DEF_VOLUME);
+   //     rotaryInstance.current_value = last_volume;
 
         inputPanel.begin();                                       // Initialiseer de input panel
         inputPanel.setButtonPressedCallback(handleInputPanelButton); // Stel de callback in
@@ -215,8 +211,11 @@ void setup()
         // Set ip display data and volume
         strncpy(displayData.ip, WiFi.localIP().toString().c_str(), sizeof(displayData.ip));
         // displayData.syncTime = true; // Reset syncTime flag
-        displayData.volume = last_volume;
-        audioData.volume = last_volume;
+//        displayData.volume = last_volume;
+//        audioData.volume = last_volume;
+
+
+//    last_volume_for_menu = last_volume; // Sync initial volume
 
         Serial.println("Starting webserver task");
         startWebServerTask(); // Start de webserver taak
@@ -228,7 +227,9 @@ void setup()
 
         // Play the last used stream
         playStream(stream_index);
-        sync_time(true); // Force sync time on startup
+    //    sync_time(true); // Force sync time on startup
+
+
 
     }
 
@@ -239,26 +240,26 @@ void setup()
 /* main loop ;-) */
 void loop()
 {
-    sync_time();
+    // sync_time();
     checkAndRunAlarms();
 
     if (!inStandby)
     {
         inputPanel.loop();     // Voer de loop van de input panel uit -> presets buttons and power led
         rfReceiver.loop();     // Voer de loop van de RF-ontvanger uit -> rf remote
-        rotaryInstance.loop(); // Voer de loop van de rotary encoder uit -> volume
+//        rotaryInstance.loop(); // Voer de loop van de rotary encoder uit -> volume
 
-        if (rotaryInstance.current_value_changed)
-        {
-            Serial.println("Volume changed to: " + String(rotaryInstance.current_value));
-            myPrefs.writeValue("volume", rotaryInstance.current_value);
-            displayData.volume = rotaryInstance.current_value;
-            audioData.volume = rotaryInstance.current_value;
-            last_volume = rotaryInstance.current_value;
-            setAudioVolume(rotaryInstance.current_value);
-            SendDataToDisplay();
-            rotaryInstance.current_value_changed = false;
-        }
+        // if (rotaryInstance.current_value_changed)
+        // {
+        //     Serial.println("Volume changed to: " + String(rotaryInstance.current_value));
+        //     myPrefs.writeValue("volume", rotaryInstance.current_value);
+        //     displayData.volume = rotaryInstance.current_value;
+        //     audioData.volume = rotaryInstance.current_value;
+        //     last_volume = rotaryInstance.current_value;
+        //     setAudioVolume(rotaryInstance.current_value);
+        //     SendDataToDisplay();
+        //     rotaryInstance.current_value_changed = false;
+        // }
     }
 
     if (xSemaphoreTake(powerButtonSemaphore, 0) == pdTRUE)
@@ -285,9 +286,10 @@ void loop()
             resumeAudioTask();
             Serial.println("resuming audio");
             playStream(stream_index);
-            sync_time(true);
+  //          sync_time(true);
         }
     }
+
 
     vTaskDelay(1 / portTICK_PERIOD_MS); // Adjust the delay as needed (e.g., 10ms)
 }
@@ -346,19 +348,19 @@ void triggerAlarmPlayback(const AlarmManager::AlarmEntry &alarm, bool fromSnooze
     resumeAudioTask();
 
     int alarmVolume = alarm.volume;
-    if (alarmVolume > max_volume)
-    {
-        alarmVolume = max_volume;
-    }
+    // if (alarmVolume > max_volume)
+    // {
+    //     alarmVolume = max_volume;
+    // }
 
     stream_index = alarm.streamIndex;
-    last_volume = alarmVolume;
-    rotaryInstance.current_value = alarmVolume;
+ //   last_volume = alarmVolume;
+ //   rotaryInstance.current_value = alarmVolume;
     displayData.volume = alarmVolume;
     audioData.volume = alarmVolume;
     myPrefs.writeValue("volume", alarmVolume);
-
-    playAudio(UrlManagerInstance.Streams[stream_index].url.c_str(), alarmVolume);
+//todo pas alarm volume door aan audiocontrol
+    playAudio(UrlManagerInstance.Streams[stream_index].url.c_str());
     CreateAndSendDisplayData(stream_index);
 }
 
@@ -387,11 +389,11 @@ void refreshAlarmDisplayState(bool sendToDisplay)
     }
 }
 
-// Interrupt routine just sets a flag when rotation is detected
-void IRAM_ATTR checkVolume()
-{
-    rotaryInstance.rotaryEncoder = true;
-}
+// // Interrupt routine just sets a flag when rotation is detected
+// void IRAM_ATTR checkVolume()
+// {
+//     rotaryInstance.rotaryEncoder = true;
+// }
 
 void IRAM_ATTR handlePowerButtonInterrupt()
 {
@@ -412,7 +414,7 @@ void IRAM_ATTR handlePowerButtonInterrupt()
 /* Get data and send it to display queue */
 void CreateAndSendDisplayData(int streamIndex)
 {
-    displayData.volume = last_volume;
+//    displayData.volume = last_volume;
     // displayData.syncTime = true;      // Reset syncTime flag
     displayData.loadingState = false;
     displayData.standbyState = inStandby; // Set standby state
@@ -455,25 +457,7 @@ void audio_info(const char *info)
     Serial.printf("[AUDIO_LIB] %s\n", info);
 }
 
-void sync_time(bool forceSync)
-{
-    if (forceSync)
-    {
-        pDateTime.syncTime();
-    }
-    else
-    {
-        pDateTime.checkSync();
-    }
 
-    strncpy(displayData.currenTime, pDateTime.getTime(), sizeof(displayData.currenTime));
-   // strncpy(displayData.currenDate, pDateTime.getDayDate(), sizeof(displayData.currenDate));
-    if (prevTime != displayData.currenTime)
-    {
-        prevTime = displayData.currenTime;
-        xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
-    }
-}
 
 void startDisplayTask()
 {
@@ -568,8 +552,11 @@ void playStream(int preset)
     strncpy(displayData.alarmState, "Geen alarm", sizeof(displayData.alarmState));
     Serial.println("Switching to stream: " + String(preset));
     stream_index = preset;
-    playAudio(UrlManagerInstance.Streams[stream_index].url.c_str(), rotaryInstance.current_value);
+//    playAudio(UrlManagerInstance.Streams[stream_index].url.c_str(), rotaryInstance.current_value);
+    playAudio(UrlManagerInstance.Streams[stream_index].url.c_str());
     CreateAndSendDisplayData(stream_index);
     /* Save last used stream, do it here so we know stream is working */
     myPrefs.putUInt("stream_index", stream_index);
 }
+
+

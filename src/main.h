@@ -4,8 +4,8 @@
 #include <FS.h>
 using FS = fs::FS;
 #include <WiFiManager.h>
-#include <ezButton.h> 
-#include "PrioRotary.h"
+
+
 #include "PrioDateTime.h"
 #include "generalHelpers.h"
 #include "MyPreferences.h"
@@ -19,7 +19,7 @@ using FS = fs::FS;
 #include "freertos/semphr.h"
 #include <freertos/event_groups.h>
 #include "UrlManager.h"
-#include "PrioWebserver.h"
+#include "PrioWebServer.h"
 #include "task_webServer.h"
 #include <Adafruit_NeoPixel.h>
 #include "globals.h" 
@@ -30,7 +30,7 @@ using FS = fs::FS;
 
 bool inStandby = false; // Flag to indicate if the system is in standby mode
 
-void checkVolume();
+
 void handlePowerButtonInterrupt() ;
 void CreateAndSendDisplayData(int streamIndex);
 void CreateAndSendAudioData(int streamIndex, int last_volume);
@@ -51,5 +51,6 @@ void triggerAlarmPlayback(const AlarmManager::AlarmEntry &alarm, bool fromSnooze
 void snoozeActiveAlarm();
 void refreshAlarmDisplayState(bool sendToDisplay = false);
 
+void playStream(int preset);
 
 

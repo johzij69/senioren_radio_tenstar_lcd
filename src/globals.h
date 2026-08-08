@@ -58,7 +58,7 @@
 
 
 
-
+extern int last_volume;
 
 
 

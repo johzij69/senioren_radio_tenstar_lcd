@@ -62,7 +62,9 @@ void PrioTft::showLocalIp(const String &ip)
 
 void PrioTft::setVolume(int _cur_volume)
 {
+    
     cur_volume = _cur_volume;
+    Serial.println("Display: Updating volume to " + String(cur_volume));
     pBar.draw(cur_volume);
 }
 
