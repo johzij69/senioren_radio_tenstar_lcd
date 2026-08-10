@@ -4,6 +4,9 @@
 PrioTft prioTft;
 bool isMenuActive = false;
 bool fixedbacklight = false; // Zet deze op true om de backlight op een vaste waarde te zetten
+bool forcePlayerRedraw = false; // Nieuwe flag voor redraw na menu sluiting
+
+unsigned long redrawLockoutTime = 0; // Tijdstempel om knopdrukken na redraw te blokkeren
 
 int last_volume_for_menu = 0; // Initialize with your default volume
 int last_volume = 10;
@@ -13,7 +16,7 @@ PrioDateTime pDateTime(RTC_CLK_PIN, RTC_DAT_PIN, RTC_RST_PIN);
 PrioRotary rotaryInstance(ROT_CLK_PIN, ROT_DT_PIN);
 
 /* Buttons */
-ezButton rotary_button(ROT_SW_PIN);
+ezButton rotary_button(ROT_SW_PIN); // Initialize the button with the pin number and mode
 
 int huidigePWN = 100;                             // beginwaarde
 const ledc_channel_t pwmChannel = LEDC_CHANNEL_0; // Kanaal 0-7
@@ -23,6 +26,11 @@ float previousLux = 0.0;
 const float LUX_THRESHOLD = 0.5;
 // Fade-instelling (hoe snel hij aanpast)
 const int FADE_STEP = 2;
+
+
+
+    DisplayData _displayData;
+
 
 const char* menuJson = R"(
 [
@@ -76,7 +84,8 @@ void DisplayTask(void *parameter)
 
 
     /* Rotary button */
-    rotary_button.setDebounceTime(50); // set debounce time to 50 milliseconds
+    
+    rotary_button.setDebounceTime(100); // set debounce time to 50 milliseconds
 
     /* Rotary Wheel */
     attachInterrupt(digitalPinToInterrupt(ROT_CLK_PIN), checkVolume, CHANGE);
@@ -141,78 +150,95 @@ void DisplayTask(void *parameter)
     Serial.println("DisplayTask: zetten van DISPLAY_TASK_STARTED_BIT");
     xEventGroupSetBits(taskEvents, DISPLAY_TASK_STARTED_BIT);
     Serial.println("DisplayTask: bit gezet");
+
     while (true)
     {
-   
-        DisplayData _displayData;
-  
-  
+    
         // 1. BELANGRIJK: Update de button status voor debounce verwerking
         rotary_button.loop();
 
         // 2. Check of de knop net is ingedrukt
         if (rotary_button.isPressed()) 
         {
-            Serial.println("Rotary button pressed! Toggling menu.");
-            isMenuActive = !isMenuActive; // Toggle de menu status
             
-            // Roep de callbacks handmatig aan, of laat de menu library dit doen
-            if (isMenuActive) {
-                onMenuOpen();
-                // myMenu.show(); // Afhankelijk van je library, forceer een redraw
-            } else {
-                onMenuClose();
+            unsigned long currentTime = millis();
+            
+            // 1. Negeer knopdrukken die binnen 500ms na een scherm-redraw (EMI piek) komen
+            if (currentTime - redrawLockoutTime < 500) {
+                Serial.println("Knopdruk genegeerd: EMI ruis van scherm redraw.");
+                continue; 
             }
+                         
+            Serial.println("Rotary button pressed! Toggling menu.");
+            myMenu.onButtonPress(); // Roep de menu callback aan
         }
 
-       rotaryInstance.loop();  
-
-       if (rotaryInstance.current_value_changed)
-        {
-            
-            
-            if (isMenuActive) 
-            {
-                // --- MENU IS ACTIEF ---
-                // Stuur de rotary waarde naar het menu voor navigatie
-                // Let op: Kijk in de documentatie van PrioRotaryMenu hoe je dit exact doet.
-                // Bijvoorbeeld: myMenu.handleRotation(rotaryInstance.current_value); 
-                // of myMenu.navigate(rotaryInstance.current_value);
-                
-                Serial.println("Menu navigation triggered");
-            }
-            else 
-            {
-                // --- NORMALE MODE (VOLUME) ---
+            // 3. Check if the rotary encoder was turned
+        if (rotaryInstance.current_value_changed) {
+            int delta = rotaryInstance.current_value - last_volume_for_menu;
+        
+            if (myMenu.isOpen()) {
+                // Menu is open -> Send rotation to menu, DO NOT change volume
+                myMenu.onRotaryDelta(delta);
+            } else {
+                // Menu is closed -> Handle volume normally
                 Serial.println("Volume changed to: " + String(rotaryInstance.current_value));
                 myPrefs.writeValue("volume", rotaryInstance.current_value);
                 _displayData.volume = rotaryInstance.current_value;
-    //           audioData.volume = rotaryInstance.current_value;
                 last_volume = rotaryInstance.current_value;
                 setAudioVolume(rotaryInstance.current_value);
                 rotaryInstance.current_value_changed = false;
                 prioTft.setVolume(_displayData.volume);
             }
             
-            // Reset de flag ALTIJD, anders blijft hij in de if hangen
-            rotaryInstance.current_value_changed = false; 
-
+            last_volume_for_menu = rotaryInstance.current_value;
+            rotaryInstance.current_value_changed = false;
         }
+        // 4. Process Menu UI rendering
+        myMenu.loop();
+        rotaryInstance.loop();  
 
-         // 4. Menu Rendering (indien actief)
-        if (isMenuActive) 
-        {
-            // De meeste menu libraries hebben een update, draw of render functie nodig
-            // myMenu.update(); 
-            // myMenu.draw();
+        if (forcePlayerRedraw) {
+            forcePlayerRedraw = false;
+            
+            // Optioneel: reset de layout van prioTft als jouw PrioTft class dat nodig heeft
+            // prioTft.init(); 
+            
+            // Teken alle elementen direct met de laatst bekende _displayData
+            prioTft.showLocalIp(_displayData.ip);
+            prioTft.setTitle(_displayData.title);
+            prioTft.setStreamTitle(_displayData.streamtitle);
+            prioTft.setAlarmState(_displayData.alarmState);
+            prioTft.setLogo(_displayData.logo);
+            prioTft.showTime(_displayData.currenTime);
+            prioTft.setVolume(last_volume); // Gebruik de lokale actuele volume
+
+            // Reset de 'prev' variabelen. 
+            // Hierdoor worden toekomstige updates vanuit de Main Task (via de queue) 
+            // wél als 'nieuw' gezien en netjes op het scherm getekend.
+            prevIp = "";
+            prevTitle = "";
+            prevLogo = "";
+            prevStreamTitle = "";
+            prevAlarmState = "";
+            prevTime = "";
+            prevVolume = -1;
+            
+            Serial.println("Display: Player UI redrawn after menu close");
+
+            // BELANGRIJK: Start de lockout timer na het tekenen
+            redrawLockoutTime = millis(); 
         }
             
         // Optimalisatie: Gebruik de QueueReceive timeout in plaats van een vTaskDelay later
         // Hierdoor ontwaakt de task DIRECT als er data is, maar slaapt hij als er niets is.
         if (xQueueReceive(DisplayQueue, &_displayData, pdMS_TO_TICKS(10)) == pdTRUE)
-   //   if (xQueueReceive(DisplayQueue, &_displayData, 0) == pdTRUE)
         {
-
+            if(isMenuActive) {
+                // Als het menu actief is, negeer de display updates
+                Serial.println("Display update received but menu is active. Ignoring.");
+                continue;
+            }
             if (_displayData.loadingState)
             {
                 prioTft.showLoadingState();
@@ -356,13 +382,7 @@ void AdjustBackLight(Adafruit_VEML7700 veml)
 {
     // Pas de helderheid aan op basis van de omgevingslichtsensor
     float lux = veml.readLux();
-
-    // Serial.print("Lux: ");
-    // Serial.println(lux);
-
     int brightness = mapLuxToPWM(lux);
-    // Serial.print("Backlight brightness: ");
-    // Serial.println(brightness);
 
     SetBacklightPWM(brightness);
 }
@@ -472,27 +492,6 @@ int mapLuxToPWM(float lux)
     return huidigePWN;
 }
 
-
-// void sync_time(bool forceSync)
-// {
-//     if (forceSync)
-//     {
-//         pDateTime.syncTime();
-//     }
-//     else
-//     {
-//         pDateTime.checkSync();
-//     }
-
-//     strncpy(displayData.currenTime, pDateTime.getTime(), sizeof(displayData.currenTime));
-//    // strncpy(displayData.currenDate, pDateTime.getDayDate(), sizeof(displayData.currenDate));
-//     if (prevTime != displayData.currenTime)
-//     {
-//         prevTime = displayData.currenTime;
-//         xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
-//     }
-// }
-
 void onMenuAction(const char* action) {
     Serial.printf("Menu Action Triggered: %s\n", action);
     
@@ -505,17 +504,22 @@ void onMenuAction(const char* action) {
 }
 
 void onMenuOpen() {
- //   isMenuActive = true;
+    isMenuActive = true;
     Serial.println("Menu Opened - Pausing Player UI updates");
 }
 
 void onMenuClose() {
-  //  isMenuActive = false;
+    isMenuActive = false;
     Serial.println("Menu Closed - Redrawing Player UI");
-    
     // Wipe screen completely and trigger your display task to redraw the player
     prioTft.tft.fillScreen(TFT_BLACK); 
-    // CreateAndSendDisplayData(stream_index); 
+
+    // redraw screen here, e.g., send a message to DisplayTask to redraw the player UI
+    forcePlayerRedraw = true; // Voor directe redraw met huidige data
+    
+    // Vraag de main om verse data te sturen
+  //  xEventGroupSetBits(taskEvents, MENU_CLOSED_REQUEST_DATA_BIT); 
+
 }
 
 // Interrupt routine just sets a flag when rotation is detected

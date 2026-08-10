@@ -1,0 +1,18 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"array": "cpp",
+			"string": "cpp",
+			"string_view": "cpp",
+			"span": "cpp"
+		},
+		"chat.tools.terminal.autoApprove": {
+			"platformio": true
+		}
+	}
+}

@@ -221,7 +221,7 @@ void setup()
         startWebServerTask(); // Start de webserver taak
         Serial.println("Webserver task started");
 
-        Serial.println("Starting audio task");
+        Serial0.println("Starting audio task");
         startAudioTask();
         Serial.println("Audio task started");
 
@@ -247,19 +247,10 @@ void loop()
     {
         inputPanel.loop();     // Voer de loop van de input panel uit -> presets buttons and power led
         rfReceiver.loop();     // Voer de loop van de RF-ontvanger uit -> rf remote
-//        rotaryInstance.loop(); // Voer de loop van de rotary encoder uit -> volume
-
-        // if (rotaryInstance.current_value_changed)
-        // {
-        //     Serial.println("Volume changed to: " + String(rotaryInstance.current_value));
-        //     myPrefs.writeValue("volume", rotaryInstance.current_value);
-        //     displayData.volume = rotaryInstance.current_value;
-        //     audioData.volume = rotaryInstance.current_value;
-        //     last_volume = rotaryInstance.current_value;
-        //     setAudioVolume(rotaryInstance.current_value);
-        //     SendDataToDisplay();
-        //     rotaryInstance.current_value_changed = false;
-        // }
+        EventBits_t uxBits = xEventGroupWaitBits(taskEvents, MENU_CLOSED_REQUEST_DATA_BIT, pdTRUE, pdFALSE, 0);
+        if (uxBits & MENU_CLOSED_REQUEST_DATA_BIT) {
+            CreateAndSendDisplayData(stream_index); // Stuur verse data naar de queue
+        }
     }
 
     if (xSemaphoreTake(powerButtonSemaphore, 0) == pdTRUE)
@@ -466,7 +457,7 @@ void startDisplayTask()
         BaseType_t result = xTaskCreate(
             DisplayTask,
             "DisplayTask",
-            8192,
+            5120,
             (void *)DisplayQueue,
             5,
             &displayTaskHandle);
@@ -488,7 +479,7 @@ void startWebServerTask()
         xTaskCreate(
             webServerTask,         // Task function
             "webServerTask",       // Name of the task
-            8192,                  // Stack size in words
+            5120,                  // Stack size in words
             (void *)&webServer,    // Task parameter
             5,                     // Priority of the task
             &webServerTaskHandle); // Task handle
@@ -501,7 +492,7 @@ void startAudioTask()
         xTaskCreate(
             AudioTask,          // Task function
             "AudioTask",        // Name of the task
-            8192,               // Stack size in words
+            16384,               // Stack size in words
             (void *)AudioQueue, // Task parameter
             6,                  // Priority of the task (HIGHER than DisplayTask)
             &audioTaskHandle);  // Task handle
@@ -524,7 +515,7 @@ void resumeAudioTask()
         BaseType_t result = xTaskCreate(
             AudioTask,
             "AudioTask",
-            8192,
+            16384,
             (void *)AudioQueue,
             6,                  // Priority (HIGHER than DisplayTask)
             &audioTaskHandle);

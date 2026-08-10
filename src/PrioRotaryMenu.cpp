@@ -26,7 +26,23 @@ bool PrioRotaryMenu::loadMenu(const char* jsonString) {
 }
 
 void PrioRotaryMenu::onButtonPress() {
+    
+    unsigned long currentTime = millis();
+    
+    // Negeer knopdrukken die binnen 300ms na de vorige actie (openen, sluiten, selecteren) komen.
+    // Dit filtert mechanische bounce en ruis van de rotary encoder effectief weg.
+    if (currentTime - _lastActionTime < 300) { 
+        return; 
+    }
+    
+    // Reset de timer, want dit is een geldige knopdruk
+    _lastActionTime = currentTime;
+    
     if (!_isOpen) {
+
+        // Bewaar huidige TFT-instellingen voordat het menu het scherm overneemt
+        saveTextStyle();
+
         _isOpen = true;
         _needsRedraw = true;
         _stateChanged = true;
@@ -70,16 +86,17 @@ void PrioRotaryMenu::handleSelection() {
         JsonArray categories = _menuDoc.as<JsonArray>();
 
         if (_selectedMainIndex == categories.size()) {
+            
+            closeMenu();
+            // _isOpen = false;
+            // _needsRedraw = false;
+            // _stateChanged = true;
+            // _state = MAIN_MENU;
+            // _selectedMainIndex = 0;
 
-            _isOpen = false;
-            _needsRedraw = false;
-            _stateChanged = true;
-            _state = MAIN_MENU;
-            _selectedMainIndex = 0;
-
-            if (_closeCallback) {
-                _closeCallback();
-            }
+            // if (_closeCallback) {
+            //     _closeCallback();
+            // }
 
         } else {
 
@@ -109,6 +126,10 @@ void PrioRotaryMenu::handleSelection() {
 
             if (_actionCallback && action) {
                 _actionCallback(action);
+
+                // als de action uiteindelijk iets veranderd op het scherm moeten we het menu opnieuw tekenen 
+                _needsRedraw = true;
+                _stateChanged = true;
             }
         }
     }
@@ -156,6 +177,29 @@ void PrioRotaryMenu::updateSelection() {
     _menuDelta = 0;
 }
 
+void PrioRotaryMenu::closeMenu() {
+    if (!_isOpen) {
+        return;
+    }
+
+    _isOpen = false;
+    _needsRedraw = false;
+    _stateChanged = true;
+
+    _state = MAIN_MENU;
+    _selectedMainIndex = 0;
+    _selectedSubIndex = 0;
+    _currentCategoryIndex = 0;
+    _menuDelta = 0;
+
+    // Zet oude TFT-instellingen terug
+    restoreTextStyle();
+
+    if (_closeCallback) {
+        _closeCallback();
+    }
+}
+
 void PrioRotaryMenu::drawMenu() {
     if (_stateChanged) {
 
@@ -188,7 +232,7 @@ void PrioRotaryMenu::drawHeader(const char* title) {
 
     _tft->setTextColor(MENU_HEADER_FG, MENU_HEADER_BG);
     _tft->setTextDatum(MC_DATUM);
-    _tft->setTextSize(2);
+    _tft->setTextSize(1);
 
     _tft->drawString(title, 160, 25);
 }
@@ -313,4 +357,31 @@ void PrioRotaryMenu::drawSubMenuItems() {
 
         count++;
     }
+}
+
+void PrioRotaryMenu::saveTextStyle() {
+    
+    _savedTextStyle.textSize  = _tft->textsize;
+    _savedTextStyle.textDatum = _tft->textdatum;
+    _savedTextStyle.textFont  = _tft->textfont;
+    _savedTextStyle.fgColor   = _tft->textcolor;
+    _savedTextStyle.bgColor   = _tft->textbgcolor;
+ //   _savedTextStyle.padX        = _tft->padX;
+
+    _savedTextStyle.cursorX   = _tft->getCursorX();
+    _savedTextStyle.cursorY   = _tft->getCursorY();
+    _savedTextStyle.valid     = true;
+}
+
+void PrioRotaryMenu::restoreTextStyle() {
+    if (!_savedTextStyle.valid) {
+        return;
+    }
+
+    _tft->setTextFont(_savedTextStyle.textFont);
+    _tft->setTextSize(_savedTextStyle.textSize);
+    _tft->setTextDatum(_savedTextStyle.textDatum);
+    _tft->setTextColor(_savedTextStyle.fgColor, _savedTextStyle.bgColor);
+    _tft->setCursor(_savedTextStyle.cursorX, _savedTextStyle.cursorY);
+    _savedTextStyle.valid = false;
 }
