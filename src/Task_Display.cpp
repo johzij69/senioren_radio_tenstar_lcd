@@ -1,5 +1,12 @@
 #include "Task_Display.h"
 #include "Task_Shared.h"
+#include "AlarmSetup.h"
+
+#include "AlarmManager.h"
+#include "UrlManager.h"
+// Externe referenties naar objecten uit main.cpp
+extern AlarmManager alarmManager;
+extern UrlManager UrlManagerInstance;
 
 PrioTft prioTft;
 bool isMenuActive = false;
@@ -14,7 +21,10 @@ int last_volume = 10;
 PrioRotaryMenu myMenu(prioTft.tft); // Create a RotaryMenu instance using the TFT object from PrioTft
 PrioDateTime pDateTime(RTC_CLK_PIN, RTC_DAT_PIN, RTC_RST_PIN);
 PrioRotary rotaryInstance(ROT_CLK_PIN, ROT_DT_PIN);
-
+// Alarm setup module
+AlarmSetup alarmSetup(prioTft.tft, alarmManager, UrlManagerInstance);
+// Globale instantie van de alarm setup module
+// AlarmSetup alarmSetup(prioTft.tft, alarmManager, UrlManagerInstance); // Verwijder dubbele instantie
 /* Buttons */
 ezButton rotary_button(ROT_SW_PIN); // Initialize the button with the pin number and mode
 
@@ -156,6 +166,50 @@ void DisplayTask(void *parameter)
     
         // 1. BELANGRIJK: Update de button status voor debounce verwerking
         rotary_button.loop();
+
+        // === ALARM SETUP MODE ===
+        if (alarmSetup.isActive()) {
+            rotary_button.loop();
+            
+            static unsigned long btnDownTime = 0;
+            static bool btnWasDown = false;
+            static bool longPressFired = false;
+            
+            if (rotary_button.isPressed()) {
+                btnDownTime = millis();
+                btnWasDown = true;
+                longPressFired = false;
+            }
+            
+            if (btnWasDown && !longPressFired) {
+                if (millis() - btnDownTime >= 800) {
+                    longPressFired = true;
+                    alarmSetup.stop();
+                    myMenu.closeMenu();
+                    onMenuClose();
+                    btnWasDown = false;
+                }
+            }
+            
+            if (rotary_button.isReleased()) {
+                if (btnWasDown && !longPressFired) {
+                    alarmSetup.onButtonPress();
+                }
+                btnWasDown = false;
+                longPressFired = false;
+            }
+            
+            rotaryInstance.loop();
+            int menuDelta = rotaryInstance.getAndResetRotationCounter();
+            if (menuDelta != 0) {
+                alarmSetup.onRotaryDelta(menuDelta);
+            }
+            
+            alarmSetup.loop();
+            vTaskDelay(10 / portTICK_PERIOD_MS);
+            continue;
+        }
+        // === EINDE ALARM SETUP MODE ===
 
         // 2. Check of de knop net is ingedrukt
         if (rotary_button.isPressed()) 
@@ -494,7 +548,16 @@ int mapLuxToPWM(float lux)
 
 void onMenuAction(const char* action) {
     Serial.printf("Menu Action Triggered: %s\n", action);
-    
+
+
+    if (strcmp(action, "setAlarm") == 0) {
+        alarmSetup.start();
+    } else if (strcmp(action, "toggleAlarm") == 0) {
+        // Snelle toggle: zet alle alarmen aan/uit
+        // Of toon een lijst om individueel te togglen
+        // (optioneel, voor nu even leeg)
+    }
+
     // Execute your system logic here
     // if (strcmp(action, "syncTime") == 0) {
     //     sync_time(true);
@@ -505,11 +568,19 @@ void onMenuAction(const char* action) {
 
 void onMenuOpen() {
     isMenuActive = true;
+    last_volume_for_menu = rotaryInstance.current_value; // SYNC
     Serial.println("Menu Opened - Pausing Player UI updates");
 }
 
 void onMenuClose() {
     isMenuActive = false;
+    
+    
+        // Stop alarm setup als die actief is
+    if (alarmSetup.isActive()) {
+        alarmSetup.stop();
+    }
+    
     Serial.println("Menu Closed - Redrawing Player UI");
     // Wipe screen completely and trigger your display task to redraw the player
     prioTft.tft.fillScreen(TFT_BLACK); 
@@ -519,6 +590,14 @@ void onMenuClose() {
     
     // Vraag de main om verse data te sturen
   //  xEventGroupSetBits(taskEvents, MENU_CLOSED_REQUEST_DATA_BIT); 
+
+
+ last_volume_for_menu = rotaryInstance.current_value; // SYNC
+
+
+
+   
+
 
 }
 
