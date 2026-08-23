@@ -92,6 +92,8 @@ private:
     void drawHeader(const char* title);
     void drawMainMenuItems();
     void drawSubMenuItems();
+    void drawMenuItem(int y, int itemHeight, const char* label, bool selected);
+    
 };
 
 #endif // PRIO_ROTARY_MENU_H
