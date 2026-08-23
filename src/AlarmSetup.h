@@ -12,6 +12,7 @@ public:
     
     void start();
     bool isActive() const { return _active; }
+    int getScreenAsInt() const { return (int)_screen; }
     void stop();
     void loop();
     

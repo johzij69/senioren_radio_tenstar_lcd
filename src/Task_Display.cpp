@@ -168,72 +168,56 @@ void DisplayTask(void *parameter)
         rotary_button.loop();
 
         // === ALARM SETUP MODE ===
-        static bool wasAlarmSetupActive = false;
+          // === ALARM SETUP MODE ===
+        static bool wasAlarmActive = false;
         
         if (alarmSetup.isActive()) {
-            // Eigen knop handling met digitalRead (ezButton is verward door menu-overgang)
-            static bool btnAlarmDown = false;
-            static unsigned long btnAlarmDownTime = 0;
-            static bool btnAlarmHandled = false;
-            static bool btnPrevRaw = false;
-            static unsigned long btnDebounceTime = 0;
-            static Screen prevAlarmScreen = SCREEN_LIST;
+            // Reset knop-state bij nieuwe activatie of schermwissel
+            static bool btnPrevRaw = true;  // start HIGH (pullup)
+            static unsigned long btnDownTime = 0;
+            static bool btnHandled = false;
+            static int prevScreen = -1;
             
-            // RESET bij nieuwe activatie: wis alle knop-state van vorige sessie
-            if (!wasAlarmSetupActive) {
-                btnAlarmDown = false;
-                btnAlarmHandled = false;
-                btnPrevRaw = false;
-                btnDebounceTime = 0;
-                prevAlarmScreen = alarmSetup.getScreen();
-                Serial.println("AlarmSetup: knop-state gereset bij start");
-            }
-            wasAlarmSetupActive = true;
+            int currScreen = alarmSetup.getScreenAsInt();
             
-            // RESET bij schermwissel binnen alarm setup (edit->list of list->edit)
-            // Voorkomt dat lange-druk-timer doorgaat naar het nieuwe scherm
-            Screen currentScreen = alarmSetup.getScreen();
-            if (currentScreen != prevAlarmScreen) {
-                btnAlarmDown = false;
-                btnAlarmHandled = false;
-                btnPrevRaw = false;
-                prevAlarmScreen = currentScreen;
-                Serial.println("AlarmSetup: scherm gewisseld, knop-state gereset");
-            }
-            
-            bool btnRaw = (digitalRead(ROT_SW_PIN) == LOW); // Active low met pullup
-            
-            // Debounce (30ms)
-            if (btnRaw != btnPrevRaw) {
-                btnDebounceTime = millis();
-            }
-            
-            if ((millis() - btnDebounceTime) > 30) {
-                if (btnRaw && !btnAlarmDown) {
-                    // Rising edge: knop net ingedrukt
-                    btnAlarmDown = true;
-                    btnAlarmDownTime = millis();
-                    btnAlarmHandled = false;
-                } else if (!btnRaw && btnAlarmDown) {
-                    // Falling edge: knop net losgelaten
-                    btnAlarmDown = false;
-                    if (!btnAlarmHandled && (millis() - btnAlarmDownTime < 800)) {
-                        // Korte klik (< 800ms)
-                        alarmSetup.onButtonPress();
-                    }
+            if (!wasAlarmActive || currScreen != prevScreen) {
+                // Eerste keer, of scherm gewisseld: reset alle state
+                btnPrevRaw = true;  // Assume released
+                btnDownTime = 0;
+                btnHandled = false;
+                prevScreen = currScreen;
+                if (!wasAlarmActive) {
+                    Serial.println("AlarmSetup: start, knop-state gereset");
+                } else {
+                    Serial.println("AlarmSetup: scherm gewisseld, knop-state gereset");
                 }
             }
+            wasAlarmActive = true;
+            
+            bool btnRaw = (digitalRead(ROT_SW_PIN) == LOW);
+            
+            // Detecteer rising edge (ingedrukt)
+            if (btnRaw && !btnPrevRaw) {
+                btnDownTime = millis();
+                btnHandled = false;
+            }
+            
+            // Detecteer falling edge (losgelaten)
+            if (!btnRaw && btnPrevRaw) {
+                if (!btnHandled && (millis() - btnDownTime < 800)) {
+                    alarmSetup.onButtonPress();
+                }
+            }
+            
+            // Lange druk tijdens ingedrukt houden
+            if (btnRaw && !btnHandled && (millis() - btnDownTime >= 800)) {
+                btnHandled = true;
+                Serial.println("AlarmSetup: lange druk, terug naar player");
+                alarmSetup.stop();
+                onMenuClose();
+            }
+            
             btnPrevRaw = btnRaw;
-            
-            // Lange druk detectie (>= 800ms)
-            if (btnAlarmDown && !btnAlarmHandled) {
-                if (millis() - btnAlarmDownTime >= 800) {
-                    btnAlarmHandled = true;
-                    Serial.println("AlarmSetup: lange druk, terug naar player");
-                    alarmSetup.stop();
-                    onMenuClose();
-                }
-            }
             
             // Rotary handling
             rotaryInstance.loop();
@@ -246,7 +230,7 @@ void DisplayTask(void *parameter)
             vTaskDelay(10 / portTICK_PERIOD_MS);
             continue;
         } else {
-            wasAlarmSetupActive = false;
+            wasAlarmActive = false;
         }
         // === EINDE ALARM SETUP MODE ===
 
