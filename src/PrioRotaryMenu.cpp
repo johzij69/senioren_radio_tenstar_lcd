@@ -29,20 +29,15 @@ void PrioRotaryMenu::onButtonPress() {
     
     unsigned long currentTime = millis();
     
-    // Negeer knopdrukken die binnen 300ms na de vorige actie (openen, sluiten, selecteren) komen.
-    // Dit filtert mechanische bounce en ruis van de rotary encoder effectief weg.
+    // Negeer knopdrukken die binnen 300ms na de vorige actie komen
     if (currentTime - _lastActionTime < 300) { 
         return; 
     }
     
-    // Reset de timer, want dit is een geldige knopdruk
     _lastActionTime = currentTime;
     
     if (!_isOpen) {
-
-        // Bewaar huidige TFT-instellingen voordat het menu het scherm overneemt
         saveTextStyle();
-
         _isOpen = true;
         _needsRedraw = true;
         _stateChanged = true;
@@ -85,22 +80,13 @@ void PrioRotaryMenu::handleSelection() {
 
         JsonArray categories = _menuDoc.as<JsonArray>();
 
-        if (_selectedMainIndex == categories.size()) {
-            
+        if (_selectedMainIndex == 0) {
+            // Item 0 = ... Terug → menu sluiten
             closeMenu();
-            // _isOpen = false;
-            // _needsRedraw = false;
-            // _stateChanged = true;
-            // _state = MAIN_MENU;
-            // _selectedMainIndex = 0;
 
-            // if (_closeCallback) {
-            //     _closeCallback();
-            // }
-
-        } else {
-
-            _currentCategoryIndex = _selectedMainIndex;
+        } else if (_selectedMainIndex > 0 && _selectedMainIndex <= (int)categories.size()) {
+            // Items 1..n = categorieën
+            _currentCategoryIndex = _selectedMainIndex - 1;
             _state = SUB_MENU;
             _selectedSubIndex = 0;
             _stateChanged = true;
@@ -109,27 +95,28 @@ void PrioRotaryMenu::handleSelection() {
 
     } else if (_state == SUB_MENU) {
 
-        JsonArray categories = _menuDoc.as<JsonArray>();
-        JsonObject category = categories[_currentCategoryIndex];
-        JsonArray items = category["items"];
-
         if (_selectedSubIndex == 0) {
-
+            // Item 0 = ... Terug → naar hoofdmenu
             _state = MAIN_MENU;
             _stateChanged = true;
             _needsRedraw = true;
 
         } else {
+            JsonArray categories = _menuDoc.as<JsonArray>();
+            JsonObject category = categories[_currentCategoryIndex];
+            JsonArray items = category["items"];
 
-            JsonObject item = items[_selectedSubIndex - 1];
-            const char* action = item["action"];
+            // Items 1..n = acties
+            int itemIdx = _selectedSubIndex - 1;
+            if (itemIdx >= 0 && itemIdx < (int)items.size()) {
+                JsonObject item = items[itemIdx];
+                const char* action = item["action"];
 
-            if (_actionCallback && action) {
-                _actionCallback(action);
-
-                // als de action uiteindelijk iets veranderd op het scherm moeten we het menu opnieuw tekenen 
-                _needsRedraw = true;
-                _stateChanged = true;
+                if (_actionCallback && action) {
+                    _actionCallback(action);
+                    _needsRedraw = true;
+                    _stateChanged = true;
+                }
             }
         }
     }
@@ -143,15 +130,16 @@ void PrioRotaryMenu::updateSelection() {
     if (_state == MAIN_MENU) {
 
         JsonArray categories = _menuDoc.as<JsonArray>();
-        int maxIdx = categories.size();
+        // +1 voor "... Terug" item bovenaan
+        int maxIdx = categories.size() + 1;
 
         _selectedMainIndex += _menuDelta;
 
         if (_selectedMainIndex < 0) {
-            _selectedMainIndex = maxIdx;
+            _selectedMainIndex = maxIdx - 1;
         }
 
-        if (_selectedMainIndex > maxIdx) {
+        if (_selectedMainIndex >= maxIdx) {
             _selectedMainIndex = 0;
         }
 
@@ -161,7 +149,7 @@ void PrioRotaryMenu::updateSelection() {
         JsonObject category = categories[_currentCategoryIndex];
         JsonArray items = category["items"];
 
-        int totalItems = items.size() + 1;
+        int totalItems = items.size() + 1; // +1 voor "... Terug"
 
         _selectedSubIndex += _menuDelta;
 
@@ -192,7 +180,6 @@ void PrioRotaryMenu::closeMenu() {
     _currentCategoryIndex = 0;
     _menuDelta = 0;
 
-    // Zet oude TFT-instellingen terug
     restoreTextStyle();
 
     if (_closeCallback) {
@@ -206,14 +193,10 @@ void PrioRotaryMenu::drawMenu() {
         _tft->fillScreen(MENU_BG_COLOR);
 
         if (_state == MAIN_MENU) {
-
             drawHeader("Main Menu");
-
         } else if (_state == SUB_MENU) {
-
             JsonArray categories = _menuDoc.as<JsonArray>();
             JsonObject category = categories[_currentCategoryIndex];
-
             drawHeader(category["label"]);
         }
 
@@ -228,26 +211,44 @@ void PrioRotaryMenu::drawMenu() {
 }
 
 void PrioRotaryMenu::drawHeader(const char* title) {
-    _tft->fillRect(0, 0, 320, 50, MENU_HEADER_BG);
+    // Zelfde als AlarmSetup: 480 breed, 40 hoog
+    _tft->fillRect(0, 0, 480, 40, MENU_HEADER_BG);
 
     _tft->setTextColor(MENU_HEADER_FG, MENU_HEADER_BG);
     _tft->setTextDatum(MC_DATUM);
     _tft->setTextSize(1);
 
-    _tft->drawString(title, 160, 25);
+    _tft->drawString(title, 240, 20);
 }
 
 void PrioRotaryMenu::drawMainMenuItems() {
     JsonArray categories = _menuDoc.as<JsonArray>();
 
     int startY = 50;
-    int itemHeight = 45;
+    int itemHeight = 40;  // Zelfde als AlarmSetup
     int maxItems = (480 - startY) / itemHeight;
 
     _tft->setTextSize(2);
     _tft->setTextDatum(ML_DATUM);
 
     int count = 0;
+
+    // Item 0: ... Terug (bovenaan, zoals AlarmSetup)
+    if (count < maxItems) {
+        int y = startY + count * itemHeight;
+        bool isSelected = (count == _selectedMainIndex);
+
+        if (isSelected) {
+            _tft->fillRect(10, y + 2, 460, itemHeight - 4, TFT_DARKGREY);
+            _tft->setTextColor(TFT_WHITE, TFT_DARKGREY);
+        } else {
+            _tft->fillRect(10, y + 2, 460, itemHeight - 4, MENU_BG_COLOR);
+            _tft->setTextColor(TFT_LIGHTGREY, MENU_BG_COLOR);
+        }
+
+        _tft->drawString("... Terug", 20, y + itemHeight / 2);
+        count++;
+    }
 
     for (JsonObject category : categories) {
 
@@ -261,38 +262,16 @@ void PrioRotaryMenu::drawMainMenuItems() {
         bool isSelected = (count == _selectedMainIndex);
 
         if (isSelected) {
-
-            _tft->fillRect(10, y + 5, 300, itemHeight - 10, MENU_HIGHLIGHT);
+            _tft->fillRect(10, y + 2, 460, itemHeight - 4, MENU_HIGHLIGHT);
             _tft->setTextColor(TFT_WHITE, MENU_HIGHLIGHT);
-
         } else {
-
-            _tft->fillRect(10, y + 5, 300, itemHeight - 10, MENU_BG_COLOR);
+            _tft->fillRect(10, y + 2, 460, itemHeight - 4, MENU_BG_COLOR);
             _tft->setTextColor(MENU_FG_COLOR, MENU_BG_COLOR);
         }
 
         _tft->drawString(label, 20, y + itemHeight / 2);
 
         count++;
-    }
-
-    if (count < maxItems) {
-
-        int y = startY + count * itemHeight;
-        bool isSelected = (count == _selectedMainIndex);
-
-        if (isSelected) {
-
-            _tft->fillRect(10, y + 5, 300, itemHeight - 10, TFT_DARKGREY);
-            _tft->setTextColor(TFT_WHITE, TFT_DARKGREY);
-
-        } else {
-
-            _tft->fillRect(10, y + 5, 300, itemHeight - 10, MENU_BG_COLOR);
-            _tft->setTextColor(TFT_LIGHTGREY, MENU_BG_COLOR);
-        }
-
-        _tft->drawString("Close Menu", 20, y + itemHeight / 2);
     }
 }
 
@@ -302,7 +281,7 @@ void PrioRotaryMenu::drawSubMenuItems() {
     JsonArray items = category["items"];
 
     int startY = 50;
-    int itemHeight = 45;
+    int itemHeight = 40;  // Zelfde als AlarmSetup
     int maxItems = (480 - startY) / itemHeight;
 
     _tft->setTextSize(2);
@@ -310,23 +289,21 @@ void PrioRotaryMenu::drawSubMenuItems() {
 
     int count = 0;
 
+    // Item 0: ... Terug (bovenaan, zoals AlarmSetup)
     if (count < maxItems) {
 
         int y = startY + count * itemHeight;
         bool isSelected = (count == _selectedSubIndex);
 
         if (isSelected) {
-
-            _tft->fillRect(10, y + 5, 300, itemHeight - 10, TFT_DARKGREY);
+            _tft->fillRect(10, y + 2, 460, itemHeight - 4, TFT_DARKGREY);
             _tft->setTextColor(TFT_WHITE, TFT_DARKGREY);
-
         } else {
-
-            _tft->fillRect(10, y + 5, 300, itemHeight - 10, MENU_BG_COLOR);
+            _tft->fillRect(10, y + 2, 460, itemHeight - 4, MENU_BG_COLOR);
             _tft->setTextColor(TFT_LIGHTGREY, MENU_BG_COLOR);
         }
 
-        _tft->drawString("< Back", 20, y + itemHeight / 2);
+        _tft->drawString("... Terug", 20, y + itemHeight / 2);
 
         count++;
     }
@@ -343,13 +320,10 @@ void PrioRotaryMenu::drawSubMenuItems() {
         bool isSelected = (count == _selectedSubIndex);
 
         if (isSelected) {
-
-            _tft->fillRect(10, y + 5, 300, itemHeight - 10, MENU_HIGHLIGHT);
+            _tft->fillRect(10, y + 2, 460, itemHeight - 4, MENU_HIGHLIGHT);
             _tft->setTextColor(TFT_WHITE, MENU_HIGHLIGHT);
-
         } else {
-
-            _tft->fillRect(10, y + 5, 300, itemHeight - 10, MENU_BG_COLOR);
+            _tft->fillRect(10, y + 2, 460, itemHeight - 4, MENU_BG_COLOR);
             _tft->setTextColor(MENU_FG_COLOR, MENU_BG_COLOR);
         }
 
@@ -366,7 +340,6 @@ void PrioRotaryMenu::saveTextStyle() {
     _savedTextStyle.textFont  = _tft->textfont;
     _savedTextStyle.fgColor   = _tft->textcolor;
     _savedTextStyle.bgColor   = _tft->textbgcolor;
- //   _savedTextStyle.padX        = _tft->padX;
 
     _savedTextStyle.cursorX   = _tft->getCursorX();
     _savedTextStyle.cursorY   = _tft->getCursorY();

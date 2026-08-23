@@ -26,7 +26,9 @@ void AlarmSetup::start() {
     _prevEditMode = false;
     _needsRedraw = true;
     _firstDraw = true;
-    Serial.println("AlarmSetup: gestart");
+    _waitForBtnRelease = true;  // Wacht tot knop los is
+    
+    Serial.println("AlarmSetup: gestart, wacht op knop-release");
 }
 
 void AlarmSetup::stop() {
@@ -100,7 +102,7 @@ void AlarmSetup::onButtonPress() {
     
     if (_screen == SCREEN_LIST) {
         if (_listSelection == 0) {
-            stop(); // ... Terug naar player
+            stop();
             return;
         }
         int alarmCount = _alarmMgr->getCount();
@@ -251,7 +253,6 @@ void AlarmSetup::drawEditForm(bool fullRedraw) {
             if (_prevField >= 0) drawEditField(_prevField, false, false);
             drawEditField(_selectedField, true, _editMode);
         } else if (_editMode && _selectedField == _prevField) {
-            // Zelfde veld in edit mode: waarde kan veranderd zijn door draaien
             drawEditField(_selectedField, true, true);
         }
     }

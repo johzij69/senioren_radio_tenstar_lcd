@@ -5,8 +5,6 @@
 #include <TFT_eSPI.h>
 #include "AlarmManager.h"
 #include "UrlManager.h"
-#include "PrioRotary.h"
-#include "ezButton.h"
 
 class AlarmSetup {
 public:
@@ -19,6 +17,10 @@ public:
     
     void onRotaryDelta(int delta);
     void onButtonPress();
+    
+    // Wacht tot de fysieke knop los is voordat we input accepteren
+    bool isWaitingForBtnRelease() const { return _waitForBtnRelease; }
+    void clearWaitForBtnRelease() { _waitForBtnRelease = false; }
 
 private:
     TFT_eSPI *_tft;
@@ -28,6 +30,7 @@ private:
     bool _active = false;
     bool _needsRedraw = true;
     bool _editMode = false;
+    bool _waitForBtnRelease = false;
     
     enum Screen { SCREEN_LIST, SCREEN_EDIT, SCREEN_CONFIRM };
     Screen _screen = SCREEN_LIST;

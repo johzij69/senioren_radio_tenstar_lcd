@@ -168,37 +168,74 @@ void DisplayTask(void *parameter)
         rotary_button.loop();
 
         // === ALARM SETUP MODE ===
+        static bool wasAlarmSetupActive = false;
+        
         if (alarmSetup.isActive()) {
-            rotary_button.loop();
+            // Eigen knop handling met digitalRead (ezButton is verward door menu-overgang)
+            static bool btnAlarmDown = false;
+            static unsigned long btnAlarmDownTime = 0;
+            static bool btnAlarmHandled = false;
+            static bool btnPrevRaw = false;
+            static unsigned long btnDebounceTime = 0;
+            static Screen prevAlarmScreen = SCREEN_LIST;
             
-            static unsigned long btnDownTime = 0;
-            static bool btnWasDown = false;
-            static bool longPressFired = false;
+            // RESET bij nieuwe activatie: wis alle knop-state van vorige sessie
+            if (!wasAlarmSetupActive) {
+                btnAlarmDown = false;
+                btnAlarmHandled = false;
+                btnPrevRaw = false;
+                btnDebounceTime = 0;
+                prevAlarmScreen = alarmSetup.getScreen();
+                Serial.println("AlarmSetup: knop-state gereset bij start");
+            }
+            wasAlarmSetupActive = true;
             
-            if (rotary_button.isPressed()) {
-                btnDownTime = millis();
-                btnWasDown = true;
-                longPressFired = false;
+            // RESET bij schermwissel binnen alarm setup (edit->list of list->edit)
+            // Voorkomt dat lange-druk-timer doorgaat naar het nieuwe scherm
+            Screen currentScreen = alarmSetup.getScreen();
+            if (currentScreen != prevAlarmScreen) {
+                btnAlarmDown = false;
+                btnAlarmHandled = false;
+                btnPrevRaw = false;
+                prevAlarmScreen = currentScreen;
+                Serial.println("AlarmSetup: scherm gewisseld, knop-state gereset");
             }
             
-            if (btnWasDown && !longPressFired) {
-                if (millis() - btnDownTime >= 800) {
-                    longPressFired = true;
+            bool btnRaw = (digitalRead(ROT_SW_PIN) == LOW); // Active low met pullup
+            
+            // Debounce (30ms)
+            if (btnRaw != btnPrevRaw) {
+                btnDebounceTime = millis();
+            }
+            
+            if ((millis() - btnDebounceTime) > 30) {
+                if (btnRaw && !btnAlarmDown) {
+                    // Rising edge: knop net ingedrukt
+                    btnAlarmDown = true;
+                    btnAlarmDownTime = millis();
+                    btnAlarmHandled = false;
+                } else if (!btnRaw && btnAlarmDown) {
+                    // Falling edge: knop net losgelaten
+                    btnAlarmDown = false;
+                    if (!btnAlarmHandled && (millis() - btnAlarmDownTime < 800)) {
+                        // Korte klik (< 800ms)
+                        alarmSetup.onButtonPress();
+                    }
+                }
+            }
+            btnPrevRaw = btnRaw;
+            
+            // Lange druk detectie (>= 800ms)
+            if (btnAlarmDown && !btnAlarmHandled) {
+                if (millis() - btnAlarmDownTime >= 800) {
+                    btnAlarmHandled = true;
+                    Serial.println("AlarmSetup: lange druk, terug naar player");
                     alarmSetup.stop();
-                    myMenu.closeMenu();
                     onMenuClose();
-                    btnWasDown = false;
                 }
             }
             
-            if (rotary_button.isReleased()) {
-                if (btnWasDown && !longPressFired) {
-                    alarmSetup.onButtonPress();
-                }
-                btnWasDown = false;
-                longPressFired = false;
-            }
-            
+            // Rotary handling
             rotaryInstance.loop();
             int menuDelta = rotaryInstance.getAndResetRotationCounter();
             if (menuDelta != 0) {
@@ -208,6 +245,8 @@ void DisplayTask(void *parameter)
             alarmSetup.loop();
             vTaskDelay(10 / portTICK_PERIOD_MS);
             continue;
+        } else {
+            wasAlarmSetupActive = false;
         }
         // === EINDE ALARM SETUP MODE ===
 
@@ -549,21 +588,15 @@ int mapLuxToPWM(float lux)
 void onMenuAction(const char* action) {
     Serial.printf("Menu Action Triggered: %s\n", action);
 
-
     if (strcmp(action, "setAlarm") == 0) {
+        // Eerst menu sluiten (zonder alarmSetup te stoppen, want die is nog niet gestart)
+        myMenu.closeMenu();
+        // Dan alarm setup starten
         alarmSetup.start();
     } else if (strcmp(action, "toggleAlarm") == 0) {
         // Snelle toggle: zet alle alarmen aan/uit
-        // Of toon een lijst om individueel te togglen
-        // (optioneel, voor nu even leeg)
+        // (optioneel, voor nu leeg)
     }
-
-    // Execute your system logic here
-    // if (strcmp(action, "syncTime") == 0) {
-    //     sync_time(true);
-    // } else if (strcmp(action, "stopWebserver") == 0) {
-    //     // stop webserver logic
-    // }
 }
 
 void onMenuOpen() {
