@@ -187,6 +187,7 @@ void AlarmSetup::draw() {
 
 void AlarmSetup::drawHeader(const char* title) {
     _tft->fillRect(0, 0, 480, 40, HEADER_BG);
+    _tft->setTextFont(1);        // <-- TOEVOEGEN
     _tft->setTextColor(HEADER_FG, HEADER_BG);
     _tft->setTextDatum(MC_DATUM);
     _tft->setTextSize(1);
@@ -219,6 +220,7 @@ void AlarmSetup::drawAlarmListItem(int index, bool selected) {
     int y = startY + index * itemHeight;
     
     _tft->fillRect(10, y + 2, 460, itemHeight - 4, selected ? HIGHLIGHT_COLOR : BG_COLOR);
+    _tft->setTextFont(1);        // <-- TOEVOEGEN
     _tft->setTextDatum(ML_DATUM);
     _tft->setTextSize(2);
     _tft->setTextColor(FG_COLOR, selected ? HIGHLIGHT_COLOR : BG_COLOR);
@@ -266,6 +268,7 @@ void AlarmSetup::drawEditField(int field, bool selected, bool editing) {
     uint16_t bg = selected ? (editing ? EDIT_COLOR : HIGHLIGHT_COLOR) : BG_COLOR;
     _tft->fillRect(10, y + 2, 460, 26, bg);
     _tft->setTextColor(FG_COLOR, bg);
+    _tft->setTextFont(1);        
     _tft->setTextDatum(ML_DATUM);
     _tft->setTextSize(1);
     
@@ -332,6 +335,7 @@ void AlarmSetup::drawEditField(int field, bool selected, bool editing) {
 
 void AlarmSetup::drawConfirmDialog() {
     drawHeader("Alarm Verwijderen?");
+    _tft->setTextFont(1);        // <-- TOEVOEGEN
     _tft->setTextColor(FG_COLOR, BG_COLOR);
     _tft->setTextDatum(MC_DATUM);
     _tft->setTextSize(2);
@@ -342,10 +346,12 @@ void AlarmSetup::drawConfirmDialog() {
     int itemHeight = 50;
     
     _tft->fillRect(100, startY, 280, itemHeight, _listSelection == 0 ? HIGHLIGHT_COLOR : BG_COLOR);
+    _tft->setTextFont(1);        // <-- TOEVOEGEN (voor de knoppen)
     _tft->setTextColor(FG_COLOR, _listSelection == 0 ? HIGHLIGHT_COLOR : BG_COLOR);
     _tft->drawString("JA, verwijder", 240, startY + itemHeight / 2);
     
     _tft->fillRect(100, startY + itemHeight + 10, 280, itemHeight, _listSelection == 1 ? HIGHLIGHT_COLOR : BG_COLOR);
+    _tft->setTextFont(1);        // <-- TOEVOEGEN (voor de knoppen)
     _tft->setTextColor(FG_COLOR, _listSelection == 1 ? HIGHLIGHT_COLOR : BG_COLOR);
     _tft->drawString("NEE, behoud", 240, startY + itemHeight + 10 + itemHeight / 2);
 }

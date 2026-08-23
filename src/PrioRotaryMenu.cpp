@@ -102,7 +102,7 @@ void PrioRotaryMenu::updateSelection() {
 
     if (_state == MAIN_MENU) {
         JsonArray categories = _menuDoc.as<JsonArray>();
-        int maxIdx = categories.size() + 1; // +1 voor "... Terug"
+        int maxIdx = categories.size() + 1;
         _selectedMainIndex += _menuDelta;
         if (_selectedMainIndex < 0) _selectedMainIndex = maxIdx - 1;
         if (_selectedMainIndex >= maxIdx) _selectedMainIndex = 0;
@@ -110,7 +110,7 @@ void PrioRotaryMenu::updateSelection() {
         JsonArray categories = _menuDoc.as<JsonArray>();
         JsonObject category = categories[_currentCategoryIndex];
         JsonArray items = category["items"];
-        int totalItems = items.size() + 1; // +1 voor "... Terug"
+        int totalItems = items.size() + 1;
         _selectedSubIndex += _menuDelta;
         if (_selectedSubIndex < 0) _selectedSubIndex = totalItems - 1;
         if (_selectedSubIndex >= totalItems) _selectedSubIndex = 0;
@@ -134,10 +134,6 @@ void PrioRotaryMenu::closeMenu() {
     }
 }
 
-// ============================================
-// DRAWING — exact gelijk aan AlarmSetup look
-// ============================================
-
 void PrioRotaryMenu::drawMenu() {
     if (_stateChanged) {
         _tft->fillScreen(MENU_BG_COLOR);
@@ -159,9 +155,10 @@ void PrioRotaryMenu::drawMenu() {
 
 void PrioRotaryMenu::drawHeader(const char* title) {
     _tft->fillRect(0, 0, 480, 40, MENU_HEADER_BG);
+    _tft->setTextFont(1);
+    _tft->setTextSize(1);
     _tft->setTextColor(MENU_HEADER_FG, MENU_HEADER_BG);
     _tft->setTextDatum(MC_DATUM);
-    _tft->setTextSize(1);
     _tft->drawString(title, 240, 20);
 }
 
@@ -170,10 +167,8 @@ void PrioRotaryMenu::drawMainMenuItems() {
     int startY = 50;
     int itemHeight = 40;
     int maxItems = (480 - startY) / itemHeight;
-
     int count = 0;
 
-    // Item 0: ... Terug (bovenaan, exact zoals AlarmSetup)
     if (count < maxItems) {
         int y = startY + count * itemHeight;
         bool isSelected = (count == _selectedMainIndex);
@@ -195,14 +190,11 @@ void PrioRotaryMenu::drawSubMenuItems() {
     JsonArray categories = _menuDoc.as<JsonArray>();
     JsonObject category = categories[_currentCategoryIndex];
     JsonArray items = category["items"];
-
     int startY = 50;
     int itemHeight = 40;
     int maxItems = (480 - startY) / itemHeight;
-
     int count = 0;
 
-    // Item 0: ... Terug (bovenaan, exact zoals AlarmSetup)
     if (count < maxItems) {
         int y = startY + count * itemHeight;
         bool isSelected = (count == _selectedSubIndex);
@@ -220,11 +212,11 @@ void PrioRotaryMenu::drawSubMenuItems() {
     }
 }
 
-// Centrale draw-functie: exact dezelfde afmetingen en stijl als AlarmSetup
 void PrioRotaryMenu::drawMenuItem(int y, int itemHeight, const char* label, bool selected) {
     _tft->fillRect(10, y + 2, 460, itemHeight - 4, selected ? MENU_HIGHLIGHT : MENU_BG_COLOR);
-    _tft->setTextDatum(ML_DATUM);
+    _tft->setTextFont(1);
     _tft->setTextSize(2);
+    _tft->setTextDatum(ML_DATUM);
     _tft->setTextColor(selected ? TFT_WHITE : MENU_FG_COLOR, selected ? MENU_HIGHLIGHT : MENU_BG_COLOR);
     _tft->drawString(label, 20, y + itemHeight / 2);
 }
