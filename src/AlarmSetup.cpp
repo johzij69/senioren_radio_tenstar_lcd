@@ -264,13 +264,13 @@ void AlarmSetup::drawEditField(int field, bool selected, bool editing) {
     int startY = 50;
     int itemHeight = 30;
     int y = startY + field * itemHeight;
-    
+
     uint16_t bg = selected ? (editing ? EDIT_COLOR : HIGHLIGHT_COLOR) : BG_COLOR;
-    _tft->fillRect(10, y + 2, 460, 26, bg);
+    _tft->fillRect(10, y + 2, 460, itemHeight - 4, bg);
     _tft->setTextColor(FG_COLOR, bg);
-    _tft->setTextFont(1);        
+    _tft->setTextFont(1);
     _tft->setTextDatum(ML_DATUM);
-    _tft->setTextSize(1);
+    _tft->setTextSize(2);
     
     char buf[64];
     const char* label = "";

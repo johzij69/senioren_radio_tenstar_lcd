@@ -89,8 +89,13 @@ void PrioRotaryMenu::handleSelection() {
                 const char* action = item["action"];
                 if (_actionCallback && action) {
                     _actionCallback(action);
-                    _needsRedraw = true;
-                    _stateChanged = true;
+                    // The callback may have closed the menu itself (e.g. to hand off to
+                    // a full-screen mode like AlarmSetup/PrioDlnaBrowser); don't revive
+                    // its redraw flags in that case, or it repaints after being closed.
+                    if (_isOpen) {
+                        _needsRedraw = true;
+                        _stateChanged = true;
+                    }
                 }
             }
         }
@@ -144,6 +149,7 @@ void PrioRotaryMenu::drawMenu() {
             JsonObject category = categories[_currentCategoryIndex];
             drawHeader(category["label"]);
         }
+        drawFooter();
         _stateChanged = false;
     }
     if (_state == MAIN_MENU) {
@@ -160,6 +166,14 @@ void PrioRotaryMenu::drawHeader(const char* title) {
     _tft->setTextColor(MENU_HEADER_FG, MENU_HEADER_BG);
     _tft->setTextDatum(MC_DATUM);
     _tft->drawString(title, 240, 20);
+}
+
+void PrioRotaryMenu::drawFooter() {
+    _tft->setTextFont(1);
+    _tft->setTextSize(1);
+    _tft->setTextColor(TFT_LIGHTGREY, MENU_BG_COLOR);
+    _tft->setTextDatum(BC_DATUM);
+    _tft->drawString("Draai = selecteer  |  Druk = open/kies", 240, 315);
 }
 
 void PrioRotaryMenu::drawMainMenuItems() {

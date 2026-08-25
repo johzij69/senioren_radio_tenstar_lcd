@@ -56,6 +56,7 @@ void PrioTft::showLocalIp(const String &ip)
 {
     clearGreenLine(1);
     tft.setCursor(2, 2, 4);
+    tft.setTextSize(1);
     tft.setTextColor(TFT_WHITE, TFT_GREYBLUE);
     tft.println("PRIO-WEBRADIO: " + ip);
 }
@@ -101,6 +102,8 @@ void PrioTft::prepLine(int lineNumber)
 {
     int line = 25 * (lineNumber - 1); // We will start counting at 1
     clearLine(lineNumber);
+    tft.setTextFont(4);
+    tft.setTextSize(1);
     tft.setCursor(kantline, line);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
 }

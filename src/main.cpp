@@ -29,6 +29,8 @@ PrioRfReceiver rfReceiver(RF_RECEIVER_PIN);
 // Queues
 QueueHandle_t DisplayQueue = xQueueCreate(3, sizeof(DisplayData));
 QueueHandle_t AudioQueue = xQueueCreate(3, sizeof(AudioData));
+QueueHandle_t DlnaCommandQueue = xQueueCreate(4, sizeof(DlnaCommand));
+QueueHandle_t DlnaEventQueue = xQueueCreate(4, sizeof(DlnaEvent));
 
 // Maak een instantie van de PrioInputPanel class
 PrioInputPanel inputPanel(TOPPANEL_ADDRESS, TOPPANEL_INT_PIN, TOPPANEL_SDA, TOPPANEL_SCL);
@@ -40,6 +42,7 @@ EventGroupHandle_t taskEvents; // Event group handle for starting order of the t
 TaskHandle_t displayTaskHandle = NULL;   // Task handle for the TFT task
 TaskHandle_t audioTaskHandle = NULL;     // Task handle for the audio task
 TaskHandle_t webServerTaskHandle = NULL; // Task handle for the webserver task
+TaskHandle_t dlnaTaskHandle = NULL;      // Task handle for the DLNA discovery/browse task
 
 
 
@@ -224,6 +227,10 @@ void setup()
         Serial0.println("Starting audio task");
         startAudioTask();
         Serial.println("Audio task started");
+
+        Serial.println("Starting DLNA task");
+        startDlnaTask();
+        Serial.println("DLNA task started");
 
         // Play the last used stream
         playStream(stream_index);
@@ -496,6 +503,20 @@ void startAudioTask()
             (void *)AudioQueue, // Task parameter
             6,                  // Priority of the task (HIGHER than DisplayTask)
             &audioTaskHandle);  // Task handle
+    }
+}
+
+void startDlnaTask()
+{
+    if (dlnaTaskHandle == NULL)
+    {
+        xTaskCreate(
+            DlnaTask,                  // Task function
+            "DlnaTask",                // Name of the task
+            8192,                      // Stack size in words
+            (void *)DlnaCommandQueue,  // Task parameter
+            3,                         // Priority (background, lower than Display/Audio)
+            &dlnaTaskHandle);          // Task handle
     }
 }
 

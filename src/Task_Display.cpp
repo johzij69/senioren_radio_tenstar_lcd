@@ -1,12 +1,17 @@
 #include "Task_Display.h"
 #include "Task_Shared.h"
 #include "AlarmSetup.h"
+#include "PrioDlnaClient.h"
+#include "PrioDlnaBrowser.h"
 
 #include "AlarmManager.h"
 #include "UrlManager.h"
 // Externe referenties naar objecten uit main.cpp
 extern AlarmManager alarmManager;
 extern UrlManager UrlManagerInstance;
+// dlnaClient leeft en wordt uitsluitend gemuteerd op DlnaTask (Task_Dlna.cpp) -
+// hier alleen gebruikt om PrioDlnaBrowser's (read-only) resultaten op te laten halen.
+extern PrioDlnaClient dlnaClient;
 
 PrioTft prioTft;
 bool isMenuActive = false;
@@ -25,6 +30,9 @@ PrioRotary rotaryInstance(ROT_CLK_PIN, ROT_DT_PIN);
 AlarmSetup alarmSetup(prioTft.tft, alarmManager, UrlManagerInstance);
 // Globale instantie van de alarm setup module
 // AlarmSetup alarmSetup(prioTft.tft, alarmManager, UrlManagerInstance); // Verwijder dubbele instantie
+
+// DLNA browser module (dlnaClient itself lives on DlnaTask; see extern above)
+PrioDlnaBrowser dlnaBrowser(prioTft.tft, dlnaClient, playAudio);
 /* Buttons */
 ezButton rotary_button(ROT_SW_PIN); // Initialize the button with the pin number and mode
 
@@ -63,6 +71,12 @@ const char* menuJson = R"(
     "label": "Other",
     "items": [
       { "label": "Stop Webserver", "action": "stopWebserver" }
+    ]
+  },
+  {
+    "label": "DLNA",
+    "items": [
+      { "label": "Blader op server", "action": "browseDlna" }
     ]
   }
 ]
@@ -234,6 +248,37 @@ void DisplayTask(void *parameter)
         }
         // === EINDE ALARM SETUP MODE ===
 
+        // === DLNA BROWSER MODE ===
+        static bool wasDlnaActive = false;
+
+        if (dlnaBrowser.isActive()) {
+            wasDlnaActive = true;
+
+            if (rotary_button.isPressed()) {
+                unsigned long currentTime = millis();
+                if (currentTime - redrawLockoutTime < 500) {
+                    Serial.println("Knopdruk genegeerd: EMI ruis van scherm redraw.");
+                } else {
+                    dlnaBrowser.onButtonPress();
+                }
+            }
+
+            rotaryInstance.loop();
+            int dlnaDelta = rotaryInstance.getAndResetRotationCounter();
+            if (dlnaDelta != 0) {
+                dlnaBrowser.onRotaryDelta(dlnaDelta);
+            }
+
+            dlnaBrowser.loop();
+            vTaskDelay(10 / portTICK_PERIOD_MS);
+            continue;
+        } else if (wasDlnaActive) {
+            // Browser is net gesloten (terug of track gekozen): speler-UI weer opbouwen
+            wasDlnaActive = false;
+            onMenuClose();
+        }
+        // === EINDE DLNA BROWSER MODE ===
+
         // 2. Check of de knop net is ingedrukt
         if (rotary_button.isPressed()) 
         {
@@ -275,9 +320,9 @@ void DisplayTask(void *parameter)
         myMenu.loop();
         rotaryInstance.loop();  
 
-        if (forcePlayerRedraw) {
+        if (forcePlayerRedraw && !alarmSetup.isActive() && !dlnaBrowser.isActive()) {
             forcePlayerRedraw = false;
-            
+
             // Optioneel: reset de layout van prioTft als jouw PrioTft class dat nodig heeft
             // prioTft.init(); 
             
@@ -580,6 +625,11 @@ void onMenuAction(const char* action) {
     } else if (strcmp(action, "toggleAlarm") == 0) {
         // Snelle toggle: zet alle alarmen aan/uit
         // (optioneel, voor nu leeg)
+    } else if (strcmp(action, "browseDlna") == 0) {
+        // Eerst menu sluiten (zonder de browser te stoppen, want die is nog niet gestart)
+        myMenu.closeMenu();
+        // Dan de DLNA-browser starten
+        dlnaBrowser.start();
     }
 }
 
@@ -600,7 +650,8 @@ void onMenuClose() {
     
     Serial.println("Menu Closed - Redrawing Player UI");
     // Wipe screen completely and trigger your display task to redraw the player
-    prioTft.tft.fillScreen(TFT_BLACK); 
+    prioTft.tft.fillScreen(TFT_BLACK);
+    redrawLockoutTime = millis(); // grote SPI-transactie kan EMI-ruis op de knop-pin geven
 
     // redraw screen here, e.g., send a message to DisplayTask to redraw the player UI
     forcePlayerRedraw = true; // Voor directe redraw met huidige data

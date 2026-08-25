@@ -11,6 +11,7 @@ using FS = fs::FS;
 #include "MyPreferences.h"
 #include "Task_Audio.h"
 #include "Task_Display.h"
+#include "Task_Dlna.h"
 #include "Task_Shared.h"
 #include "PrioTft.h"
 #include "Free_Fonts.h"
@@ -41,6 +42,7 @@ void sync_time(bool forceSync = false);
 void startDisplayTask();
 void startWebServerTask();
 void startAudioTask();
+void startDlnaTask();
 void SendDataToDisplay();
 void pauseAudioTask();
 void resumeAudioTask(); 

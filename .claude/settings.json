@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(curl -sL https://raw.githubusercontent.com/schreibfaul1/ESP32-DLNA-Client/main/src/DLNAClient.h -o /tmp/DLNAClient.h)",
+      "Bash(curl -sL https://raw.githubusercontent.com/schreibfaul1/ESP32-DLNA-Client/main/src/DLNAClient.cpp -o /tmp/DLNAClient.cpp)",
+      "Bash(curl -sL https://raw.githubusercontent.com/schreibfaul1/ESP32-DLNA-Client/main/examples/main.cpp -o /tmp/dlna_example.cpp)",
+      "Bash(python3 -)",
+      "Bash(command -v pio)",
+      "Bash(command -v platformio)",
+      "Read(//usr/local/bin/**)",
+      "Bash(python3 -m platformio --version)"
+    ]
+  }
+}

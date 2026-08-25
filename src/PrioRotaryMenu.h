@@ -90,6 +90,7 @@ private:
     // Rendering
     void drawMenu();
     void drawHeader(const char* title);
+    void drawFooter();
     void drawMainMenuItems();
     void drawSubMenuItems();
     void drawMenuItem(int y, int itemHeight, const char* label, bool selected);
