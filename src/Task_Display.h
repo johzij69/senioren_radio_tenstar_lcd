@@ -53,7 +53,7 @@ struct DisplayData {
     int volume;
     bool loadingState;
     bool standbyState;
-    char currenTime[5];
+    char currenTime[6]; // "HH:MM\0" - was [5], one byte short of the null terminator
     char currenDate[20];
 
 };

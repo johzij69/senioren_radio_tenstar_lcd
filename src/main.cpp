@@ -274,6 +274,14 @@ void loop()
             Serial.println("⏻ Naar slaapstand...");
             inStandby = true;                // Zet de standby status
             displayData.standbyState = true; // Zet de standby state in display data
+            // Task_Display.cpp's standbyState render path shows currenTime/currenDate
+            // as-is instead of re-reading the RTC (that refresh only happens on the
+            // normal-player path) - without this, standby could show whatever
+            // updateClockDisplay() last cached, up to a minute stale (or older).
+            strncpy(displayData.currenTime, pDateTime.getTime(), sizeof(displayData.currenTime));
+            displayData.currenTime[sizeof(displayData.currenTime) - 1] = '\0';
+            strncpy(displayData.currenDate, pDateTime.getDayDate(), sizeof(displayData.currenDate));
+            displayData.currenDate[sizeof(displayData.currenDate) - 1] = '\0';
             SendDataToDisplay();             // Stuur de display data naar de queue
             // Webserver blijft actief in standby; alleen audio wordt gepauzeerd.
             stopAudio();
