@@ -20,6 +20,7 @@ struct DlnaCommand {
     DlnaCommandType command;
     uint8_t serverIndex;
     char objectId[64];
+    bool forceRescan; // DLNA_CMD_SEEK only: bypass the cached server list, see PrioDlnaClient::seekServer()
 };
 
 enum DlnaEventType {

@@ -50,7 +50,7 @@ void DlnaTask(void *parameter) {
         if (xQueueReceive(commandQueue, &cmd, 0) == pdTRUE) {
             if (cmd.command == DLNA_CMD_SEEK) {
                 s_seekReadyFired = false;
-                if (!dlnaClient.seekServer()) {
+                if (!dlnaClient.seekServer(cmd.forceRescan)) {
                     DlnaEvent evt{ DLNA_EVT_SEEK_FAILED, 0 };
                     xQueueSend(DlnaEventQueue, &evt, 0);
                 } else {

@@ -70,7 +70,11 @@ public:
 
     // Sends an SSDP M-SEARCH multicast and starts the discovery state machine.
     // Results arrive asynchronously via loop() -> ServerFoundCallback / SeekReadyCallback.
-    bool seekServer();
+    // If a server list was cached from a previous successful seek (see loadServerCache()),
+    // that cache is used instead and SeekReadyCallback fires synchronously before this
+    // returns - skipping the ~8s SSDP wait entirely. Pass forceRescan=true to bypass the
+    // cache and always do a fresh multicast discovery (e.g. for a user-triggered refresh).
+    bool seekServer(bool forceRescan = false);
 
     // Re-announces already discovered servers via ServerFoundCallback.
     int8_t listServer();
@@ -95,6 +99,8 @@ public:
 private:
     void parseDlnaServer(uint16_t len);
     bool getServerItems(uint8_t srvNr);
+    bool loadServerCache();  // fills m_dlnaServer from LittleFS; returns false if no/empty cache
+    void saveServerCache();  // persists m_dlnaServer to LittleFS after a successful real seek
     bool browseResult();
     bool srvGet(uint8_t srvNr);
     bool readHttpHeader();

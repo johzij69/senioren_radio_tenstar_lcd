@@ -4,6 +4,14 @@
 #include <freertos/task.h>
 #include <string.h>
 #include <stdlib.h>
+#include <LittleFS.h>
+
+// Cache of the last successful seekServer() result, so a normal (non-forced)
+// seek can skip the ~8s SSDP M-SEARCH wait entirely on subsequent opens of the
+// DLNA browser. Home-network media servers rarely change IP, so this is safe
+// to reuse until the user explicitly asks for a rescan (or a cached server
+// turns out to be unreachable when actually browsed).
+static const char* DLNA_SERVER_CACHE_FILE = "/dlna_servers.cache";
 
 // Discovery/browse protocol logic adapted from
 // https://github.com/schreibfaul1/ESP32-DLNA-Client (SSDP M-SEARCH discovery +
@@ -36,7 +44,14 @@ void PrioDlnaClient::setCallbacks(InfoCallback info, ServerFoundCallback serverF
     _browseReadyCallback = browseReady;
 }
 //------------------------------------------------------------------------------------------------
-bool PrioDlnaClient::seekServer() {
+bool PrioDlnaClient::seekServer(bool forceRescan) {
+    if (!forceRescan && loadServerCache()) {
+        m_state = IDLE;
+        if (_infoCallback) _infoCallback("DLNA-servers geladen uit cache");
+        if (_seekReadyCallback) _seekReadyCallback(m_dlnaServer.size);
+        return true;
+    }
+
     if (WiFi.status() != WL_CONNECTED) return false; // guard
 
     if (m_chbuf) { free(m_chbuf); m_chbuf = nullptr; }
@@ -791,6 +806,10 @@ void PrioDlnaClient::loop() {
                 break;
             }
             cnt = 0;
+            // Only overwrite a previously good cache when this scan actually found
+            // something - a transient scan failure shouldn't wipe out servers that
+            // were reachable moments ago and may well be reachable again next time.
+            if (m_dlnaServer.size > 0) saveServerCache();
             if (_seekReadyCallback) _seekReadyCallback(m_dlnaServer.size);
             m_state = IDLE;
             break;
@@ -809,6 +828,55 @@ void PrioDlnaClient::loop() {
         default:
             break;
     }
+}
+//------------------------------------------------------------------------------------------------
+void PrioDlnaClient::saveServerCache() {
+    File f = LittleFS.open(DLNA_SERVER_CACHE_FILE, "w");
+    if (!f) { log_e("could not open %s for writing", DLNA_SERVER_CACHE_FILE); return; }
+    for (int i = 0; i < m_dlnaServer.size; i++) {
+        f.printf("%s|%u|%s|%s|%s|%u|%s\n",
+                 m_dlnaServer.ip[i], m_dlnaServer.port[i], m_dlnaServer.location[i],
+                 m_dlnaServer.friendlyName[i], m_dlnaServer.controlURL[i],
+                 m_dlnaServer.presentationPort[i], m_dlnaServer.presentationURL[i]);
+    }
+    f.close();
+}
+
+bool PrioDlnaClient::loadServerCache() {
+    if (!LittleFS.exists(DLNA_SERVER_CACHE_FILE)) return false;
+    File f = LittleFS.open(DLNA_SERVER_CACHE_FILE, "r");
+    if (!f) return false;
+
+    dlnaServer_clear_and_shrink();
+    m_dlnaServer.size = 0;
+
+    while (f.available()) {
+        String line = f.readStringUntil('\n');
+        line.trim();
+        if (line.length() == 0) continue;
+
+        String fields[7];
+        int fieldCount = 0;
+        int fieldStart = 0;
+        for (int i = 0; i <= (int)line.length() && fieldCount < 7; i++) {
+            if (i == (int)line.length() || line[i] == '|') {
+                fields[fieldCount++] = line.substring(fieldStart, i);
+                fieldStart = i + 1;
+            }
+        }
+        if (fieldCount != 7) { log_e("skipping malformed cache line"); continue; }
+
+        m_dlnaServer.ip.push_back(x_ps_strdup(fields[0].c_str()));
+        m_dlnaServer.port.push_back((uint16_t)fields[1].toInt());
+        m_dlnaServer.location.push_back(x_ps_strdup(fields[2].c_str()));
+        m_dlnaServer.friendlyName.push_back(x_ps_strdup(fields[3].c_str()));
+        m_dlnaServer.controlURL.push_back(x_ps_strdup(fields[4].c_str()));
+        m_dlnaServer.presentationPort.push_back((uint16_t)fields[5].toInt());
+        m_dlnaServer.presentationURL.push_back(x_ps_strdup(fields[6].c_str()));
+        m_dlnaServer.size++;
+    }
+    f.close();
+    return m_dlnaServer.size > 0;
 }
 //------------------------------------------------------------------------------------------------
 // Helpers

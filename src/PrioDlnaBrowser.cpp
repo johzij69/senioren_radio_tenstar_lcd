@@ -40,6 +40,7 @@ void PrioDlnaBrowser::start() {
     cmd.command = DLNA_CMD_SEEK;
     cmd.serverIndex = 0;
     cmd.objectId[0] = '\0';
+    cmd.forceRescan = false; // use the cached server list if there is one
     sendCommand(cmd);
 }
 
@@ -58,8 +59,9 @@ void PrioDlnaBrowser::onButtonPress() {
 
     if (_screen == SCREEN_SERVERS) {
         if (_selectedIndex == 0) { stop(); return; } // "... Terug" -> close browser
+        if (_selectedIndex == 1) { rescanServers(); return; } // "... Vernieuwen"
         PrioDlnaClient::dlnaServer_t servers = _dlna->getServer();
-        int srvIdx = _selectedIndex - 1;
+        int srvIdx = _selectedIndex - 2;
         if (srvIdx < 0 || srvIdx >= servers.size) return;
         _currentServerIndex = (int8_t)srvIdx;
         _folderStack.clear();
@@ -140,7 +142,7 @@ void PrioDlnaBrowser::loop() {
 
 //------------------------------------------------------------------------------------------------
 int PrioDlnaBrowser::itemCount() const {
-    if (_screen == SCREEN_SERVERS) return 1 + _dlna->getServer().size;
+    if (_screen == SCREEN_SERVERS) return 2 + _dlna->getServer().size; // "... Terug" + "... Vernieuwen"
     if (_screen == SCREEN_BROWSE)  return 1 + _dlna->getBrowseResult().size;
     return 0;
 }
@@ -170,6 +172,20 @@ void PrioDlnaBrowser::showStatus(const String &text) {
     _statusText = text;
     _screen = SCREEN_STATUS;
     _needsRedraw = true;
+}
+
+void PrioDlnaBrowser::rescanServers() {
+    _busy = true;
+    showStatus("Zoeken naar DLNA-servers...");
+
+    xQueueReset(DlnaEventQueue);
+
+    DlnaCommand cmd;
+    cmd.command = DLNA_CMD_SEEK;
+    cmd.serverIndex = 0;
+    cmd.objectId[0] = '\0';
+    cmd.forceRescan = true;
+    sendCommand(cmd);
 }
 
 //------------------------------------------------------------------------------------------------
@@ -250,7 +266,7 @@ void PrioDlnaBrowser::drawStatusScreen() {
 
 void PrioDlnaBrowser::drawServerList(bool fullRedraw) {
     PrioDlnaClient::dlnaServer_t servers = _dlna->getServer();
-    int total = 1 + servers.size;
+    int total = 2 + servers.size;
 
     int oldScrollOffset = _scrollOffset;
     if (_selectedIndex - _scrollOffset >= VISIBLE_ROWS) _scrollOffset = _selectedIndex - VISIBLE_ROWS + 1;
@@ -258,7 +274,9 @@ void PrioDlnaBrowser::drawServerList(bool fullRedraw) {
     bool scrollChanged = (oldScrollOffset != _scrollOffset);
 
     auto labelFor = [&](int idx) -> const char* {
-        return (idx == 0) ? "... Terug" : servers.friendlyName[idx - 1];
+        if (idx == 0) return "... Terug";
+        if (idx == 1) return "... Vernieuwen";
+        return servers.friendlyName[idx - 2];
     };
 
     if (fullRedraw) drawHeader("DLNA Servers");

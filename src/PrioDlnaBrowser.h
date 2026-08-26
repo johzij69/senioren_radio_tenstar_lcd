@@ -44,6 +44,7 @@ private:
     void enterServerList();
     void enterBrowse(const char* objectId);
     void showStatus(const String &text);
+    void rescanServers(); // "... Vernieuwen": forces a fresh SSDP scan, bypassing the server cache
 
     int itemCount() const;
     String truncateToFit(const char* text, int maxWidth);
