@@ -235,7 +235,6 @@ void setup()
 
         // Play the last used stream
         playStream(stream_index);
-    //    sync_time(true); // Force sync time on startup
 
 
 
@@ -248,7 +247,11 @@ void setup()
 /* main loop ;-) */
 void loop()
 {
-    // sync_time();
+    // checkSync() zelf gooit alleen elk uur (zie PrioDateTime::_syncInterval) een
+    // echte NTP-sync eruit; deze aanroep is dus goedkoop om elke loop te doen en
+    // is - samen met de onvoorwaardelijke sync in PrioDateTime::begin() - de enige
+    // plek die de RTC-tijd periodiek corrigeert (drift, gemiste zomertijdwissel).
+    pDateTime.checkSync();
     checkAndRunAlarms();
 
     if (!inStandby)
@@ -285,7 +288,6 @@ void loop()
             resumeAudioTask();
             Serial.println("resuming audio");
             playStream(stream_index);
-  //          sync_time(true);
         }
     }
 

@@ -18,17 +18,20 @@ void PrioDateTime::begin()
         Serial.println("RTC initialiseren...");
         delay(5000); // Wacht 1 seconde voor de initialisatie
     }
-    // Controleer of de RTC werkt en een geldige tijd heeft
+    // "Valid" alleen betekent dat de RTC-chip niet is gecrasht/leeg is - niet dat
+    // de opgeslagen tijd ook klopt. Zonder deze onvoorwaardelijke sync bleef een
+    // verlopen/verkeerd gezette RTC-tijd (bv. na een gemiste zomertijdwissel of
+    // gewoon kristaldrift) onopgemerkt staan totdat iemand handmatig /api/synctime
+    // aanriep - checkSync() in loop() ving dat pas na een vol uur op.
     if (!_rtc.IsDateTimeValid())
     {
         Serial.println("⛔ RTC heeft geen geldige tijd! Synchroniseren met NTP...");
-        syncTime(); // Synchroniseer de tijd met NTP als de RTC-tijd ongeldig is
     }
     else
     {
-        Serial.println("✅ RTC heeft een geldige tijd.");
-        timeSynced = true;
+        Serial.println("✅ RTC heeft een geldige tijd, synchroniseer alsnog met NTP om drift/zomertijd te corrigeren...");
     }
+    syncTime();
 }
 
 void PrioDateTime::syncTime()

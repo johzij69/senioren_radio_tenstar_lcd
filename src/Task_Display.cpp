@@ -644,6 +644,9 @@ void onMenuAction(const char* action) {
         myMenu.closeMenu();
         // Dan de DLNA-browser starten
         dlnaBrowser.start();
+    } else if (strcmp(action, "syncTime") == 0) {
+        myMenu.closeMenu();
+        pDateTime.syncTime(); // blokkeert dit scherm max. ~20s (NTP-timeout), zelfde als elders in de UI geaccepteerd
     }
 }
 
