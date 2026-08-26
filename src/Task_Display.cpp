@@ -32,7 +32,7 @@ AlarmSetup alarmSetup(prioTft.tft, alarmManager, UrlManagerInstance);
 // AlarmSetup alarmSetup(prioTft.tft, alarmManager, UrlManagerInstance); // Verwijder dubbele instantie
 
 // DLNA browser module (dlnaClient itself lives on DlnaTask; see extern above)
-PrioDlnaBrowser dlnaBrowser(prioTft.tft, dlnaClient, playAudio);
+PrioDlnaBrowser dlnaBrowser(prioTft.tft, dlnaClient, playDlnaTrack);
 /* Buttons */
 ezButton rotary_button(ROT_SW_PIN); // Initialize the button with the pin number and mode
 

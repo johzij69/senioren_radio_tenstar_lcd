@@ -388,6 +388,9 @@ bool PrioDlnaClient::browseResult() {
         m_srvContent.objectId.push_back(strdup("?"));
         m_srvContent.parentId.push_back(strdup("?"));
         m_srvContent.title.push_back(strdup("?"));
+        m_srvContent.artist.push_back(strdup("?"));
+        m_srvContent.album.push_back(strdup("?"));
+        m_srvContent.albumArtURI.push_back(strdup("?"));
         m_srvContent.size++;
     };
 
@@ -444,6 +447,17 @@ bool PrioDlnaClient::browseResult() {
                 m_srvContent.title[cNr] = x_ps_strndup(m_chbuf + a, b - a);
                 if (strlen(m_srvContent.title[cNr]) == 0) { free(m_srvContent.title[cNr]); m_srvContent.title[cNr] = strdup("Unknown"); }
             }
+            a = indexOf(m_chbuf, "upnp:albumArtURI", 0);
+            if (a >= 0) {
+                c = indexOf(m_chbuf, ">http", a);
+                if (c >= 0) {
+                    c += 1;
+                    d = indexOf(m_chbuf, "<", c);
+                    free(m_srvContent.albumArtURI[cNr]);
+                    m_srvContent.albumArtURI[cNr] = x_ps_strndup(m_chbuf + c, d - c);
+                    replacestr(m_srvContent.albumArtURI[cNr], "&amp;", "&");
+                }
+            }
 
             if (_browseResultCallback) {
                 _browseResultCallback(m_srvContent.objectId[cNr], m_srvContent.parentId[cNr], m_srvContent.childCount[cNr],
@@ -491,6 +505,38 @@ bool PrioDlnaClient::browseResult() {
                 b -= 1;
                 free(m_srvContent.title[cNr]);
                 m_srvContent.title[cNr] = x_ps_strndup(m_chbuf + a, b - a);
+            }
+
+            a = indexOf(m_chbuf, "dc:creator", 0);
+            if (a >= 0) {
+                a += 11;
+                b = indexOf(m_chbuf, "/dc:creator", a);
+                b -= 1;
+                if (b > a) {
+                    free(m_srvContent.artist[cNr]);
+                    m_srvContent.artist[cNr] = x_ps_strndup(m_chbuf + a, b - a);
+                }
+            }
+            a = indexOf(m_chbuf, "upnp:album>", 0); // "upnp:album>" excludes upnp:albumArtURI
+            if (a >= 0) {
+                a += 11;
+                b = indexOf(m_chbuf, "/upnp:album>", a);
+                b -= 1;
+                if (b > a) {
+                    free(m_srvContent.album[cNr]);
+                    m_srvContent.album[cNr] = x_ps_strndup(m_chbuf + a, b - a);
+                }
+            }
+            a = indexOf(m_chbuf, "upnp:albumArtURI", 0);
+            if (a >= 0) {
+                c = indexOf(m_chbuf, ">http", a);
+                if (c >= 0) {
+                    c += 1;
+                    d = indexOf(m_chbuf, "<", c);
+                    free(m_srvContent.albumArtURI[cNr]);
+                    m_srvContent.albumArtURI[cNr] = x_ps_strndup(m_chbuf + c, d - c);
+                    replacestr(m_srvContent.albumArtURI[cNr], "&amp;", "&");
+                }
             }
 
             a = indexOf(m_chbuf, "<res", 0);
@@ -796,6 +842,9 @@ void PrioDlnaClient::srvContent_clear_and_shrink() {
     vector_clear_and_shrink(m_srvContent.duration);
     vector_clear_and_shrink(m_srvContent.title);
     m_srvContent.childCount.clear(); m_srvContent.childCount.shrink_to_fit();
+    vector_clear_and_shrink(m_srvContent.artist);
+    vector_clear_and_shrink(m_srvContent.album);
+    vector_clear_and_shrink(m_srvContent.albumArtURI);
 }
 
 int32_t PrioDlnaClient::indexOf(const char* haystack, const char* needle, int32_t startIndex) {

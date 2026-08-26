@@ -3,8 +3,10 @@
 
 // Full-screen DLNA server/content browser, opened from PrioRotaryMenu the same
 // way AlarmSetup is: a self-contained screen driven by the rotary + button while
-// active, that closes itself and hands a chosen track's stream URL back via
-// PlayCallback (wire this to AudioControl's playAudio()).
+// active, that closes itself and hands a chosen track's stream URL and DIDL-Lite
+// metadata back via PlayCallback (wire this to Task_Display's playDlnaTrack(),
+// which forwards to AudioControl's playAudio() and pushes the metadata to the
+// display queue).
 //
 // PrioDlnaClient's network I/O is blocking, so it runs on its own DlnaTask
 // (see Task_Dlna.h/.cpp) - this class only ever reads results back via
@@ -19,7 +21,8 @@
 
 class PrioDlnaBrowser {
 public:
-    typedef void (*PlayCallback)(const char* url);
+    typedef void (*PlayCallback)(const char* url, const char* title, const char* artist,
+                                  const char* album, const char* albumArtURI);
 
     PrioDlnaBrowser(TFT_eSPI &tft, PrioDlnaClient &dlnaClient, PlayCallback playCallback);
 

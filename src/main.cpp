@@ -433,6 +433,36 @@ void SendDataToDisplay()
     xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
 }
 
+// PrioDlnaBrowser hands a chosen track here instead of calling playAudio()
+// directly, so its DIDL-Lite metadata reaches the screen the same way preset
+// info does via CreateAndSendDisplayData() above. "?" is PrioDlnaClient's
+// sentinel for "field not present in this item" - treated as empty here.
+void playDlnaTrack(const char* url, const char* title, const char* artist,
+                    const char* album, const char* albumArtURI)
+{
+    auto present = [](const char* s) { return s && s[0] != '\0' && strcmp(s, "?") != 0; };
+
+    playAudio(url);
+
+    displayData.loadingState = false;
+    displayData.standbyState = inStandby;
+    strncpy(displayData.ip, WiFi.localIP().toString().c_str(), sizeof(displayData.ip));
+    strncpy(displayData.title, present(title) ? title : "DLNA", sizeof(displayData.title));
+
+    String subtitle;
+    if (present(artist)) subtitle = artist;
+    if (present(album)) { if (subtitle.length()) subtitle += " - "; subtitle += album; }
+    strncpy(displayData.station, subtitle.c_str(), sizeof(displayData.station));
+
+    strncpy(displayData.logo, present(albumArtURI) ? albumArtURI : "", sizeof(displayData.logo));
+    strncpy(displayData.bitrate, "", sizeof(displayData.bitrate));
+    strncpy(displayData.icyurl, "", sizeof(displayData.icyurl));
+    strncpy(displayData.lasthost, "", sizeof(displayData.lasthost));
+    strncpy(displayData.streamtitle, "", sizeof(displayData.streamtitle));
+    strncpy(displayData.currenTime, pDateTime.getTime(), sizeof(displayData.currenTime));
+    SendDataToDisplay();
+}
+
 /* Audio events */
 void audio_showstation(const char *info)
 {

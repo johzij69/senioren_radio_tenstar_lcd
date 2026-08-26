@@ -90,7 +90,10 @@ void PrioDlnaBrowser::onButtonPress() {
             _currentObjectId = String(content.objectId[idx]);
             enterBrowse(_currentObjectId.c_str());
         } else if (strcmp(content.itemURL[idx], "?") != 0) {
-            if (_playCallback) _playCallback(content.itemURL[idx]);
+            if (_playCallback) {
+                _playCallback(content.itemURL[idx], content.title[idx], content.artist[idx],
+                              content.album[idx], content.albumArtURI[idx]);
+            }
             stop(); // hand off to the player and return to the normal player screen
         }
     }

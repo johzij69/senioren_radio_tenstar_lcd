@@ -1,12 +1,11 @@
 #include "Arduino.h"
 #include "LittleFS.h"
-#include <HTTPClient.h>
-// WiFiClientSecure removed - conflicts with Audio library SSL
+// Deliberately no HTTPClient/WiFiClientSecure here - see fetchImage.cpp for why.
 #include <WiFi.h>
-#include <TFT_eSPI.h>  
+#include <TFT_eSPI.h>
 #include <WiFiClient.h>
 
 
-bool getFileOld(String url, String filename);
-bool getFile(String url, String filename);  // Now disabled - returns false
+// Downloads url (http:// only) into filename on LittleFS if not already cached there.
+bool getFile(String url, String filename);
 void listDir(fs::FS &fs, const char *dirname, uint8_t levels);

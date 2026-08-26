@@ -42,6 +42,9 @@ public:
         std::vector<char*>     duration;
         std::vector<char*>     title;
         std::vector<int16_t>   childCount;
+        std::vector<char*>     artist;      // dc:creator, "?" if absent
+        std::vector<char*>     album;       // upnp:album, "?" if absent
+        std::vector<char*>     albumArtURI; // upnp:albumArtURI, "?" if absent
     } srvContent_t;
 
     // Callback types, invoked from loop() while the discovery/browse state machine runs.

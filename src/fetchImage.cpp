@@ -1,119 +1,134 @@
 #include "fetchImage.h"
-// Fetch a file from the URL given and save it in LittleFS
-// Return 1 if a web fetch was needed or 0 if file already exists
-
-// DISABLED: Logo download functionality conflicts with Audio library SSL
-// Only logo upload via web interface is supported now
+// Fetch a file from the URL given and save it in LittleFS.
+// Return true if the file is now present locally (already cached, or freshly downloaded).
 
 #define FORMAT_LITTLEFS_IF_FAILED false
 
-static WiFiClient sHttpClient;
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include <freertos/semphr.h>
-
-void testNetworkConnectivity() {
-    Serial.println("\n========== NETWORK DIAGNOSTICS ==========");
-    
-    // 1. ESP32 Network Info
-    Serial.printf("[INFO] ESP32 IP: %s\n", WiFi.localIP().toString().c_str());
-    Serial.printf("[INFO] Subnet Mask: %s\n", WiFi.subnetMask().toString().c_str());
-    Serial.printf("[INFO] Gateway: %s\n", WiFi.gatewayIP().toString().c_str());
-    Serial.printf("[INFO] DNS: %s\n", WiFi.dnsIP().toString().c_str());
-    
-    // 2. Target Info
-    String targetIP = "195.240.122.90";
-    uint16_t targetPort = 444;
-    Serial.printf("[INFO] Target: %s:%d\n", targetIP.c_str(), targetPort);
-    
-    // 3. Test Raw TCP Connection
-    Serial.printf("[TEST] Testing TCP connection to %s:%d...\n", targetIP.c_str(), targetPort);
-    WiFiClient tcpClient;
-    
-    unsigned long startTime = millis();
-    bool connected = tcpClient.connect(targetIP.c_str(), targetPort);
-    unsigned long elapsed = millis() - startTime;
-    
-    if (connected) {
-        Serial.printf("[SUCCESS] TCP connection established in %lu ms\n", elapsed);
-        Serial.printf("[INFO] Local port used: %d\n", tcpClient.localPort());
-        tcpClient.stop();
-    } else {
-        Serial.printf("[FAILED] TCP connection failed after %lu ms\n", elapsed);
-        Serial.println("[HINT] Possible causes:");
-        Serial.println("  - ESP32 is on different VLAN/subnet");
-        Serial.println("  - Firewall on target server blocks this IP");
-        Serial.println("  - ARP resolution failed");
-    }
-    
-    // 4. Test Alternative Port (80)
-    Serial.printf("[TEST] Testing TCP connection to %s:80...\n", targetIP.c_str());
-    WiFiClient tcpClient80;
-    connected = tcpClient80.connect(targetIP.c_str(), 80);
-    if (connected) {
-        Serial.println("[SUCCESS] Port 80 is reachable");
-        tcpClient80.stop();
-    } else {
-        Serial.println("[FAILED] Port 80 is also unreachable");
-    }
-    
-    Serial.println("==========================================\n");
-}
-
-struct DownloadTaskParams {
-    String url;
-    String filename;
-    int* httpCodeOut;
-    bool* successOut;
-    SemaphoreHandle_t doneSemaphore;
-};
-
-void downloadTask(void* pvParameters) {
-    // DISABLED - Logo download conflicts with Audio SSL
-    DownloadTaskParams* params = (DownloadTaskParams*)pvParameters;
-    *(params->httpCodeOut) = 0;
-    *(params->successOut) = false;
-    xSemaphoreGive(params->doneSemaphore);
-    vTaskDelete(NULL);
-}
-
-static bool downloadUrlToFile(const String &url, const String &filename, int &httpCodeOut)
+// Only plain http:// is supported. https:// would need WiFiClientSecure, whose
+// BearSSL context previously destabilized the Audio library's own TLS stream
+// connections when both ran concurrently - this project intentionally sticks
+// to a bare WiFiClient (same approach as PrioDlnaClient's SOAP GET/POST) so
+// image downloads never touch that shared TLS state. DLNA media servers serve
+// album art over plain http on the LAN, so this covers that use case.
+bool getFile(String url, String filename)
 {
-    // Run network diagnostics before download
-    testNetworkConnectivity();
-    
-    bool success = false;
-    SemaphoreHandle_t doneSemaphore = xSemaphoreCreateBinary();
-    if (doneSemaphore == NULL) return false;
-
-    DownloadTaskParams params;
-    params.url = url;
-    params.filename = filename;
-    params.httpCodeOut = &httpCodeOut;
-    params.successOut = &success;
-    params.doneSemaphore = doneSemaphore;
-
-    BaseType_t taskCreated = xTaskCreate(
-        downloadTask, "DownloadTask", 40960, &params, tskIDLE_PRIORITY + 1, NULL
-    );
-
-    if (taskCreated != pdPASS) {
-        vSemaphoreDelete(doneSemaphore);
+    if (!url.startsWith("http://")) {
+        Serial.println("[ERROR] getFile: only http:// URLs are supported: " + url);
         return false;
     }
 
-    xSemaphoreTake(doneSemaphore, portMAX_DELAY);
-    vSemaphoreDelete(doneSemaphore);
-    return success;
-}
+    if (!LittleFS.begin(FORMAT_LITTLEFS_IF_FAILED)) {
+        Serial.println("[ERROR] LittleFS initialization failed!");
+        return false;
+    }
 
-/* end */
-bool getFile(String url, String filename)
-{
-    // DISABLED: Logo download functionality conflicts with Audio library SSL
-    // Use web interface to upload logos instead
-    Serial.println("[INFO] Logo download is disabled - use web upload instead");
-    return false;
+    if (LittleFS.exists(filename)) {
+        Serial.println("[INFO] File already exists: " + filename);
+        return true;
+    }
+
+    String rest = url.substring(7); // strip "http://"
+    int slashIdx = rest.indexOf('/');
+    String hostPort = (slashIdx >= 0) ? rest.substring(0, slashIdx) : rest;
+    String path = (slashIdx >= 0) ? rest.substring(slashIdx) : "/";
+    String host = hostPort;
+    uint16_t port = 80;
+    int colonIdx = hostPort.indexOf(':');
+    if (colonIdx >= 0) {
+        host = hostPort.substring(0, colonIdx);
+        port = (uint16_t)hostPort.substring(colonIdx + 1).toInt();
+    }
+
+    WiFiClient client;
+    client.setTimeout(5000);
+    if (!client.connect(host.c_str(), port)) {
+        Serial.printf("[ERROR] getFile: could not connect to %s:%u\n", host.c_str(), port);
+        return false;
+    }
+
+    client.printf("GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\nUser-Agent: ESP32/Player/1.0\r\n\r\n",
+                  path.c_str(), host.c_str());
+
+    unsigned long deadline = millis() + 5000;
+    while (client.connected() && !client.available()) {
+        if (millis() > deadline) {
+            Serial.println("[ERROR] getFile: timeout waiting for response from " + host);
+            client.stop();
+            return false;
+        }
+        delay(5);
+    }
+
+    String statusLine = client.readStringUntil('\n');
+    if (statusLine.indexOf(" 200 ") < 0) {
+        Serial.println("[ERROR] getFile: unexpected HTTP status from " + url + ": " + statusLine);
+        client.stop();
+        return false;
+    }
+
+    long contentLength = -1;
+    bool chunked = false;
+    while (client.connected() || client.available()) {
+        String line = client.readStringUntil('\n');
+        line.trim();
+        if (line.length() == 0) break; // blank line ends the header block
+        String lower = line;
+        lower.toLowerCase();
+        if (lower.startsWith("content-length:")) {
+            contentLength = line.substring(line.indexOf(':') + 1).toInt();
+        } else if (lower.startsWith("transfer-encoding:") && lower.indexOf("chunked") >= 0) {
+            chunked = true;
+        }
+    }
+
+    if (chunked) {
+        Serial.println("[ERROR] getFile: chunked transfer-encoding not supported: " + url);
+        client.stop();
+        return false;
+    }
+
+    File file = LittleFS.open(filename, "w");
+    if (!file) {
+        Serial.println("[ERROR] getFile: could not open for writing: " + filename);
+        client.stop();
+        return false;
+    }
+
+    uint8_t buf[512];
+    long remaining = contentLength; // -1 means "unknown, read until the connection closes"
+    unsigned long lastData = millis();
+    while (client.connected() || client.available()) {
+        int avail = client.available();
+        if (avail > 0) {
+            int toRead = sizeof(buf);
+            if (avail < toRead) toRead = avail;
+            if (remaining >= 0 && remaining < toRead) toRead = (int)remaining;
+            int n = client.read(buf, toRead);
+            if (n > 0) {
+                file.write(buf, n);
+                if (remaining >= 0) remaining -= n;
+                lastData = millis();
+            }
+        } else {
+            if (millis() - lastData > 5000) {
+                Serial.println("[ERROR] getFile: stalled download for " + url);
+                break;
+            }
+            delay(2);
+        }
+        if (remaining == 0) break;
+    }
+    file.close();
+    client.stop();
+
+    if (remaining > 0) { // known length that we didn't fully receive
+        Serial.println("[ERROR] getFile: incomplete download for " + url);
+        LittleFS.remove(filename);
+        return false;
+    }
+
+    Serial.println("[INFO] getFile: downloaded " + url + " -> " + filename);
+    return true;
 }
 
 void listDir(fs::FS &fs, const char *dirname, uint8_t levels) {

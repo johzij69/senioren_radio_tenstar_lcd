@@ -22,6 +22,13 @@ void onMenuClose();
 
 void checkVolume();
 void DisplayTask(void *parameter);
+// PrioDlnaBrowser::PlayCallback target: starts playback of a DLNA track and
+// pushes its DIDL-Lite metadata (title/artist/album/albumArtURI) to the
+// display queue, reusing the same title/logo fields presets use. Defined in
+// main.cpp since that's where the persistent DisplayData/SendDataToDisplay()
+// state lives. Fields may be "?" (DLNA-not-present sentinel) or empty.
+void playDlnaTrack(const char* url, const char* title, const char* artist,
+                    const char* album, const char* albumArtURI);
 void spl(String mes);
 void cleanStreamTitle(struct DisplayData * data);
 void AdjustBackLight(Adafruit_VEML7700 veml);
