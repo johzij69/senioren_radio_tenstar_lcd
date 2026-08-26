@@ -6,24 +6,27 @@ PrioDateTime::PrioDateTime(int clkPin, int datPin, int rstPin)
     timeSynced = false;              // Standaard niet gesynchroniseerd
     _lastSyncTime = 0;               // Laatste synchronisatietijd (in milliseconden)
     _syncInterval = 1 * 3600 * 1000; // Synchroniseer elke 1 uur (1 uur * 3600 seconden * 1000 ms)
+    _mutex = xSemaphoreCreateMutex();
 }
 
 void PrioDateTime::begin()
 {
-    // Initialiseer de RTC
+    xSemaphoreTake(_mutex, portMAX_DELAY);
     _rtc.Begin();
-
     if (debug)
     {
         Serial.println("RTC initialiseren...");
         delay(5000); // Wacht 1 seconde voor de initialisatie
     }
+    bool wasValid = _rtc.IsDateTimeValid();
+    xSemaphoreGive(_mutex);
+
     // "Valid" alleen betekent dat de RTC-chip niet is gecrasht/leeg is - niet dat
     // de opgeslagen tijd ook klopt. Zonder deze onvoorwaardelijke sync bleef een
     // verlopen/verkeerd gezette RTC-tijd (bv. na een gemiste zomertijdwissel of
     // gewoon kristaldrift) onopgemerkt staan totdat iemand handmatig /api/synctime
     // aanriep - checkSync() in loop() ving dat pas na een vol uur op.
-    if (!_rtc.IsDateTimeValid())
+    if (!wasValid)
     {
         Serial.println("⛔ RTC heeft geen geldige tijd! Synchroniseren met NTP...");
     }
@@ -31,7 +34,7 @@ void PrioDateTime::begin()
     {
         Serial.println("✅ RTC heeft een geldige tijd, synchroniseer alsnog met NTP om drift/zomertijd te corrigeren...");
     }
-    syncTime();
+    syncTime(); // heeft zijn eigen lock rond het _rtc.SetDateTime() gedeelte, zie hieronder
 }
 
 void PrioDateTime::syncTime()
@@ -70,7 +73,9 @@ void PrioDateTime::syncTime()
             RtcDateTime compiledDateTime(
                 timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
                 timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+            xSemaphoreTake(_mutex, portMAX_DELAY);
             _rtc.SetDateTime(compiledDateTime);
+            xSemaphoreGive(_mutex);
             Serial.println("RTC bijgewerkt met NTP-tijd.");
             Serial.println("Tijd: " + String(timeinfo.tm_hour) + ":" + String(timeinfo.tm_min) + ":" + String(timeinfo.tm_sec));
             Serial.println("Datum: " + String(timeinfo.tm_mday) + "-" + String(timeinfo.tm_mon + 1) + "-" + String(timeinfo.tm_year + 1900));
@@ -97,24 +102,31 @@ bool PrioDateTime::isTimeSynced()
     return timeSynced;
 }
 
+// NB: still returns a pointer into the shared `buffer` member, so callers
+// must copy the result out (e.g. via strncpy) before any other task gets a
+// chance to call another get*() and overwrite it - the lock only guarantees
+// the RTC read + buffer write itself isn't torn by a concurrent call.
 char *PrioDateTime::getTime()
 {
+    xSemaphoreTake(_mutex, portMAX_DELAY);
     RtcDateTime now = _rtc.GetDateTime(); // Lees de tijd van de RTC
-
     snprintf(buffer, sizeof(buffer), "%02d:%02d", now.Hour(), now.Minute());
+    xSemaphoreGive(_mutex);
     return buffer;
 }
 
 char *PrioDateTime::getDate()
 {
+    xSemaphoreTake(_mutex, portMAX_DELAY);
     RtcDateTime now = _rtc.GetDateTime(); // Lees de datum van de RTC
-
     snprintf(buffer, sizeof(buffer), "%02d-%02d-%04d", now.Day(), now.Month(), now.Year());
+    xSemaphoreGive(_mutex);
     return buffer;
 }
 
 char *PrioDateTime::getDayDate()
 {
+    xSemaphoreTake(_mutex, portMAX_DELAY);
     RtcDateTime now = _rtc.GetDateTime();
 
     tm timeinfo = {};
@@ -132,15 +144,17 @@ char *PrioDateTime::getDayDate()
 
     snprintf(buffer, sizeof(buffer), "%s %02d-%02d-%04d",
              dayNames[dayIndex], now.Day(), now.Month(), now.Year());
+    xSemaphoreGive(_mutex);
     return buffer;
 }
 
 char *PrioDateTime::getDateTime()
 {
+    xSemaphoreTake(_mutex, portMAX_DELAY);
     RtcDateTime now = _rtc.GetDateTime(); // Lees datum en tijd van de RTC
-
     snprintf(buffer, sizeof(buffer), "%02d-%02d-%04d %02d:%02d",
              now.Day(), now.Month(), now.Year(), now.Hour(), now.Minute());
+    xSemaphoreGive(_mutex);
     return buffer;
 }
 

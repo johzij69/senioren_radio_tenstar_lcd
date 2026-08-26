@@ -5,6 +5,8 @@
 #include <RtcDS1302.h>
 #include <WiFi.h>
 #include <time.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 class PrioDateTime {
 public:
@@ -45,6 +47,13 @@ public:
 private:
     ThreeWire _threeWire; // ThreeWire-object voor communicatie met de RTC
     RtcDS1302<ThreeWire> _rtc; // RTC-object
+    // _rtc is bit-banged over shared GPIO pins and buffer is written by every
+    // get*() call below - both are touched from DisplayTask, the main loop
+    // task (updateClockDisplay(), CreateAndSendDisplayData(), playDlnaTrack())
+    // and the webserver task (/api/synctime), so every access needs to go
+    // through this mutex or two tasks racing on the same read/write can tear
+    // the buffer content or the RTC's bit-bang timing.
+    SemaphoreHandle_t _mutex;
 
     bool timeSynced; // Geeft aan of de tijd succesvol is gesynchroniseerd
     unsigned long _lastSyncTime; // Laatste synchronisatietijd (in milliseconden)

@@ -322,12 +322,25 @@ void handleInputPanelButton(int buttonIndex)
 // all) left the displayed clock frozen at whatever time that last incidental
 // update happened, growing further "behind" the longer nothing else changed.
 // This gives it its own independent tick, throttled to once a second like
-// checkAndRunAlarms() below, and only actually sends when the shown HH:MM
-// value changes so it doesn't spam the queue every second for nothing.
+// checkAndRunAlarms() below, and only actually sends when the minute changes
+// so it doesn't spam the queue every second for nothing.
+//
+// Deliberately does NOT call pDateTime.getTime() here: pDateTime bit-bangs the
+// RTC over shared GPIO pins and writes into one shared internal buffer for
+// every get*() call, and Task_Display.cpp already calls pDateTime.getTime()
+// on every DisplayQueue message it receives (DisplayTask). Calling it again
+// from this task raced with that read/write - most reproducibly right at the
+// instant the minute changes, since that's exactly when both tasks notice it
+// at once - and tore the buffer content (missing/garbled last character,
+// worst on the standby screen). time()/localtime_r() are backed by the
+// ESP-IDF's own NTP-synced system clock, not the RTC chip, so they're safe to
+// poll from any task; this only uses them to detect "a minute passed" and
+// then pokes the queue so DisplayTask's own (already-safe, single-task) RTC
+// read fires and refreshes the screen.
 void updateClockDisplay()
 {
     static unsigned long lastCheck = 0;
-    static String lastShown = "";
+    static int lastMinute = -1;
 
     unsigned long nowMs = millis();
     if (nowMs - lastCheck < 1000)
@@ -336,12 +349,12 @@ void updateClockDisplay()
     }
     lastCheck = nowMs;
 
-    String nowStr = pDateTime.getTime();
-    if (nowStr == lastShown) return;
-    lastShown = nowStr;
+    time_t now = time(nullptr);
+    struct tm timeinfo;
+    localtime_r(&now, &timeinfo);
+    if (timeinfo.tm_min == lastMinute) return;
+    lastMinute = timeinfo.tm_min;
 
-    strncpy(displayData.currenTime, nowStr.c_str(), sizeof(displayData.currenTime));
-    displayData.currenTime[sizeof(displayData.currenTime) - 1] = '\0';
     SendDataToDisplay();
 }
 
