@@ -45,15 +45,14 @@ void PrioDlnaClient::setCallbacks(InfoCallback info, ServerFoundCallback serverF
 }
 //------------------------------------------------------------------------------------------------
 bool PrioDlnaClient::seekServer(bool forceRescan) {
-    if (!forceRescan && loadServerCache()) {
-        m_state = IDLE;
-        if (_infoCallback) _infoCallback("DLNA-servers geladen uit cache");
-        if (_seekReadyCallback) _seekReadyCallback(m_dlnaServer.size);
-        return true;
-    }
-
-    if (WiFi.status() != WL_CONNECTED) return false; // guard
-
+    // m_chbuf isn't just an SSDP-response scratch buffer - srvPost() also
+    // sprintf()s the outgoing browse POST request into it. It must be at its
+    // full PSRAM-backed size (or 512B without PSRAM) before any browseServer()
+    // call can happen, whether we get there via a fresh scan or the cache
+    // fast-path below. This used to only run in the real-scan branch further
+    // down, so a cache hit skipped it entirely and left m_chbuf at its tiny
+    // 512-byte constructor size - srvPost() then overflowed it while building
+    // the POST request, corrupting the heap and crashing the board.
     if (m_chbuf) { free(m_chbuf); m_chbuf = nullptr; }
     if (!m_PSRAMfound) {
         m_chbuf = (char*)malloc(512);
@@ -62,6 +61,15 @@ bool PrioDlnaClient::seekServer(bool forceRescan) {
         m_chbuf = (char*)ps_malloc(4 * 4096);
         m_chbufSize = 4 * 4096;
     }
+
+    if (!forceRescan && loadServerCache()) {
+        m_state = IDLE;
+        if (_infoCallback) _infoCallback("DLNA-servers geladen uit cache");
+        if (_seekReadyCallback) _seekReadyCallback(m_dlnaServer.size);
+        return true;
+    }
+
+    if (WiFi.status() != WL_CONNECTED) return false; // guard
 
     dlnaServer_clear_and_shrink();
     m_dlnaServer.size = 0;
