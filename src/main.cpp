@@ -29,6 +29,7 @@ PrioRfReceiver rfReceiver(RF_RECEIVER_PIN);
 // Queues
 QueueHandle_t DisplayQueue = xQueueCreate(3, sizeof(DisplayData));
 QueueHandle_t AudioQueue = xQueueCreate(3, sizeof(AudioData));
+QueueHandle_t AudioEventQueue = xQueueCreate(4, sizeof(AudioEvent));
 QueueHandle_t DlnaCommandQueue = xQueueCreate(4, sizeof(DlnaCommand));
 QueueHandle_t DlnaEventQueue = xQueueCreate(4, sizeof(DlnaEvent));
 
@@ -442,7 +443,7 @@ void playDlnaTrack(const char* url, const char* title, const char* artist,
 {
     auto present = [](const char* s) { return s && s[0] != '\0' && strcmp(s, "?") != 0; };
 
-    playAudio(url);
+    playAudio(url, true);
 
     displayData.loadingState = false;
     displayData.standbyState = inStandby;

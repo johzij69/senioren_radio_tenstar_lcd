@@ -3,6 +3,7 @@
 #include "AlarmSetup.h"
 #include "PrioDlnaClient.h"
 #include "PrioDlnaBrowser.h"
+#include "Task_Audio.h"
 
 #include "AlarmManager.h"
 #include "UrlManager.h"
@@ -12,6 +13,11 @@ extern UrlManager UrlManagerInstance;
 // dlnaClient leeft en wordt uitsluitend gemuteerd op DlnaTask (Task_Dlna.cpp) -
 // hier alleen gebruikt om PrioDlnaBrowser's (read-only) resultaten op te laten halen.
 extern PrioDlnaClient dlnaClient;
+// Filled by Task_audio.cpp's audio_eof_stream() when a DLNA track finishes;
+// drained below to advance dlnaBrowser's auto-advance playlist. dlnaBrowser
+// should only ever be touched from this task, so the advance is handled here
+// rather than where the queue is filled.
+extern QueueHandle_t AudioEventQueue;
 
 PrioTft prioTft;
 bool isMenuActive = false;
@@ -180,6 +186,14 @@ void DisplayTask(void *parameter)
     
         // 1. BELANGRIJK: Update de button status voor debounce verwerking
         rotary_button.loop();
+
+        // Auto-advance: a DLNA track just reached its natural end.
+        AudioEvent audioEvt;
+        while (xQueueReceive(AudioEventQueue, &audioEvt, 0) == pdTRUE) {
+            if (audioEvt.type == AUDIO_EVT_TRACK_ENDED) {
+                dlnaBrowser.playNext();
+            }
+        }
 
         // === ALARM SETUP MODE ===
           // === ALARM SETUP MODE ===

@@ -8,11 +8,12 @@
 extern QueueHandle_t AudioQueue;
 extern EventGroupHandle_t taskEvents;
 
-void playAudio(const char *url)
+void playAudio(const char *url, bool isDlnaTrack)
 {
     AudioData data;
     data.command = CMD_PLAY;
     data.volume = last_volume;
+    data.isDlnaTrack = isDlnaTrack;
     strncpy(data.url, url ? url : "", sizeof(data.url));
     data.url[sizeof(data.url) - 1] = '\0';
     xQueueSend(AudioQueue, &data, portMAX_DELAY);

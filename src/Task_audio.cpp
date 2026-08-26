@@ -3,6 +3,29 @@
 #include "Task_Shared.h"
 #include "globals.h"
 
+extern QueueHandle_t AudioEventQueue;
+
+// Set on every CMD_PLAY, read by audio_eof_stream() below. audio_eof_stream()
+// fires for both live radio streams and DLNA file URLs (both go through
+// connecttohost()/processWebStream() - see Audio.cpp), so this flag is what
+// tells us whether "the stream ended" should trigger DLNA auto-advance or be
+// ignored (e.g. a radio stream that dropped its connection).
+static volatile bool s_currentIsDlna = false;
+
+// Weak callback provided by the Audio library (Audio.h) - fires once when a
+// stream reaches its natural end. stopSong()/reconnecting does NOT trigger
+// this (m_f_eof is only set from the byte-counted end-of-data path in
+// Audio.cpp), so it won't fire spuriously when the user or CMD_PLAY itself
+// stops the current stream to start a new one.
+void audio_eof_stream(const char* lastHost)
+{
+    (void)lastHost;
+    if (s_currentIsDlna) {
+        AudioEvent evt{ AUDIO_EVT_TRACK_ENDED };
+        xQueueSend(AudioEventQueue, &evt, 0);
+    }
+}
+
 void AudioTask(void *parameter)
 {
     Audio *audio;
@@ -37,6 +60,7 @@ void AudioTask(void *parameter)
             case CMD_PLAY:
                 Serial.printf("[AUDIO] CMD_PLAY - URL: '%s', Volume: %d\n", audioData.url, audioData.volume);
                 Serial.printf("[AUDIO] Current URL: '%s', Current Volume: %d\n", current_url, current_volume);
+                s_currentIsDlna = audioData.isDlnaTrack;
 
                 if (audioData.volume != current_volume)
                 {

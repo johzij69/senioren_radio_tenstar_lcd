@@ -92,6 +92,22 @@ void PrioDlnaBrowser::onButtonPress() {
             _currentObjectId = String(content.objectId[idx]);
             enterBrowse(_currentObjectId.c_str());
         } else if (strcmp(content.itemURL[idx], "?") != 0) {
+            // Snapshot every playable item in this folder as the auto-advance
+            // playlist, so a natural end-of-track can continue with the next
+            // one (see playNext()) even after this browser screen closes.
+            _playlistUrl.clear(); _playlistTitle.clear(); _playlistArtist.clear();
+            _playlistAlbum.clear(); _playlistAlbumArt.clear();
+            _playlistIndex = -1;
+            for (int i = 0; i < content.size; i++) {
+                if (strcmp(content.itemURL[i], "?") == 0) continue; // folder, not a track
+                if (i == idx) _playlistIndex = (int)_playlistUrl.size();
+                _playlistUrl.push_back(content.itemURL[i]);
+                _playlistTitle.push_back(content.title[i]);
+                _playlistArtist.push_back(content.artist[i]);
+                _playlistAlbum.push_back(content.album[i]);
+                _playlistAlbumArt.push_back(content.albumArtURI[i]);
+            }
+
             if (_playCallback) {
                 _playCallback(content.itemURL[idx], content.title[idx], content.artist[idx],
                               content.album[idx], content.albumArtURI[idx]);
@@ -138,6 +154,14 @@ void PrioDlnaBrowser::loop() {
         draw();
         _needsRedraw = false;
     }
+}
+
+void PrioDlnaBrowser::playNext() {
+    if (_playlistUrl.empty() || !_playCallback) return;
+    _playlistIndex = (_playlistIndex + 1) % (int)_playlistUrl.size();
+    _playCallback(_playlistUrl[_playlistIndex].c_str(), _playlistTitle[_playlistIndex].c_str(),
+                  _playlistArtist[_playlistIndex].c_str(), _playlistAlbum[_playlistIndex].c_str(),
+                  _playlistAlbumArt[_playlistIndex].c_str());
 }
 
 //------------------------------------------------------------------------------------------------

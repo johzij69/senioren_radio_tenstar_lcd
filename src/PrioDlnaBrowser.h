@@ -34,6 +34,14 @@ public:
     void onRotaryDelta(int delta);
     void loop();
 
+    // Called by DisplayTask when the currently playing DLNA track reaches its
+    // natural end (Task_audio's audio_eof_stream -> AudioEventQueue), so the
+    // player keeps going: advances to the next audio item from the folder the
+    // current track was chosen from, wrapping back to the first after the
+    // last. No-op if nothing was ever played from here (e.g. a preset/alarm
+    // stream is currently playing instead).
+    void playNext();
+
 private:
     enum Screen { SCREEN_STATUS, SCREEN_SERVERS, SCREEN_BROWSE };
 
@@ -76,6 +84,16 @@ private:
     int8_t _currentServerIndex = -1;
     std::vector<String> _folderStack; // parent objectIds, for "... Terug" navigation
     String _currentObjectId = "0";
+
+    // Auto-advance playlist: every audio item from the folder the most
+    // recently played track came from, snapshotted at play time (see
+    // onButtonPress()) so it stays valid even after the browser closes.
+    std::vector<String> _playlistUrl;
+    std::vector<String> _playlistTitle;
+    std::vector<String> _playlistArtist;
+    std::vector<String> _playlistAlbum;
+    std::vector<String> _playlistAlbumArt;
+    int _playlistIndex = -1;
 
     static constexpr int LIST_START_Y = 50;
     static constexpr int ITEM_HEIGHT = 40;
