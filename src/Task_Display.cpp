@@ -283,6 +283,22 @@ void DisplayTask(void *parameter)
                 dlnaBrowser.onRotaryDelta(dlnaDelta);
             }
 
+            // rotationCounter (above) is the properly decoupled source for list
+            // navigation, but PrioRotary::loop() also unconditionally bumps/clamps
+            // current_value (the volume value, bounded to [MIN_VOLUME, max_volume])
+            // on every tick regardless of what the knob is currently being used for.
+            // Section 3 below (the volume handler) does the same resync while the
+            // settings menu is open, which is what keeps last_volume_for_menu from
+            // ever falling behind - without doing it here too, scrolling a long DLNA
+            // list left current_value_changed stuck true and current_value drifted/
+            // clamped (often pinned at max_volume), and the very next loop iteration
+            // after the browser closed slammed that straight into last_volume/
+            // setAudioVolume() as a single huge jump (typically straight to max).
+            if (rotaryInstance.current_value_changed) {
+                last_volume_for_menu = rotaryInstance.current_value;
+                rotaryInstance.current_value_changed = false;
+            }
+
             dlnaBrowser.loop();
             vTaskDelay(10 / portTICK_PERIOD_MS);
             continue;
