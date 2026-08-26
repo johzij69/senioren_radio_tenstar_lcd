@@ -252,6 +252,7 @@ void loop()
     // is - samen met de onvoorwaardelijke sync in PrioDateTime::begin() - de enige
     // plek die de RTC-tijd periodiek corrigeert (drift, gemiste zomertijdwissel).
     pDateTime.checkSync();
+    updateClockDisplay();
     checkAndRunAlarms();
 
     if (!inStandby)
@@ -311,6 +312,37 @@ void handleInputPanelButton(int buttonIndex)
     {
         Serial.println("Onbekende button index: " + String(buttonIndex));
     }
+}
+
+// The on-screen clock was only ever refreshed as a side effect of
+// Task_Display.cpp receiving a DisplayQueue message for something else
+// (station/title/streamtitle/volume/alarm change) - see the strncpy right
+// before showTime() there. A station that doesn't send frequent ICY
+// StreamTitle updates (or standby, where nothing else touches the queue at
+// all) left the displayed clock frozen at whatever time that last incidental
+// update happened, growing further "behind" the longer nothing else changed.
+// This gives it its own independent tick, throttled to once a second like
+// checkAndRunAlarms() below, and only actually sends when the shown HH:MM
+// value changes so it doesn't spam the queue every second for nothing.
+void updateClockDisplay()
+{
+    static unsigned long lastCheck = 0;
+    static String lastShown = "";
+
+    unsigned long nowMs = millis();
+    if (nowMs - lastCheck < 1000)
+    {
+        return;
+    }
+    lastCheck = nowMs;
+
+    String nowStr = pDateTime.getTime();
+    if (nowStr == lastShown) return;
+    lastShown = nowStr;
+
+    strncpy(displayData.currenTime, nowStr.c_str(), sizeof(displayData.currenTime));
+    displayData.currenTime[sizeof(displayData.currenTime) - 1] = '\0';
+    SendDataToDisplay();
 }
 
 void checkAndRunAlarms()

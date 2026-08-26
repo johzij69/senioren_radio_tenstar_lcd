@@ -48,6 +48,7 @@ void resumeAudioTask();
 void playStream(int presetNumber);
 void handleInputPanelButton(int buttonIndex);
 void checkAndRunAlarms();
+void updateClockDisplay();
 void triggerAlarmPlayback(const AlarmManager::AlarmEntry &alarm, bool fromSnooze);
 void snoozeActiveAlarm();
 void refreshAlarmDisplayState(bool sendToDisplay = false);
