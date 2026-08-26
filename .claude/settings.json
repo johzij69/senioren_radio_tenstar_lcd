@@ -10,7 +10,8 @@
       "Bash(command -v pio)",
       "Bash(command -v platformio)",
       "Read(//usr/local/bin/**)",
-      "Bash(python3 -m platformio --version)"
+      "Bash(python3 -m platformio --version)",
+      "Bash(~/.platformio/penv/bin/pio run *)"
     ]
   }
 }

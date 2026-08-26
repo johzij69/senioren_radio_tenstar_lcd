@@ -1,4 +1,5 @@
 #include "PrioDlnaBrowser.h"
+#include "AudioControl.h"
 #include <string.h>
 
 extern QueueHandle_t DlnaCommandQueue;
@@ -8,8 +9,9 @@ extern QueueHandle_t DlnaEventQueue;
 // rest of the UI uses around its own redraws).
 extern unsigned long redrawLockoutTime;
 
-PrioDlnaBrowser::PrioDlnaBrowser(TFT_eSPI &tft, PrioDlnaClient &dlnaClient, PlayCallback playCallback)
-    : _tft(&tft), _dlna(&dlnaClient), _playCallback(playCallback) {
+PrioDlnaBrowser::PrioDlnaBrowser(TFT_eSPI &tft, PrioDlnaClient &dlnaClient, PlayCallback playCallback,
+                                 CancelledCallback cancelledCallback)
+    : _tft(&tft), _dlna(&dlnaClient), _playCallback(playCallback), _cancelledCallback(cancelledCallback) {
 }
 
 void PrioDlnaBrowser::sendCommand(const DlnaCommand &cmd) {
@@ -18,6 +20,13 @@ void PrioDlnaBrowser::sendCommand(const DlnaCommand &cmd) {
 
 //------------------------------------------------------------------------------------------------
 void PrioDlnaBrowser::start() {
+    // SSDP discovery and the SOAP browse requests are blocking network I/O on
+    // DlnaTask; sharing the WiFi radio/CPU with a decoding audio stream made
+    // it audibly stutter, so stop playback for the whole time the browser is
+    // open (search and folder browsing alike) and resume it in the cancel
+    // paths below if the user backs out without choosing a track.
+    stopAudio();
+
     _active = true;
     _screen = SCREEN_STATUS;
     _prevScreen = SCREEN_STATUS;
@@ -49,16 +58,21 @@ void PrioDlnaBrowser::stop() {
     _needsRedraw = false;
 }
 
+void PrioDlnaBrowser::cancel() {
+    if (_cancelledCallback) _cancelledCallback();
+    stop();
+}
+
 //------------------------------------------------------------------------------------------------
 void PrioDlnaBrowser::onButtonPress() {
     if (!_active) return;
 
-    if (_busy) { stop(); return; } // cancel while searching/loading
+    if (_busy) { cancel(); return; } // cancel while searching/loading
 
-    if (_screen == SCREEN_STATUS) { stop(); return; } // message screen (e.g. "no servers found")
+    if (_screen == SCREEN_STATUS) { cancel(); return; } // message screen (e.g. "no servers found")
 
     if (_screen == SCREEN_SERVERS) {
-        if (_selectedIndex == 0) { stop(); return; } // "... Terug" -> close browser
+        if (_selectedIndex == 0) { cancel(); return; } // "... Terug" -> close browser
         if (_selectedIndex == 1) { rescanServers(); return; } // "... Vernieuwen"
         PrioDlnaClient::dlnaServer_t servers = _dlna->getServer();
         int srvIdx = _selectedIndex - 2;

@@ -464,6 +464,18 @@ void playDlnaTrack(const char* url, const char* title, const char* artist,
     SendDataToDisplay();
 }
 
+// PrioDlnaBrowser::CancelledCallback: the browser stopped playback on open
+// (see PrioDlnaBrowser::start()) and closed again without a track chosen -
+// pick up where we left off. stream_index isn't touched by playDlnaTrack(),
+// so it still reflects the last favorite played even if DLNA tracks were
+// played in between.
+void resumePreviousStream()
+{
+    if (UrlManagerInstance.streamCount == 0) return; // no favorites configured
+    int idx = (stream_index >= 0 && stream_index < (int)UrlManagerInstance.streamCount) ? stream_index : 0;
+    playStream(idx);
+}
+
 /* Audio events */
 void audio_showstation(const char *info)
 {

@@ -23,8 +23,14 @@ class PrioDlnaBrowser {
 public:
     typedef void (*PlayCallback)(const char* url, const char* title, const char* artist,
                                   const char* album, const char* albumArtURI);
+    // Called when the browser closes without a track having been chosen (cancelled
+    // while searching/browsing, "no servers found", or "... Terug" from the server
+    // list) - wire this to something that resumes whatever was playing before the
+    // browser stopped it (see start()), e.g. the last-played favorite.
+    typedef void (*CancelledCallback)();
 
-    PrioDlnaBrowser(TFT_eSPI &tft, PrioDlnaClient &dlnaClient, PlayCallback playCallback);
+    PrioDlnaBrowser(TFT_eSPI &tft, PrioDlnaClient &dlnaClient, PlayCallback playCallback,
+                     CancelledCallback cancelledCallback);
 
     void start();
     void stop();
@@ -46,6 +52,11 @@ private:
     enum Screen { SCREEN_STATUS, SCREEN_SERVERS, SCREEN_BROWSE };
 
     void sendCommand(const DlnaCommand &cmd);
+    // Closes the browser WITHOUT a track chosen - invokes CancelledCallback (see
+    // start()'s stopAudio()) so playback resumes, then stop(). Kept distinct from
+    // the "track chosen" path in onButtonPress(), which calls stop() directly since
+    // _playCallback already started new playback there.
+    void cancel();
     void handleSeekReady(uint8_t numberOfServers);
     void handleBrowseReady(uint16_t numberReturned, uint16_t totalMatches);
 
@@ -68,6 +79,7 @@ private:
     TFT_eSPI* _tft;
     PrioDlnaClient* _dlna;
     PlayCallback _playCallback;
+    CancelledCallback _cancelledCallback;
 
     bool _active = false;
     bool _needsRedraw = true;

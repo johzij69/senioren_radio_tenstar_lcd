@@ -29,6 +29,11 @@ void DisplayTask(void *parameter);
 // state lives. Fields may be "?" (DLNA-not-present sentinel) or empty.
 void playDlnaTrack(const char* url, const char* title, const char* artist,
                     const char* album, const char* albumArtURI);
+// PrioDlnaBrowser::CancelledCallback target: resumes whatever preset was
+// playing before the DLNA browser stopped it (see PrioDlnaBrowser::start()),
+// falling back to the first favorite if none is known yet. Defined in
+// main.cpp, where stream_index/UrlManagerInstance/playStream() live.
+void resumePreviousStream();
 void spl(String mes);
 void cleanStreamTitle(struct DisplayData * data);
 void AdjustBackLight(Adafruit_VEML7700 veml);
