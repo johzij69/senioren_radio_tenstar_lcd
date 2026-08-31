@@ -1,4 +1,5 @@
 #include "PrioRotaryMenu.h"
+#include "generalHelpers.h"
 
 PrioRotaryMenu::PrioRotaryMenu(TFT_eSPI &tft) {
     _tft = &tft;
@@ -71,12 +72,14 @@ void PrioRotaryMenu::handleSelection() {
             _currentCategoryIndex = _selectedMainIndex - 1;
             _state = SUB_MENU;
             _selectedSubIndex = 0;
+            _scrollOffset = 0;
             _stateChanged = true;
             _needsRedraw = true;
         }
     } else if (_state == SUB_MENU) {
         if (_selectedSubIndex == 0) {
             _state = MAIN_MENU;
+            _scrollOffset = 0;
             _stateChanged = true;
             _needsRedraw = true;
         } else {
@@ -132,6 +135,7 @@ void PrioRotaryMenu::closeMenu() {
     _selectedMainIndex = 0;
     _selectedSubIndex = 0;
     _currentCategoryIndex = 0;
+    _scrollOffset = 0;
     _menuDelta = 0;
     restoreTextStyle();
     if (_closeCallback) {
@@ -176,54 +180,40 @@ void PrioRotaryMenu::drawFooter() {
     _tft->drawString("Draai = selecteer  |  Druk = open/kies", 240, 315);
 }
 
+void PrioRotaryMenu::drawListWindow(int selectedIndex, int total, const std::function<const char*(int)> &labelFor) {
+    updatePageOffset(selectedIndex, total, VISIBLE_ROWS, _scrollOffset);
+
+    for (int row = 0; row < VISIBLE_ROWS; row++) {
+        int idx = _scrollOffset + row;
+        int y = LIST_START_Y + row * ITEM_HEIGHT;
+        if (idx >= total) {
+            _tft->fillRect(10, y + 2, 460, ITEM_HEIGHT - 4, MENU_BG_COLOR);
+            continue;
+        }
+        drawMenuItem(y, ITEM_HEIGHT, labelFor(idx), idx == selectedIndex);
+    }
+}
+
 void PrioRotaryMenu::drawMainMenuItems() {
     JsonArray categories = _menuDoc.as<JsonArray>();
-    int startY = 50;
-    int itemHeight = 40;
-    int maxItems = (480 - startY) / itemHeight;
-    int count = 0;
+    int total = 1 + (int)categories.size();
 
-    if (count < maxItems) {
-        int y = startY + count * itemHeight;
-        bool isSelected = (count == _selectedMainIndex);
-        drawMenuItem(y, itemHeight, "... Terug", isSelected);
-        count++;
-    }
-
-    for (JsonObject category : categories) {
-        if (count >= maxItems) break;
-        const char* label = category["label"];
-        int y = startY + count * itemHeight;
-        bool isSelected = (count == _selectedMainIndex);
-        drawMenuItem(y, itemHeight, label, isSelected);
-        count++;
-    }
+    drawListWindow(_selectedMainIndex, total, [&](int idx) -> const char* {
+        if (idx == 0) return "... Terug";
+        return categories[idx - 1]["label"].as<const char*>();
+    });
 }
 
 void PrioRotaryMenu::drawSubMenuItems() {
     JsonArray categories = _menuDoc.as<JsonArray>();
     JsonObject category = categories[_currentCategoryIndex];
     JsonArray items = category["items"];
-    int startY = 50;
-    int itemHeight = 40;
-    int maxItems = (480 - startY) / itemHeight;
-    int count = 0;
+    int total = 1 + (int)items.size();
 
-    if (count < maxItems) {
-        int y = startY + count * itemHeight;
-        bool isSelected = (count == _selectedSubIndex);
-        drawMenuItem(y, itemHeight, "... Terug", isSelected);
-        count++;
-    }
-
-    for (JsonObject item : items) {
-        if (count >= maxItems) break;
-        const char* label = item["label"];
-        int y = startY + count * itemHeight;
-        bool isSelected = (count == _selectedSubIndex);
-        drawMenuItem(y, itemHeight, label, isSelected);
-        count++;
-    }
+    drawListWindow(_selectedSubIndex, total, [&](int idx) -> const char* {
+        if (idx == 0) return "... Terug";
+        return items[idx - 1]["label"].as<const char*>();
+    });
 }
 
 void PrioRotaryMenu::drawMenuItem(int y, int itemHeight, const char* label, bool selected) {

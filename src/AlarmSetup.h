@@ -55,6 +55,11 @@ private:
     int _selectedAlarmIndex = -1;
     int _selectedField = 0;
     int _listSelection = 0;
+    int _scrollOffset = 0;
+
+    static constexpr int LIST_START_Y = 50;
+    static constexpr int ITEM_HEIGHT = 40;
+    static constexpr int VISIBLE_ROWS = 6;
     
     // Partial redraw state
     int _prevListSelection = -1;

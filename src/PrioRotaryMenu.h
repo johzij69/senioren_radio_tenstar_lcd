@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <TFT_eSPI.h>
 #include <ArduinoJson.h>
+#include <functional>
 
 // Menu UI Colors
 #define MENU_BG_COLOR    TFT_BLACK
@@ -77,6 +78,11 @@ private:
     int _selectedMainIndex = 0;
     int _selectedSubIndex = 0;
     int _currentCategoryIndex = 0;
+    int _scrollOffset = 0;
+
+    static constexpr int LIST_START_Y = 50;
+    static constexpr int ITEM_HEIGHT = 40;
+    static constexpr int VISIBLE_ROWS = 6;
 
     SavedTextStyle _savedTextStyle;
 
@@ -94,6 +100,7 @@ private:
     void drawMainMenuItems();
     void drawSubMenuItems();
     void drawMenuItem(int y, int itemHeight, const char* label, bool selected);
+    void drawListWindow(int selectedIndex, int total, const std::function<const char*(int)> &labelFor);
     
 };
 

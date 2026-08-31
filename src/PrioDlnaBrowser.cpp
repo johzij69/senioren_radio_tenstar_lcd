@@ -1,5 +1,6 @@
 #include "PrioDlnaBrowser.h"
 #include "AudioControl.h"
+#include "generalHelpers.h"
 #include <string.h>
 
 extern QueueHandle_t DlnaCommandQueue;
@@ -186,20 +187,7 @@ int PrioDlnaBrowser::itemCount() const {
 }
 
 bool PrioDlnaBrowser::updateScrollOffset(int total) {
-    int oldOffset = _scrollOffset;
-
-    if (_selectedIndex >= _scrollOffset + VISIBLE_ROWS) {
-        // Vooruit voorbij de onderste regel: volgende pagina, selectie bovenaan.
-        _scrollOffset = _selectedIndex;
-    } else if (_selectedIndex < _scrollOffset) {
-        // Terug voorbij de bovenste regel: vorige pagina, selectie onderaan.
-        _scrollOffset = _selectedIndex - VISIBLE_ROWS + 1;
-    }
-
-    if (_scrollOffset > total - 1) _scrollOffset = total - 1;
-    if (_scrollOffset < 0) _scrollOffset = 0;
-
-    return oldOffset != _scrollOffset;
+    return updatePageOffset(_selectedIndex, total, VISIBLE_ROWS, _scrollOffset);
 }
 
 void PrioDlnaBrowser::enterServerList() {

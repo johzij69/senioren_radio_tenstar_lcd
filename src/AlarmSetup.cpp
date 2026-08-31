@@ -1,4 +1,5 @@
 #include "AlarmSetup.h"
+#include "generalHelpers.h"
 
 static String alarmModeToString(AlarmManager::RepeatMode mode) {
     switch (mode) {
@@ -19,6 +20,7 @@ void AlarmSetup::start() {
     _prevScreen = SCREEN_LIST;
     _listSelection = 0;
     _prevListSelection = -1;
+    _scrollOffset = 0;
     _selectedAlarmIndex = -1;
     _selectedField = 0;
     _prevField = -1;
@@ -195,29 +197,41 @@ void AlarmSetup::drawHeader(const char* title) {
 }
 
 void AlarmSetup::drawAlarmList(bool fullRedraw) {
-    if (fullRedraw) {
-        drawHeader("Alarmen");
-        int totalItems = _alarmMgr->getCount() + 2;
-        for (int i = 0; i < totalItems && i < 10; i++) {
-            drawAlarmListItem(i, (i == _listSelection));
+    int totalItems = _alarmMgr->getCount() + 2;
+    bool pageChanged = updatePageOffset(_listSelection, totalItems, VISIBLE_ROWS, _scrollOffset);
+
+    if (fullRedraw) drawHeader("Alarmen");
+
+    if (fullRedraw || pageChanged) {
+        for (int row = 0; row < VISIBLE_ROWS; row++) {
+            int idx = _scrollOffset + row;
+            if (idx < totalItems) {
+                drawAlarmListItem(idx, (idx == _listSelection));
+            } else {
+                int y = LIST_START_Y + row * ITEM_HEIGHT;
+                _tft->fillRect(10, y + 2, 460, ITEM_HEIGHT - 4, BG_COLOR);
+            }
         }
+    } else if (_prevListSelection != _listSelection && _prevListSelection >= 0) {
+        drawAlarmListItem(_prevListSelection, false);
+        drawAlarmListItem(_listSelection, true);
+    }
+
+    if (fullRedraw) {
         _tft->setTextColor(TFT_LIGHTGREY, BG_COLOR);
         _tft->setTextDatum(BC_DATUM);
         _tft->setTextSize(1);
         _tft->drawString("Draai = selecteer  |  Druk = bewerk  |  Lang = terug", 240, 315);
-    } else {
-        if (_prevListSelection != _listSelection && _prevListSelection >= 0) {
-            drawAlarmListItem(_prevListSelection, false);
-            drawAlarmListItem(_listSelection, true);
-        }
     }
 }
 
 void AlarmSetup::drawAlarmListItem(int index, bool selected) {
+    int row = index - _scrollOffset;
+    if (row < 0 || row >= VISIBLE_ROWS) return;
+
     int alarmCount = _alarmMgr->getCount();
-    int startY = 50;
-    int itemHeight = 40;
-    int y = startY + index * itemHeight;
+    int y = LIST_START_Y + row * ITEM_HEIGHT;
+    int itemHeight = ITEM_HEIGHT;
     
     _tft->fillRect(10, y + 2, 460, itemHeight - 4, selected ? HIGHLIGHT_COLOR : BG_COLOR);
     _tft->setTextFont(1);        // <-- TOEVOEGEN

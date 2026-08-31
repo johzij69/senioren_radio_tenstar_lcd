@@ -50,6 +50,22 @@ void enableTlsPsramAllocator()
                   (unsigned)TLS_PSRAM_THRESHOLD, (unsigned)ESP.getFreePsram());
 }
 
+bool updatePageOffset(int selectedIndex, int totalItems, int visibleRows, int &scrollOffset)
+{
+    int oldOffset = scrollOffset;
+
+    if (selectedIndex >= scrollOffset + visibleRows) {
+        scrollOffset = selectedIndex;
+    } else if (selectedIndex < scrollOffset) {
+        scrollOffset = selectedIndex - visibleRows + 1;
+    }
+
+    if (scrollOffset > totalItems - 1) scrollOffset = totalItems - 1;
+    if (scrollOffset < 0) scrollOffset = 0;
+
+    return oldOffset != scrollOffset;
+}
+
 void searchAndReplace(String *htmlString, String findPattern, String replaceWith)
 {
   int index = 0;
