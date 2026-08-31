@@ -136,7 +136,7 @@ void PrioTft::showTime(const String &time, const String &dayDate)
 {
     const int areaX = 185;
     const int areaW = tft.width() - (pBar.width_set + areaX);
-    const int timeY = 55; // 5 px onder de bovenkant van de cover art
+    const int timeY = 60;
 
     tft.setTextDatum(TL_DATUM);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
