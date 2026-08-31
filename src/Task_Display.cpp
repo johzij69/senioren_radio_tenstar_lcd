@@ -241,8 +241,7 @@ void DisplayTask(void *parameter)
             if (btnRaw && !btnHandled && (millis() - btnDownTime >= 800)) {
                 btnHandled = true;
                 Serial.println("AlarmSetup: lange druk, terug naar player");
-                alarmSetup.stop();
-                onMenuClose();
+                alarmSetup.stop(); // onMenuClose() volgt hieronder zodra isActive() false is
             }
             
             btnPrevRaw = btnRaw;
@@ -257,8 +256,10 @@ void DisplayTask(void *parameter)
             alarmSetup.loop();
             vTaskDelay(10 / portTICK_PERIOD_MS);
             continue;
-        } else {
+        } else if (wasAlarmActive) {
+            // AlarmSetup is net gesloten ("... Terug" of lange druk): speler-UI weer opbouwen
             wasAlarmActive = false;
+            onMenuClose();
         }
         // === EINDE ALARM SETUP MODE ===
 
