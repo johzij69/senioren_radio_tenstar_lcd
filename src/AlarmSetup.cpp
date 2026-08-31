@@ -1,6 +1,8 @@
 #include "AlarmSetup.h"
 #include "generalHelpers.h"
 
+void refreshAlarmDisplayState(bool sendToDisplay); // main.cpp
+
 static String alarmModeToString(AlarmManager::RepeatMode mode) {
     switch (mode) {
         case AlarmManager::REPEAT_WEEKDAYS: return "weekdays";
@@ -412,6 +414,7 @@ void AlarmSetup::saveAlarm() {
     String errorMsg;
     bool ok = _alarmMgr->updateFromJson((uint8_t*)jsonStr.c_str(), jsonStr.length(), _urlMgr->streamCount, errorMsg);
     Serial.println(ok ? "AlarmSetup: opgeslagen" : "AlarmSetup: fout " + errorMsg);
+    refreshAlarmDisplayState(true);
 }
 
 void AlarmSetup::deleteAlarm() {
@@ -443,6 +446,7 @@ void AlarmSetup::deleteAlarm() {
     serializeJson(doc, jsonStr);
     String errorMsg;
     _alarmMgr->updateFromJson((uint8_t*)jsonStr.c_str(), jsonStr.length(), _urlMgr->streamCount, errorMsg);
+    refreshAlarmDisplayState(true);
 }
 
 const char* AlarmSetup::getRepeatLabel(AlarmManager::RepeatMode mode) {

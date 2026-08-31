@@ -94,10 +94,9 @@ void setup()
         Serial.println("Event group aangemaakt.");
     }
     Serial.println("Starting tasks");
-        refreshAlarmDisplayState();
 
     displayData.loadingState = true; // Set loading state to true initially
-    strncpy(displayData.alarmState, "Geen alarm", sizeof(displayData.alarmState));
+    refreshAlarmDisplayState(); // definitieve status volgt na alarmManager.begin()
     xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
     startDisplayTask();
 
@@ -175,6 +174,7 @@ void setup()
 
         myPrefs.begin();
         alarmManager.begin();
+        refreshAlarmDisplayState(); // pas nu zijn de opgeslagen alarmen bekend
         alarmSnoozeButtonIndex = (uint8_t)myPrefs.getUInt("snooze_btn_idx", 10);
         if (alarmSnoozeButtonIndex > 15)
         {
@@ -662,7 +662,7 @@ void resumeAudioTask()
 void playStream(int preset)
 {
     alarmManager.stopRinging();
-    strncpy(displayData.alarmState, "Geen alarm", sizeof(displayData.alarmState));
+    refreshAlarmDisplayState();
     Serial.println("Switching to stream: " + String(preset));
     stream_index = preset;
 //    playAudio(UrlManagerInstance.Streams[stream_index].url.c_str(), rotaryInstance.current_value);
