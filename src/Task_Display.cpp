@@ -127,6 +127,7 @@ void DisplayTask(void *parameter)
     String prevAlarmState = "";
     String prevTime = "";
     String prevDate = "";
+    unsigned long lastClockRefresh = 0;
 
 
     /* Rotary button */
@@ -370,6 +371,27 @@ void DisplayTask(void *parameter)
         myMenu.loop();
         rotaryInstance.loop();  
 
+        // The RTC is the source that is rendered, so refresh from it directly
+        // instead of depending on a queue message timed from the system clock.
+        if (!isMenuActive && !alarmSetup.isActive() && !dlnaBrowser.isActive() &&
+            millis() - lastClockRefresh >= 1000) {
+            lastClockRefresh = millis();
+            strncpy(_displayData.currenTime, pDateTime.getTime(), sizeof(_displayData.currenTime));
+            _displayData.currenTime[sizeof(_displayData.currenTime) - 1] = '\0';
+            strncpy(_displayData.currenDate, pDateTime.getDayDate(), sizeof(_displayData.currenDate));
+            _displayData.currenDate[sizeof(_displayData.currenDate) - 1] = '\0';
+
+            if (prevTime != _displayData.currenTime || prevDate != _displayData.currenDate) {
+                if (_displayData.standbyState) {
+                    prioTft.showStandbyTime(_displayData.currenTime, _displayData.currenDate);
+                } else {
+                    prioTft.showTime(_displayData.currenTime, _displayData.currenDate);
+                }
+                prevTime = _displayData.currenTime;
+                prevDate = _displayData.currenDate;
+            }
+        }
+
         if (forcePlayerRedraw && !alarmSetup.isActive() && !dlnaBrowser.isActive()) {
             forcePlayerRedraw = false;
 
@@ -382,6 +404,10 @@ void DisplayTask(void *parameter)
             prioTft.setStreamTitle(_displayData.streamtitle);
             prioTft.setAlarmState(_displayData.alarmState);
             prioTft.setLogo(_displayData.logo);
+            strncpy(_displayData.currenTime, pDateTime.getTime(), sizeof(_displayData.currenTime));
+            _displayData.currenTime[sizeof(_displayData.currenTime) - 1] = '\0';
+            strncpy(_displayData.currenDate, pDateTime.getDayDate(), sizeof(_displayData.currenDate));
+            _displayData.currenDate[sizeof(_displayData.currenDate) - 1] = '\0';
             prioTft.showTime(_displayData.currenTime, _displayData.currenDate);
             prioTft.setVolume(last_volume); // Gebruik de lokale actuele volume
 
@@ -423,7 +449,13 @@ void DisplayTask(void *parameter)
                 {
                     inStandby = true; // Zet de standby status
                     fromStandby = true; // Zet de fromStandby status
+                    strncpy(_displayData.currenTime, pDateTime.getTime(), sizeof(_displayData.currenTime));
+                    _displayData.currenTime[sizeof(_displayData.currenTime) - 1] = '\0';
+                    strncpy(_displayData.currenDate, pDateTime.getDayDate(), sizeof(_displayData.currenDate));
+                    _displayData.currenDate[sizeof(_displayData.currenDate) - 1] = '\0';
                     prioTft.showStandbyTime(_displayData.currenTime, _displayData.currenDate);
+                    prevTime = _displayData.currenTime;
+                    prevDate = _displayData.currenDate;
                     Serial.println("Display: Standby state active");
                 }
                 else
