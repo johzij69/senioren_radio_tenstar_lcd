@@ -1,6 +1,8 @@
 #include "PrioRotaryMenu.h"
 #include "generalHelpers.h"
 
+extern unsigned long redrawLockoutTime; // Task_Display.cpp
+
 PrioRotaryMenu::PrioRotaryMenu(TFT_eSPI &tft) {
     _tft = &tft;
 }
@@ -155,6 +157,7 @@ void PrioRotaryMenu::drawMenu() {
         }
         drawFooter();
         _stateChanged = false;
+        redrawLockoutTime = millis(); // grote SPI-transactie kan EMI-ruis op de knop-pin geven
     }
     if (_state == MAIN_MENU) {
         drawMainMenuItems();
