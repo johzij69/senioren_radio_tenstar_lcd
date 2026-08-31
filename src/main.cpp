@@ -385,6 +385,17 @@ void checkAndRunAlarms()
     if (alarmManager.poll(now, alarm, fromSnooze))
     {
         triggerAlarmPlayback(alarm, fromSnooze);
+        return;
+    }
+
+    // Het getoonde tijdstip verschuift zodra een alarm voorbij is, dus periodiek herzien.
+    char statusText[sizeof(displayData.alarmState)];
+    alarmManager.getDisplayStatusText(now, statusText, sizeof(statusText));
+    if (strncmp(statusText, displayData.alarmState, sizeof(statusText)) != 0)
+    {
+        strncpy(displayData.alarmState, statusText, sizeof(displayData.alarmState));
+        displayData.alarmState[sizeof(displayData.alarmState) - 1] = '\0';
+        SendDataToDisplay();
     }
 }
 
@@ -437,8 +448,7 @@ void snoozeActiveAlarm()
 
 void refreshAlarmDisplayState(bool sendToDisplay)
 {
-    strncpy(displayData.alarmState, alarmManager.getDisplayStatusLabel(), sizeof(displayData.alarmState));
-    displayData.alarmState[sizeof(displayData.alarmState) - 1] = '\0';
+    alarmManager.getDisplayStatusText(time(nullptr), displayData.alarmState, sizeof(displayData.alarmState));
 
     if (sendToDisplay)
     {

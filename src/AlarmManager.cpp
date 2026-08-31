@@ -393,11 +393,104 @@ const char *AlarmManager::getDisplayStatusLabel() const
     return "Geen alarm";
 }
 
+bool AlarmManager::getNextAlarm(time_t now, AlarmEntry &alarmOut, time_t &whenOut) const
+{
+    tm nowInfo = {};
+    localtime_r(&now, &nowInfo);
+
+    bool found = false;
+    time_t best = 0;
+
+    for (uint8_t i = 0; i < alarmCount; i++)
+    {
+        const AlarmEntry &alarm = alarms[i];
+        if (!alarm.enabled)
+        {
+            continue;
+        }
+
+        // Maximaal 8 dagen vooruit: dekt ook een wekelijks alarm dat vandaag al voorbij is.
+        for (int dayOffset = 0; dayOffset < 8; dayOffset++)
+        {
+            tm candidate = nowInfo;
+            candidate.tm_mday += dayOffset;
+            candidate.tm_hour = alarm.hour;
+            candidate.tm_min = alarm.minute;
+            candidate.tm_sec = 0;
+            candidate.tm_isdst = -1;
+
+            time_t when = mktime(&candidate);
+            if (when == (time_t)-1 || when <= now)
+            {
+                continue;
+            }
+            if (!isDayActiveForAlarm(alarm, static_cast<uint8_t>(candidate.tm_wday)))
+            {
+                continue;
+            }
+
+            if (!found || when < best)
+            {
+                found = true;
+                best = when;
+                alarmOut = alarm;
+            }
+            break;
+        }
+    }
+
+    whenOut = best;
+    return found;
+}
+
+void AlarmManager::getDisplayStatusText(time_t now, char *buf, size_t len) const
+{
+    if (!buf || len == 0)
+    {
+        return;
+    }
+
+    if (alarmRinging)
+    {
+        snprintf(buf, len, "Alarm actief");
+        return;
+    }
+
+    if (snoozePending)
+    {
+        snprintf(buf, len, "Snooze wacht");
+        return;
+    }
+
+    AlarmEntry next;
+    time_t when = 0;
+    if (getNextAlarm(now, next, when))
+    {
+        tm nowInfo = {};
+        tm whenInfo = {};
+        localtime_r(&now, &nowInfo);
+        localtime_r(&when, &whenInfo);
+
+        if (whenInfo.tm_yday == nowInfo.tm_yday && whenInfo.tm_year == nowInfo.tm_year)
+        {
+            snprintf(buf, len, "%02d:%02d", whenInfo.tm_hour, whenInfo.tm_min);
+        }
+        else
+        {
+            static const char *dayNames[] = {"Zo", "Ma", "Di", "Wo", "Do", "Vr", "Za"};
+            uint8_t dayIndex = (whenInfo.tm_wday >= 0 && whenInfo.tm_wday <= 6) ? (uint8_t)whenInfo.tm_wday : 0;
+            snprintf(buf, len, "%s %02d:%02d", dayNames[dayIndex], whenInfo.tm_hour, whenInfo.tm_min);
+        }
+        return;
+    }
+
+    snprintf(buf, len, "Geen alarm");
+}
+
 uint8_t AlarmManager::getCount() const
 {
     return alarmCount;
 }
-
 const AlarmManager::AlarmEntry *AlarmManager::getAlarms() const
 {
     return alarms;

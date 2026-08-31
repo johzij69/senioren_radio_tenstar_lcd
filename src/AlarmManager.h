@@ -58,6 +58,10 @@ public:
     RuntimeStatus getRuntimeStatus() const;
     const char *getRuntimeStatusLabel() const;
     const char *getDisplayStatusLabel() const;
+    // Statusregel voor het display: "Alarm actief", "Snooze wacht", het tijdstip van
+    // het eerstvolgende alarm ("07:00" vandaag, anders "Ma 07:00") of "Geen alarm".
+    void getDisplayStatusText(time_t now, char *buf, size_t len) const;
+    bool getNextAlarm(time_t now, AlarmEntry &alarmOut, time_t &whenOut) const;
 
     uint8_t getCount() const;
     const AlarmEntry *getAlarms() const;
