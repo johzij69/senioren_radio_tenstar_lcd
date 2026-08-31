@@ -63,6 +63,9 @@ void setup()
 {
     Serial.begin(115200); // Initialize serial communication
 
+    // Moet vóór elke TLS-verbinding gebeuren
+    enableTlsPsramAllocator();
+
     // Zorg er voor dat de RGB led op board uit is en blijft
     // Als je de pin laag zet is er altijd kans dat deze ruis opakt waardoor de led aan gaat!
     strip.begin(); // Initialiseer de strip

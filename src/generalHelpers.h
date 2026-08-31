@@ -5,5 +5,6 @@
 void printTaskCore(TaskHandle_t taskHandle, const char *taskName);
 void printBinary(int v, int num_places);  
 void searchAndReplace(String *htmlString, String findPattern, String replaceWith);
+void enableTlsPsramAllocator();
 
 #endif

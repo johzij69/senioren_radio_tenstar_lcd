@@ -1,4 +1,54 @@
 # include "generalHelpers.h"
+#include <esp_heap_caps.h>
+#include <mbedtls/platform.h>
+
+// Blokken vanaf deze grootte gaan naar PSRAM; kleintjes blijven intern zodat de
+// (tragere) PSRAM-toegang de TLS-handshake niet onnodig vertraagt.
+static const size_t TLS_PSRAM_THRESHOLD = 512;
+
+// De Arduino-core is gebouwd met CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC, dus mbedTLS
+// eist standaard intern RAM (~36 kB per verbinding) en faalt met -32512 zodra de
+// interne heap gefragmenteerd raakt. De precompiled lib laat zich niet
+// herconfigureren, maar mbedtls_calloc/free zijn function pointers.
+static void *tlsPsramCalloc(size_t n, size_t size)
+{
+    size_t total = 0;
+    if (__builtin_mul_overflow(n, size, &total) || total == 0) {
+        return nullptr;
+    }
+
+    void *ptr = nullptr;
+    if (total >= TLS_PSRAM_THRESHOLD) {
+        ptr = heap_caps_calloc(n, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    }
+    if (!ptr) {
+        ptr = heap_caps_calloc(n, size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    }
+    return ptr;
+}
+
+static void tlsPsramFree(void *ptr)
+{
+    if (ptr) {
+        heap_caps_free(ptr);
+    }
+}
+
+void enableTlsPsramAllocator()
+{
+    if (!psramFound()) {
+        Serial.println("[MEM] Geen PSRAM gevonden, TLS blijft interne heap gebruiken");
+        return;
+    }
+
+    if (mbedtls_platform_set_calloc_free(tlsPsramCalloc, tlsPsramFree) != 0) {
+        Serial.println("[MEM] Kon mbedTLS allocator niet omzetten naar PSRAM");
+        return;
+    }
+
+    Serial.printf("[MEM] mbedTLS allocaties >= %u bytes gaan naar PSRAM (%u bytes vrij)\n",
+                  (unsigned)TLS_PSRAM_THRESHOLD, (unsigned)ESP.getFreePsram());
+}
 
 void searchAndReplace(String *htmlString, String findPattern, String replaceWith)
 {
