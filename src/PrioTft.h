@@ -27,6 +27,11 @@ public:
     int last_volume = 10; // Laatst ingestelde volume waarde
     int cur_volume = 0; // Huidige volume waarde
     int kantline = 25 ;
+
+    // Klokkolom rechts van de cover art: tijd, daaronder de datum, daaronder het alarm.
+    static constexpr int CLOCK_AREA_X = 185;
+    static constexpr int CLOCK_TIME_Y = 60;
+    static constexpr int CLOCK_GAP = 10;
     
     PrioTft();
     void begin(); // Initialiseer het scherm
@@ -44,6 +49,9 @@ public:
     void prepLogoLine(int lineNumber);
     void clearGreenLine(int lineNumber);
     void showTime(const String &time, const String &dayDate);
+    int clockAreaWidth();
+    int clockDateY();
+    int clockAlarmY();
     void drawParaLine(const String &text, int startY);
     void showLoadingState();
     void showStandbyState();

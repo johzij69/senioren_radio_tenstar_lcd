@@ -86,10 +86,18 @@ void PrioTft::setTitle(const String &title)
 
 void PrioTft::setAlarmState(const String &state)
 {
-    prepLine(11);
+    const int areaW = clockAreaWidth();
+    const int y = clockAlarmY();
+
+    tft.setTextFont(4);
+    tft.setTextSize(1);
+    tft.setTextDatum(TC_DATUM);
     tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-    String truncatedState = truncateStringToFit("Alarm: " + state, tft.width() - (pBar.width_set + kantline));
-    tft.println(truncatedState);
+    tft.fillRect(CLOCK_AREA_X, y, areaW, tft.fontHeight(), TFT_BLACK);
+    tft.drawString(truncateStringToFit("Alarm: " + state, areaW - 10), CLOCK_AREA_X + areaW / 2, y);
+
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
 }
 
 void PrioTft::setStreamTitle(const String &streamTitle)
@@ -132,11 +140,32 @@ void PrioTft::setLogo(const String &url)
     sLogo.Show(kantline, 50, url);
 }
 
+int PrioTft::clockAreaWidth()
+{
+    return tft.width() - (pBar.width_set + CLOCK_AREA_X);
+}
+
+int PrioTft::clockDateY()
+{
+    tft.setTextFont(8);
+    tft.setTextSize(1);
+    return CLOCK_TIME_Y + tft.fontHeight() + CLOCK_GAP;
+}
+
+int PrioTft::clockAlarmY()
+{
+    int y = clockDateY();
+    tft.setFreeFont(FSS18);
+    y += tft.fontHeight() + 6;
+    tft.setTextFont(4);
+    return y;
+}
+
 void PrioTft::showTime(const String &time, const String &dayDate)
 {
-    const int areaX = 185;
-    const int areaW = tft.width() - (pBar.width_set + areaX);
-    const int timeY = 70;
+    const int areaX = CLOCK_AREA_X;
+    const int areaW = clockAreaWidth();
+    const int timeY = CLOCK_TIME_Y;
 
     tft.setTextDatum(TL_DATUM);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -145,7 +174,7 @@ void PrioTft::showTime(const String &time, const String &dayDate)
     tft.fillRect(areaX, timeY, areaW, tft.fontHeight(), TFT_BLACK);
     tft.drawString(time, areaX, timeY);
 
-    const int dateY = timeY + tft.fontHeight() + 10;
+    const int dateY = clockDateY();
 
     tft.setFreeFont(FSS18);
     tft.setTextDatum(TC_DATUM);
