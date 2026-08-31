@@ -1,4 +1,5 @@
 #include "PrioTft.h"
+#include "Free_Fonts.h"
 
 
 PrioTft::PrioTft() : tft(), pBar(&tft), sLogo(&tft), max_volume(30), last_volume(10), cur_volume(0), isInitialized(false), sTitle(tft, 20, 60, 100, 450, FM12)
@@ -179,25 +180,17 @@ void PrioTft::showStandbyTime(const String &time, const String &dayDate)
     const int centerX = tft.width() / 2;
     const int centerY = tft.height() / 2;
     const int timeY = centerY - 18;
-    const int dateY = tft.height() - 8;
 
     const String fontFilePath = String("/") + TIME_FONT_LARGE_PATH + ".vlw";
-    const String smallFontFilePath = String("/") + TIME_FONT_SMALL_PATH + ".vlw";
     bool fontAvailable = LittleFS.exists(fontFilePath);
+    int dateY = 0;
     if (fontAvailable)
     {
         tft.unloadFont(); // Clear any existing font
         tft.loadFont(TIME_FONT_LARGE_PATH, LittleFS);
         tft.drawString(time, centerX, timeY);
+        dateY = timeY + tft.fontHeight() / 2 + 12;
         tft.unloadFont();
-
-        tft.setTextDatum(BC_DATUM);
-        if (LittleFS.exists(smallFontFilePath)) {
-            tft.loadFont(TIME_FONT_SMALL_PATH, LittleFS);
-            String compactDayDate = truncateStringToFit(dayDate, tft.width() - 20);
-            tft.drawString(compactDayDate, centerX, dateY);
-            tft.unloadFont();
-        } 
     }
     else
     {
@@ -212,13 +205,16 @@ void PrioTft::showStandbyTime(const String &time, const String &dayDate)
         tft.setTextFont(8);
         tft.setTextSize(2);
         tft.drawString(time, centerX, timeY);
-
-        tft.setTextDatum(BC_DATUM);
-        tft.setTextFont(2);
+        dateY = timeY + tft.fontHeight() + 12;
         tft.setTextSize(1);
-        String compactDayDate = truncateStringToFit(dayDate, tft.width() - 20);
-        tft.drawString(compactDayDate, centerX, dateY);
     }
+
+    // Smooth fonts negeren setTextSize, dus de datum gebruikt een GFX-font (~36 px,
+    // ruim anderhalf keer de oude Oswald24) net onder de klok i.p.v. onderaan.
+    tft.setTextDatum(TC_DATUM);
+    tft.setFreeFont(FSS18);
+    String compactDayDate = truncateStringToFit(dayDate, tft.width() - 20);
+    tft.drawString(compactDayDate, centerX, dateY);
 
     tft.setTextDatum(MC_DATUM);
     tft.setTextFont(4);
