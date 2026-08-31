@@ -1,5 +1,7 @@
 #include "PrioWebServer.h"
 
+static const char *WEBSERVER_ENABLED_KEY = "websrv_on";
+
 void refreshAlarmDisplayState(bool sendToDisplay);
 
 PrioWebServer::PrioWebServer(UrlManager &urlManager, AlarmManager &alarmManager, MyPreferences &preferences, int port)
@@ -148,6 +150,40 @@ void PrioWebServer::begin()
       );
      
   server.begin();
+  running = true;
+
+  if (preferences.readValue(WEBSERVER_ENABLED_KEY, 1) == 0)
+  {
+    Serial.println("Webserver blijft uit (opgeslagen instelling)");
+    server.end();
+    running = false;
+  }
+}
+
+void PrioWebServer::setEnabled(bool enabled)
+{
+  preferences.writeValue(WEBSERVER_ENABLED_KEY, enabled ? 1 : 0);
+
+  if (enabled == running)
+  {
+    return;
+  }
+
+  if (enabled)
+  {
+    server.begin();
+  }
+  else
+  {
+    server.end();
+  }
+  running = enabled;
+  Serial.println(enabled ? "Webserver gestart" : "Webserver gestopt");
+}
+
+bool PrioWebServer::isRunning() const
+{
+  return running;
 }
 void PrioWebServer::onBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
 {

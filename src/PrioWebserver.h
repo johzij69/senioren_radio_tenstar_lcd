@@ -21,11 +21,16 @@ public:
   PrioWebServer(UrlManager &urlManager, AlarmManager &alarmManager, MyPreferences &preferences, int port);
 
   void begin();
+  // Zet de listener aan/uit zonder de handlers opnieuw te registreren; de stand
+  // wordt bewaard en bij begin() weer toegepast.
+  void setEnabled(bool enabled);
+  bool isRunning() const;
   String ip;
   
 
 private:
   AsyncWebServer server;
+  bool running = false;
   UrlManager &urlManager;
   AlarmManager &alarmManager;
   MyPreferences &preferences;

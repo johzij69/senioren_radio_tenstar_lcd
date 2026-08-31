@@ -7,9 +7,11 @@
 
 #include "AlarmManager.h"
 #include "UrlManager.h"
+#include "PrioWebserver.h"
 // Externe referenties naar objecten uit main.cpp
 extern AlarmManager alarmManager;
 extern UrlManager UrlManagerInstance;
+extern PrioWebServer webServer;
 // dlnaClient leeft en wordt uitsluitend gemuteerd op DlnaTask (Task_Dlna.cpp) -
 // hier alleen gebruikt om PrioDlnaBrowser's (read-only) resultaten op te laten halen.
 extern PrioDlnaClient dlnaClient;
@@ -49,6 +51,11 @@ ezButton rotary_button(ROT_SW_PIN); // Initialize the button with the pin number
 static void updateClockModeMenuLabel()
 {
     myMenu.setActionLabel("set24hMode", pDateTime.is24HourMode() ? "Klok: 24u" : "Klok: 12u");
+}
+
+static void updateWebserverMenuLabel()
+{
+    myMenu.setActionLabel("stopWebserver", webServer.isRunning() ? "Webserver: aan" : "Webserver: uit");
 }
 
 int huidigePWN = 100;                             // beginwaarde
@@ -681,6 +688,9 @@ void onMenuAction(const char* action) {
         pDateTime.set24HourMode(use24Hour);
         menuPrefs.writeValue(CLOCK_MODE_KEY, use24Hour ? 1 : 0);
         updateClockModeMenuLabel();
+    } else if (strcmp(action, "stopWebserver") == 0) {
+        webServer.setEnabled(!webServer.isRunning());
+        updateWebserverMenuLabel();
     } else if (strcmp(action, "syncTime") == 0) {
         prioTft.showCenteredMessage("Tijd synchroniseren...");
         bool ok = pDateTime.syncTime(); // blokkeert dit scherm max. ~20s (NTP-timeout)
@@ -693,6 +703,7 @@ void onMenuAction(const char* action) {
 void onMenuOpen() {
     isMenuActive = true;
     last_volume_for_menu = rotaryInstance.current_value; // SYNC
+    updateWebserverMenuLabel(); // webserver start pas na deze task, dus label hier verversen
     Serial.println("Menu Opened - Pausing Player UI updates");
 }
 
