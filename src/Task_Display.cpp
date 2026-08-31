@@ -693,7 +693,14 @@ void onMenuClose() {
   //  xEventGroupSetBits(taskEvents, MENU_CLOSED_REQUEST_DATA_BIT); 
 
 
- last_volume_for_menu = rotaryInstance.current_value; // SYNC
+    // PrioRotary::loop() blijft current_value tellen/clampen terwijl de knop voor
+    // menu- of DLNA-navigatie wordt gebruikt, dus die staat na het bladeren vaak op
+    // max_value. Zet hem terug op het echte volume, anders springt de eerste
+    // volumeklik na het sluiten meteen naar 30.
+    rotaryInstance.current_value = last_volume;
+    rotaryInstance.current_value_changed = false;
+    rotaryInstance.getAndResetRotationCounter();
+    last_volume_for_menu = last_volume; // SYNC
 
 
 
