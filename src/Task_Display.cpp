@@ -111,6 +111,7 @@ void DisplayTask(void *parameter)
     String prevStreamTitle = "";
     String prevAlarmState = "";
     String prevTime = "";
+    String prevDate = "";
 
 
     /* Rotary button */
@@ -363,7 +364,7 @@ void DisplayTask(void *parameter)
             prioTft.setStreamTitle(_displayData.streamtitle);
             prioTft.setAlarmState(_displayData.alarmState);
             prioTft.setLogo(_displayData.logo);
-            prioTft.showTime(_displayData.currenTime);
+            prioTft.showTime(_displayData.currenTime, _displayData.currenDate);
             prioTft.setVolume(last_volume); // Gebruik de lokale actuele volume
 
             // Reset de 'prev' variabelen. 
@@ -375,6 +376,7 @@ void DisplayTask(void *parameter)
             prevStreamTitle = "";
             prevAlarmState = "";
             prevTime = "";
+            prevDate = "";
             prevVolume = -1;
             
             Serial.println("Display: Player UI redrawn after menu close");
@@ -419,6 +421,7 @@ void DisplayTask(void *parameter)
                         prevStreamTitle = "";
                         prevAlarmState = "";
                         prevTime = "";
+                        prevDate = "";
                         prevVolume = -1; // Reset previous values
 
                     }
@@ -471,12 +474,13 @@ void DisplayTask(void *parameter)
 
                     //      Serial.println("Display: currenTime" + String(_displayData.currenTime));
                        strncpy(_displayData.currenTime, pDateTime.getTime(), sizeof(_displayData.currenTime));
-                   //    strncpy(_displayData.currenDate, pDateTime.getDayDate(), sizeof(_displayData.currenDate));   
+                       strncpy(_displayData.currenDate, pDateTime.getDayDate(), sizeof(_displayData.currenDate));
 
-                    if (prevTime != _displayData.currenTime)
+                    if (prevTime != _displayData.currenTime || prevDate != _displayData.currenDate)
                     {
-                        prioTft.showTime(_displayData.currenTime);
+                        prioTft.showTime(_displayData.currenTime, _displayData.currenDate);
                         prevTime = _displayData.currenTime;
+                        prevDate = _displayData.currenDate;
                     }
                 }
             }

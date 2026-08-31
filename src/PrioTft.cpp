@@ -132,14 +132,27 @@ void PrioTft::setLogo(const String &url)
     sLogo.Show(kantline, 50, url);
 }
 
-void PrioTft::showTime(const String &time)
+void PrioTft::showTime(const String &time, const String &dayDate)
 {
+    const int areaX = 185;
+    const int areaW = tft.width() - (pBar.width_set + areaX);
+    const int timeY = 55; // 5 px onder de bovenkant van de cover art
+
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.setTextFont(8);
     tft.setTextSize(1);
-    tft.fillRect(185, 90, tft.width() - (pBar.width_set + 200), tft.fontHeight(), TFT_BLACK);
-    tft.setCursor(185, 90);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    tft.println(time);
+    tft.fillRect(areaX, timeY, areaW, tft.fontHeight(), TFT_BLACK);
+    tft.drawString(time, areaX, timeY);
+
+    const int dateY = timeY + tft.fontHeight() + 10;
+
+    tft.setFreeFont(FSS18);
+    tft.setTextDatum(TC_DATUM);
+    tft.fillRect(areaX, dateY, areaW, tft.fontHeight(), TFT_BLACK);
+    tft.drawString(truncateStringToFit(dayDate, areaW - 10), areaX + areaW / 2, dateY);
+
+    tft.setTextDatum(TL_DATUM);
     tft.setTextFont(4);
     tft.setTextSize(1);
 }

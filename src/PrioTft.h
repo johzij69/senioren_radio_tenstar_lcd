@@ -43,7 +43,7 @@ public:
     void prepLine(int lineNumber);
     void prepLogoLine(int lineNumber);
     void clearGreenLine(int lineNumber);
-    void showTime(const String &time);
+    void showTime(const String &time, const String &dayDate);
     void drawParaLine(const String &text, int startY);
     void showLoadingState();
     void showStandbyState();
