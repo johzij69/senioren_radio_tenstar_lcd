@@ -26,6 +26,22 @@ bool PrioRotaryMenu::loadMenu(const char* jsonString) {
     return true;
 }
 
+bool PrioRotaryMenu::setActionLabel(const char* action, const char* label) {
+    if (!action || !label) return false;
+
+    for (JsonObject category : _menuDoc.as<JsonArray>()) {
+        for (JsonObject item : category["items"].as<JsonArray>()) {
+            const char* itemAction = item["action"];
+            if (itemAction && strcmp(itemAction, action) == 0) {
+                item["label"] = label;
+                _needsRedraw = true;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 void PrioRotaryMenu::onButtonPress() {
     unsigned long currentTime = millis();
     if (currentTime - _lastActionTime < 300) {

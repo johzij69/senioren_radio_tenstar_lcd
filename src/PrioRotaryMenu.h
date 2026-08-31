@@ -25,6 +25,9 @@ public:
                       MenuStateCallback close);
 
     bool loadMenu(const char* jsonString);
+    // Label van het item met deze action vervangen; label moet een literal/statische
+    // string zijn, ArduinoJson bewaart alleen de pointer.
+    bool setActionLabel(const char* action, const char* label);
 
     void onButtonPress();
     void onRotaryDelta(int delta);

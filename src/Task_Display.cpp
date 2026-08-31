@@ -26,6 +26,10 @@ bool forcePlayerRedraw = false; // Nieuwe flag voor redraw na menu sluiting
 
 unsigned long redrawLockoutTime = 0; // Tijdstempel om knopdrukken na redraw te blokkeren
 
+static MyPreferences menuPrefs("myRadio"); // voor instellingen die vanuit onMenuAction worden bewaard
+static const char* CLOCK_MODE_KEY = "clock24h";
+static void updateClockModeMenuLabel();
+
 int last_volume_for_menu = 0; // Initialize with your default volume
 int last_volume = 10;
 
@@ -41,6 +45,11 @@ AlarmSetup alarmSetup(prioTft.tft, alarmManager, UrlManagerInstance);
 PrioDlnaBrowser dlnaBrowser(prioTft.tft, dlnaClient, playDlnaTrack, resumePreviousStream);
 /* Buttons */
 ezButton rotary_button(ROT_SW_PIN); // Initialize the button with the pin number and mode
+
+static void updateClockModeMenuLabel()
+{
+    myMenu.setActionLabel("set24hMode", pDateTime.is24HourMode() ? "Klok: 24u" : "Klok: 12u");
+}
 
 int huidigePWN = 100;                             // beginwaarde
 const ledc_channel_t pwmChannel = LEDC_CHANNEL_0; // Kanaal 0-7
@@ -69,7 +78,6 @@ const char* menuJson = R"(
     "label": "Time",
     "items": [
       { "label": "24h", "action": "set24hMode" },
-      { "label": "Daylight Savings", "action": "setDST" },
       { "label": "Sync Time", "action": "syncTime" }
     ]
   },
@@ -148,6 +156,9 @@ void DisplayTask(void *parameter)
    // Initialize Menu
     myMenu.setCallbacks(onMenuAction, onMenuOpen, onMenuClose);
     myMenu.loadMenu(menuJson);
+    menuPrefs.begin();
+    pDateTime.set24HourMode(menuPrefs.readValue(CLOCK_MODE_KEY, 1) != 0);
+    updateClockModeMenuLabel();
     
 
     for (int attempt = 0; attempt < 5; ++attempt)
@@ -665,9 +676,17 @@ void onMenuAction(const char* action) {
         myMenu.closeMenu();
         // Dan de DLNA-browser starten
         dlnaBrowser.start();
+    } else if (strcmp(action, "set24hMode") == 0) {
+        bool use24Hour = !pDateTime.is24HourMode();
+        pDateTime.set24HourMode(use24Hour);
+        menuPrefs.writeValue(CLOCK_MODE_KEY, use24Hour ? 1 : 0);
+        updateClockModeMenuLabel();
     } else if (strcmp(action, "syncTime") == 0) {
+        prioTft.showCenteredMessage("Tijd synchroniseren...");
+        bool ok = pDateTime.syncTime(); // blokkeert dit scherm max. ~20s (NTP-timeout)
+        prioTft.showCenteredMessage(ok ? "Tijd gesynchroniseerd" : "Synchronisatie mislukt");
+        vTaskDelay(pdMS_TO_TICKS(1500));
         myMenu.closeMenu();
-        pDateTime.syncTime(); // blokkeert dit scherm max. ~20s (NTP-timeout), zelfde als elders in de UI geaccepteerd
     }
 }
 

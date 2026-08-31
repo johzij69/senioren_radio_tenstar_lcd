@@ -54,6 +54,7 @@ public:
     int clockAlarmY();
     void drawParaLine(const String &text, int startY);
     void showLoadingState();
+    void showCenteredMessage(const String &text);
     void showStandbyState();
     void showStandbyTime(const String &time, const String &dayDate);
     String truncateStringToFit(const String &text, int maxWidth);

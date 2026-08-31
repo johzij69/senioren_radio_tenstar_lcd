@@ -16,8 +16,12 @@ public:
     // Initialiseer de RTC en synchroniseer indien nodig
     void begin();
 
-    // Synchroniseer de tijd met de NTP-server
-    void syncTime();
+    // Synchroniseer de tijd met de NTP-server; true als de sync is gelukt
+    bool syncTime();
+
+    // 12- of 24-uurs weergave voor getTime()
+    void set24HourMode(bool use24Hour);
+    bool is24HourMode() const;
 
     // Geeft aan of de tijd succesvol is gesynchroniseerd
     bool isTimeSynced();
@@ -56,6 +60,7 @@ private:
     SemaphoreHandle_t _mutex;
 
     bool timeSynced; // Geeft aan of de tijd succesvol is gesynchroniseerd
+    bool _use24Hour = true;
     unsigned long _lastSyncTime; // Laatste synchronisatietijd (in milliseconden)
     unsigned long _syncInterval; // Interval tussen synchronisaties (in milliseconden)
 

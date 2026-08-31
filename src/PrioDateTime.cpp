@@ -37,9 +37,8 @@ void PrioDateTime::begin()
     syncTime(); // heeft zijn eigen lock rond het _rtc.SetDateTime() gedeelte, zie hieronder
 }
 
-void PrioDateTime::syncTime()
-{
-    Serial.println("Synchroniseren met NTP-server...");
+bool PrioDateTime::syncTime()
+{    Serial.println("Synchroniseren met NTP-server...");
 
     // Gebruik een volledige TZ-regel voor Nederland (CET/CEST met DST)
     configTzTime("CET-1CEST,M3.5.0/2,M10.5.0/3", "pool.ntp.org", "time.nist.gov");
@@ -83,6 +82,17 @@ void PrioDateTime::syncTime()
     }
 
     _lastSyncTime = millis(); // Update de laatste synchronisatietijd
+    return timeSynced;
+}
+
+void PrioDateTime::set24HourMode(bool use24Hour)
+{
+    _use24Hour = use24Hour;
+}
+
+bool PrioDateTime::is24HourMode() const
+{
+    return _use24Hour;
 }
 
 void PrioDateTime::checkSync()
@@ -110,7 +120,16 @@ char *PrioDateTime::getTime()
 {
     xSemaphoreTake(_mutex, portMAX_DELAY);
     RtcDateTime now = _rtc.GetDateTime(); // Lees de tijd van de RTC
-    snprintf(buffer, sizeof(buffer), "%02d:%02d", now.Hour(), now.Minute());
+    if (_use24Hour)
+    {
+        snprintf(buffer, sizeof(buffer), "%02d:%02d", now.Hour(), now.Minute());
+    }
+    else
+    {
+        uint8_t hour12 = now.Hour() % 12;
+        if (hour12 == 0) hour12 = 12;
+        snprintf(buffer, sizeof(buffer), "%d:%02d", hour12, now.Minute());
+    }
     xSemaphoreGive(_mutex);
     return buffer;
 }

@@ -281,6 +281,17 @@ String PrioTft::truncateStringToFit(const String &text, int maxWidth)
     return truncatedText;
 }
 
+void PrioTft::showCenteredMessage(const String &text)
+{
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextFont(4);
+    tft.setTextSize(1);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.drawString(truncateStringToFit(text, tft.width() - 20), tft.width() / 2, tft.height() / 2);
+    tft.setTextDatum(TL_DATUM);
+}
+
 void PrioTft::showLoadingState()
 {
     tft.setTextFont(8);
