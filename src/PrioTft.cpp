@@ -91,10 +91,10 @@ void PrioTft::setAlarmState(const String &state)
 
     tft.setTextFont(4);
     tft.setTextSize(1);
-    tft.setTextDatum(TC_DATUM);
+    tft.setTextDatum(TL_DATUM);
     tft.setTextColor(TFT_YELLOW, TFT_BLACK);
     tft.fillRect(CLOCK_AREA_X, y, areaW, tft.fontHeight(), TFT_BLACK);
-    tft.drawString(truncateStringToFit("Alarm: " + state, areaW - 10), CLOCK_AREA_X + areaW / 2, y);
+    tft.drawString(truncateStringToFit("Alarm: " + state, areaW - 10), CLOCK_AREA_X, y);
 
     tft.setTextDatum(TL_DATUM);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -177,9 +177,9 @@ void PrioTft::showTime(const String &time, const String &dayDate)
     const int dateY = clockDateY();
 
     tft.setFreeFont(FSS18);
-    tft.setTextDatum(TC_DATUM);
+    tft.setTextDatum(TL_DATUM);
     tft.fillRect(areaX, dateY, areaW, tft.fontHeight(), TFT_BLACK);
-    tft.drawString(truncateStringToFit(dayDate, areaW - 10), areaX + areaW / 2, dateY);
+    tft.drawString(truncateStringToFit(dayDate, areaW - 10), areaX, dateY);
 
     tft.setTextDatum(TL_DATUM);
     tft.setTextFont(4);
