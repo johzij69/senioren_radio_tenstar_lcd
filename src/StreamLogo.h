@@ -12,6 +12,10 @@
 
 #define MAX_IMAGE_WIDTH 240
 
+// Vaste afmetingen van het logo/cover-vak op het scherm
+#define LOGO_BOX_W 150
+#define LOGO_BOX_H 150
+
 class StreamLogo
 {
 
@@ -23,6 +27,11 @@ public:
 private:
     String image_folder;
     TFT_eSPI *tft;
+
+    int16_t box_x = 0;
+    int16_t box_y = 0;
+
+    void clearBox();
 
     bool fileExists(String path);
     bool LoadImage(String url, String filename);

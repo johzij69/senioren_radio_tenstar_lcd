@@ -13,6 +13,8 @@ static int s_png_xpos = 0;
 static int s_png_ypos = 0;
 static PNG s_png;
 static uint16_t s_png_yield_count = 0;
+static int s_png_clip_w = LOGO_BOX_W;
+static int s_png_clip_h = LOGO_BOX_H;
 
 // Static PNG line buffer (allocated in PSRAM to prevent stack overflow)
 uint16_t* StreamLogo::s_png_line_buffer = nullptr;
@@ -63,8 +65,17 @@ void StreamLogo::begin()
     }
 }
 
+void StreamLogo::clearBox()
+{
+    tft->fillRect(box_x, box_y, LOGO_BOX_W, LOGO_BOX_H, TFT_BLACK);
+}
+
 void StreamLogo::Show(int16_t x, int16_t y, String url)
 {
+    box_x = x;
+    box_y = y;
+    clearBox();
+
     if (url.length() == 0)
     {
         Serial.println("[WARN] Lege logo URL, gebruik fallback logo.");
@@ -180,7 +191,11 @@ void StreamLogo::drawJpeg(const char *filename, int xpos, int ypos)
     if (decoded)
     {
         Serial.println("rendering image");
-        renderJPEG(xpos, ypos);
+        int drawX = xpos + (LOGO_BOX_W - (int)JpegDec.width) / 2;
+        int drawY = ypos + (LOGO_BOX_H - (int)JpegDec.height) / 2;
+        if (drawX < xpos) drawX = xpos;
+        if (drawY < ypos) drawY = ypos;
+        renderJPEG(drawX, drawY);
     }
     else
     {
@@ -203,14 +218,12 @@ void StreamLogo::renderJPEG(int xpos, int ypos)
     uint16_t *pImg;
     uint16_t mcu_w = JpegDec.MCUWidth;
     uint16_t mcu_h = JpegDec.MCUHeight;
-    uint32_t max_x = JpegDec.width;
-    uint32_t max_y = JpegDec.height;
+    int max_x = xpos + (int)JpegDec.width;
+    int max_y = ypos + (int)JpegDec.height;
 
-    // Jpeg images are draw as a set of image block (tiles) called Minimum Coding Units (MCUs)
-    // Typically these MCUs are 16x16 pixel blocks
-    // Determine the width and height of the right and bottom edge image blocks
-    uint32_t min_w = minimum(mcu_w, max_x % mcu_w);
-    uint32_t min_h = minimum(mcu_h, max_y % mcu_h);
+    // Nooit buiten het vaste logo-vak tekenen
+    if (max_x > box_x + LOGO_BOX_W) max_x = box_x + LOGO_BOX_W;
+    if (max_y > box_y + LOGO_BOX_H) max_y = box_y + LOGO_BOX_H;
 
     // save the current image block size
     uint32_t win_w = mcu_w;
@@ -218,11 +231,6 @@ void StreamLogo::renderJPEG(int xpos, int ypos)
 
     // record the current time so we can measure how long it takes to draw an image
     uint32_t drawTime = millis();
-
-    // save the coordinate of the right and bottom edges to assist image cropping
-    // to the screen size
-    max_x += xpos;
-    max_y += ypos;
 
     // Counter for yielding to other tasks
     int blockCount = 0;
@@ -243,16 +251,14 @@ void StreamLogo::renderJPEG(int xpos, int ypos)
         int mcu_x = JpegDec.MCUx * mcu_w + xpos; // Calculate coordinates of top left corner of current MCU
         int mcu_y = JpegDec.MCUy * mcu_h + ypos;
 
-        // check if the image block size needs to be changed for the right edge
-        if (mcu_x + mcu_w <= max_x)
-            win_w = mcu_w;
-        else
-            win_w = min_w;
-        // check if the image block size needs to be changed for the bottom edge
-        if (mcu_y + mcu_h <= max_y)
-            win_h = mcu_h;
-        else
-            win_h = min_h;
+        // crop the block against the right/bottom edge of the logo box
+        int block_w = (mcu_x + mcu_w <= max_x) ? mcu_w : max_x - mcu_x;
+        int block_h = (mcu_y + mcu_h <= max_y) ? mcu_h : max_y - mcu_y;
+        if (block_w <= 0 || block_h <= 0)
+            continue;
+
+        win_w = block_w;
+        win_h = block_h;
 
         // copy pixels into a contiguous block
         if (win_w != mcu_w)
@@ -290,7 +296,7 @@ void StreamLogo::renderJPEG(int xpos, int ypos)
                 tft->pushColor(*pImg++);
             }
         }
-        else if ((mcu_y + win_h) >= tft->height())
+        else if ((mcu_y + (int)win_h) >= tft->height())
             JpegDec.abort(); // Image has run off bottom of screen so abort decoding
 
         tft->endWrite();
@@ -404,9 +410,15 @@ int StreamLogo::pngDraw(PNGDRAW *pDraw)
     }
     
     // Convert PNG line to RGB565 and render
+    if (pDraw->y >= s_png_clip_h) return 1;
+
+    int lineWidth = pDraw->iWidth;
+    if (lineWidth > s_png_clip_w) lineWidth = s_png_clip_w;
+    if (lineWidth <= 0) return 1;
+
     s_png.getLineAsRGB565(pDraw, s_png_line_buffer, PNG_RGB565_BIG_ENDIAN, 0xffffffff);
-    
-    s_tft_for_png->pushImage(s_png_xpos, s_png_ypos + pDraw->y, pDraw->iWidth, 1, s_png_line_buffer);
+
+    s_tft_for_png->pushImage(s_png_xpos, s_png_ypos + pDraw->y, lineWidth, 1, s_png_line_buffer);
     return 1;
 }
 
@@ -414,11 +426,21 @@ void StreamLogo::renderPNG(int xpos, int ypos)
 {
     int img_width = s_png.getWidth();
     int img_height = s_png.getHeight();
-    
+
+    // s_png_line_buffer is MAX_IMAGE_WIDTH breed; bredere images zouden hem overschrijven
+    if (img_width > MAX_IMAGE_WIDTH) {
+        Serial.printf("[PNG] Image too wide (%d px, max %d) - skipped\n", img_width, MAX_IMAGE_WIDTH);
+        return;
+    }
+
     // Set static variables for callback
     s_tft_for_png = tft;
-    s_png_xpos = xpos;
-    s_png_ypos = ypos;
+    s_png_xpos = xpos + (LOGO_BOX_W - img_width) / 2;
+    s_png_ypos = ypos + (LOGO_BOX_H - img_height) / 2;
+    if (s_png_xpos < xpos) s_png_xpos = xpos;
+    if (s_png_ypos < ypos) s_png_ypos = ypos;
+    s_png_clip_w = (box_x + LOGO_BOX_W) - s_png_xpos;
+    s_png_clip_h = (box_y + LOGO_BOX_H) - s_png_ypos;
     s_png_yield_count = 0;  // Reset yield counter for new render
     
     // Decode and render PNG line-by-line
