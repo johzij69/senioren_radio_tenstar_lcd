@@ -56,9 +56,14 @@ void PrioRotary::loop()
             // NIEUW: altijd bijhouden voor menu navigatie (ongeacht volume clamping)
             rotationCounter += rotationValue;
 
-            if (current_value > min_value && current_value < max_value || current_value == max_value && rotationValue == -1 || current_value == min_value && rotationValue == 1)
+            // Volume loopt tegengesteld aan rotationCounter: met de klok mee harder.
+            int newValue = current_value - rotationValue;
+            if (newValue < min_value) newValue = min_value;
+            if (newValue > max_value) newValue = max_value;
+
+            if (newValue != current_value)
             {
-                rotationValue < 1 ? current_value-- : current_value++;
+                current_value = newValue;
                 current_value_changed = true;
             }
         }

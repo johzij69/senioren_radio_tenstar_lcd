@@ -350,8 +350,8 @@ void DisplayTask(void *parameter)
             int delta = rotaryInstance.current_value - last_volume_for_menu;
         
             if (myMenu.isOpen()) {
-                // Menu is open -> Send rotation to menu, DO NOT change volume
-                myMenu.onRotaryDelta(delta);
+                // current_value telt tegengesteld aan de menu-richting (zie PrioRotary::loop)
+                myMenu.onRotaryDelta(-delta);
             } else {
                 // Menu is closed -> Handle volume normally
                 Serial.println("Volume changed to: " + String(rotaryInstance.current_value));
