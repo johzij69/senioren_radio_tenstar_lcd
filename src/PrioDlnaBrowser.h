@@ -66,6 +66,8 @@ private:
     void rescanServers(); // "... Vernieuwen": forces a fresh SSDP scan, bypassing the server cache
 
     int itemCount() const;
+    // Verschuift het venster per hele pagina i.p.v. per regel; true als de pagina wisselde.
+    bool updateScrollOffset(int total);
     String truncateToFit(const char* text, int maxWidth);
 
     void draw();

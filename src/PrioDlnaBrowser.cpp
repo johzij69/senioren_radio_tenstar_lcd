@@ -185,6 +185,23 @@ int PrioDlnaBrowser::itemCount() const {
     return 0;
 }
 
+bool PrioDlnaBrowser::updateScrollOffset(int total) {
+    int oldOffset = _scrollOffset;
+
+    if (_selectedIndex >= _scrollOffset + VISIBLE_ROWS) {
+        // Vooruit voorbij de onderste regel: volgende pagina, selectie bovenaan.
+        _scrollOffset = _selectedIndex;
+    } else if (_selectedIndex < _scrollOffset) {
+        // Terug voorbij de bovenste regel: vorige pagina, selectie onderaan.
+        _scrollOffset = _selectedIndex - VISIBLE_ROWS + 1;
+    }
+
+    if (_scrollOffset > total - 1) _scrollOffset = total - 1;
+    if (_scrollOffset < 0) _scrollOffset = 0;
+
+    return oldOffset != _scrollOffset;
+}
+
 void PrioDlnaBrowser::enterServerList() {
     _screen = SCREEN_SERVERS;
     _selectedIndex = 0;
@@ -306,10 +323,7 @@ void PrioDlnaBrowser::drawServerList(bool fullRedraw) {
     PrioDlnaClient::dlnaServer_t servers = _dlna->getServer();
     int total = 2 + servers.size;
 
-    int oldScrollOffset = _scrollOffset;
-    if (_selectedIndex - _scrollOffset >= VISIBLE_ROWS) _scrollOffset = _selectedIndex - VISIBLE_ROWS + 1;
-    if (_selectedIndex < _scrollOffset) _scrollOffset = _selectedIndex;
-    bool scrollChanged = (oldScrollOffset != _scrollOffset);
+    bool scrollChanged = updateScrollOffset(total);
 
     auto labelFor = [&](int idx) -> const char* {
         if (idx == 0) return "... Terug";
@@ -340,10 +354,7 @@ void PrioDlnaBrowser::drawBrowseList(bool fullRedraw) {
     PrioDlnaClient::srvContent_t content = _dlna->getBrowseResult();
     int total = 1 + content.size;
 
-    int oldScrollOffset = _scrollOffset;
-    if (_selectedIndex - _scrollOffset >= VISIBLE_ROWS) _scrollOffset = _selectedIndex - VISIBLE_ROWS + 1;
-    if (_selectedIndex < _scrollOffset) _scrollOffset = _selectedIndex;
-    bool scrollChanged = (oldScrollOffset != _scrollOffset);
+    bool scrollChanged = updateScrollOffset(total);
 
     if (fullRedraw) {
         PrioDlnaClient::dlnaServer_t servers = _dlna->getServer();
