@@ -2,7 +2,7 @@
 
 #define FORMAT_LITTLEFS_IF_FAILED false
 static const char *FALLBACK_LOGO_JPG = "/StreamLogos/webradio-default.jpg";
-static const char *FALLBACK_LOGO_PNG = "/StreamLogos/webradio-default.jpg";
+static const char *FALLBACK_LOGO_PNG = "/StreamLogos/webradio-default.png";
 
 // Return the minimum of two values a and b
 #define minimum(a, b) (((a) < (b)) ? (a) : (b))

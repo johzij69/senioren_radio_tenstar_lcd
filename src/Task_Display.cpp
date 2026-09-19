@@ -67,10 +67,7 @@ const float LUX_THRESHOLD = 0.5;
 // Fade-instelling (hoe snel hij aanpast)
 const int FADE_STEP = 2;
 
-
-
-    DisplayData _displayData;
-
+DisplayData _displayData;
 
 const char* menuJson = R"(
 [
@@ -115,6 +112,7 @@ void DisplayTask(void *parameter)
     bool fromStandby = false; // Flag to indicate if the system is coming from standby
 
     static unsigned long lastBacklightUpdate = 0;
+
 
     QueueHandle_t DisplayQueue = static_cast<QueueHandle_t>(parameter);
 
@@ -169,35 +167,39 @@ void DisplayTask(void *parameter)
     updateClockModeMenuLabel();
     
 
-    for (int attempt = 0; attempt < 5; ++attempt)
-    {
-        Serial.print("DisplayTask: Initializing light sensor, attempt ");
-        Serial.println(attempt + 1);
-        if (veml.begin())
-        {
-            sensorFound = true;
-            break;
-        }
-        Serial.println("Sensor not found, retrying...");
-        vTaskDelay(500 / portTICK_PERIOD_MS);
-    }
+    // for (int attempt = 0; attempt < 5; ++attempt)
+    // {
+    //     Serial.print("DisplayTask: Initializing light sensor, attempt ");
+    //     Serial.println(attempt + 1);
+        
+    //     if (veml.begin())
+    //     {
+    //         sensorFound = true;
+    //         break;
+    //     }
+    //     Serial.println("Sensor not found, retrying...");
+    //     vTaskDelay(500 / portTICK_PERIOD_MS);
+    // }
 
-    //  sensorFound = false; // Probeer de sensor te initialiseren
-    if (!sensorFound)
-    {
-        Serial.println("Light sensor not found after 5 attempts, continuing without sensor.");
-    }
-    else
-    {
-        Serial.println("Light Sensor found");
-        veml.setGain(VEML7700_GAIN_1);
-        veml.setIntegrationTime(VEML7700_IT_100MS);
-    }
+    // //  sensorFound = false; // Probeer de sensor te initialiseren
+    // if (!sensorFound)
+    // {
+    //     Serial.println("Light sensor not found after 5 attempts, continuing without sensor.");
+    // }
+    // else
+    // {
+    //     Serial.println("Light Sensor found");
+    //     veml.setGain(VEML7700_GAIN_1);
+    //     veml.setIntegrationTime(VEML7700_IT_100MS);
+    // }
     setup_backlight(); // Initialiseer de backlight
 
     // Zet het event om aan te geven dat de DisplayTask is gestart
 
     Serial.println("DisplayTask: zetten van DISPLAY_TASK_STARTED_BIT");
+    // just for now we wait until the display task is fully initialized before proceeding
+    vTaskDelay(5000 / portTICK_PERIOD_MS); // Wait a short time to ensure display task is ready
+    
     xEventGroupSetBits(taskEvents, DISPLAY_TASK_STARTED_BIT);
     Serial.println("DisplayTask: bit gezet");
 
@@ -215,7 +217,6 @@ void DisplayTask(void *parameter)
             }
         }
 
-        // === ALARM SETUP MODE ===
           // === ALARM SETUP MODE ===
         static bool wasAlarmActive = false;
         
@@ -572,8 +573,8 @@ We will remove this part from the streamtitle.
 void cleanStreamTitle(struct DisplayData *data)
 {
 
-    Serial.println("Display: stream title" + String(data->streamtitle));
-    Serial.println("Display: title" + String(data->title));
+    Serial.println("Display: stream title: " + String(data->streamtitle));
+    Serial.println("Display: title: " + String(data->title));
     // Controleer of streamtitle begint met title
     if (strncmp(data->streamtitle, data->title, strlen(data->title)) == 0)
     {

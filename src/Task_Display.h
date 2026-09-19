@@ -14,7 +14,7 @@
 
 
 
-
+// extern PrioDateTime pDateTime; // Declare as extern (definition comes elsewhere)
 
 void onMenuAction(const char* action);
 void onMenuOpen();

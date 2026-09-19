@@ -3,9 +3,10 @@
 #include "UrlManager.h"
 #include "driver/ledc.h" // Include LEDC driver header for PWM functionality
 #include "PrioRotaryMenu.h"
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h"
 
-
-bool debug = true; // Set to true for debug output
+bool debug = false; // Set to true for debug output
 uint8_t alarmSnoozeButtonIndex = 10;
 
 // int max_volume = MAX_VOLUME; // set default max volume
@@ -47,7 +48,7 @@ TaskHandle_t dlnaTaskHandle = NULL;      // Task handle for the DLNA discovery/b
 
 
 
-WiFiManager wm;
+//WiFiManager wm;
 
 // Semaphore voor ISR-communicatie
 SemaphoreHandle_t powerButtonSemaphore;
@@ -57,20 +58,21 @@ volatile unsigned long lastInterruptTime = 0;
 const unsigned long debounceDelay = 200; // ms
 bool systemLowPower = false;
 
-Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
+//Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 void setup()
 {
     Serial.begin(115200); // Initialize serial communication
+      // initialize LED digital pin as an output.
+  // Schakel de Brownout Detector uit
+   // ESP32-S3 Brownout detector uitschakelen
+  //REG_WRITE(RTC_CNTL_BROWN_OUT_REG, 0);
+  
+    pinMode(LED_BUILTIN, OUTPUT);
+    digitalWrite(LED_BUILTIN, LOW); // Zet de ingebouwde LED uit bij opstarten
 
     // Moet vóór elke TLS-verbinding gebeuren
     enableTlsPsramAllocator();
-
-    // Zorg er voor dat de RGB led op board uit is en blijft
-    // Als je de pin laag zet is er altijd kans dat deze ruis opakt waardoor de led aan gaat!
-    strip.begin(); // Initialiseer de strip
-    strip.clear(); // Alle pixels op zwart zetten
-    strip.show();
 
     // Om er zeker van te zijn dat de i2c bus voor de licht sensor en Top panel actief is
     Wire.begin(TOPPANEL_SDA, TOPPANEL_SCL); // Initialize I2C bus for the top panel and light sensor
@@ -79,7 +81,7 @@ void setup()
     {
         Serial.println("Starting Prio Radio...");
         delay(10000);            // Wait for serial to initialize
-        wm.setDebugOutput(true); // Debug-logging aan
+   //     wm.setDebugOutput(true); // Debug-logging aan
         Serial.println("Debug mode is ON");
     }
 
@@ -106,11 +108,10 @@ void setup()
     time_t now = time(nullptr);
     struct tm timeinfo;
     localtime_r(&now, &timeinfo);
-    strftime(timeBuffer, sizeof(timeBuffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
-    Serial.print("Timestamp: ");
+    strftime(timeBuffer, sizeof(timeBuffer), "%H:%M:%S", &timeinfo);
+    Serial.print("Timestamp for start display task check: ");
     Serial.println(timeBuffer);
     // Wacht op het event dat de display task is gestart
-
     EventBits_t bits = xEventGroupWaitBits(
         taskEvents,               // Event group handle
         DISPLAY_TASK_STARTED_BIT, // Bits om op te wachten
@@ -122,8 +123,8 @@ void setup()
     time_t nowe = time(nullptr);
     struct tm timeinfoe;
     localtime_r(&nowe, &timeinfoe);
-    strftime(timeBuffer, sizeof(timeBuffer), "%Y-%m-%d %H:%M:%S", &timeinfoe);
-    Serial.print("Timestamp eind: ");
+    strftime(timeBuffer, sizeof(timeBuffer), "%H:%M:%S", &timeinfoe);
+    Serial.print("Timestamp start display task check eind: ");
     Serial.println(timeBuffer);
 
     if ((bits & DISPLAY_TASK_STARTED_BIT) == 0)
@@ -132,6 +133,42 @@ void setup()
         while (1)
             ; // Blokkeer als display niet start
     }
+
+  Serial.println("Continuing with setup wifi");
+   const char* ssid = "WiFi-2.4-E770";
+   const char* password = "wub4yhd65nwb7";
+
+    WiFi.mode(WIFI_MODE_NULL); // Zorg dat alles uitgezet is
+    delay(100);
+    WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+    // // Reduceer WiFi-zendvermogen (minder interferentie)
+    // WiFi.setTxPower(WIFI_POWER_21dBm); // Experimenteer met lagere waarden
+    // WiFi.mode(WIFI_STA);
+
+        // wm.setConfigPortalTimeout(120); // Langere timeout
+        // wm.setConnectTimeout(30);       // Verbind timeout
+    Serial.println("Starting WiFi autoConnect...");
+
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssid, password);
+    Serial.println("\nConnecting to WiFi Network ..");
+
+    while(WiFi.status() != WL_CONNECTED){
+        Serial.print(".");
+        delay(100);
+    }
+
+    Serial.println("\nConnected to the WiFi network");
+    Serial.print("Local ESP32 IP: ");
+    Serial.println(WiFi.localIP());
+
+
+
+
+
+
+ 
+
 
     displayData.loadingState = false;
     strncpy(displayData.title, "Verbinden met WiFi...", sizeof(displayData.title));
@@ -142,16 +179,10 @@ void setup()
     powerButtonSemaphore = xSemaphoreCreateBinary();
     attachInterrupt(digitalPinToInterrupt(POWER_BUTTON_PIN), handlePowerButtonInterrupt, FALLING);
 
-    WiFi.mode(WIFI_MODE_NULL); // Zorg dat alles uitgezet is
-    delay(100);
-    WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-    // Reduceer WiFi-zendvermogen (minder interferentie)
-    WiFi.setTxPower(WIFI_POWER_21dBm); // Experimenteer met lagere waarden
-    WiFi.mode(WIFI_STA);
-
-    wm.setConfigPortalTimeout(120); // Langere timeout
-    wm.setConnectTimeout(30);       // Verbind timeout
-    bool res = wm.autoConnect("prio-radio");
+   Serial.println("Power button initialized.");
+    //bool res = wm.autoConnect("prio-radio");
+    bool res = (WiFi.status() == WL_CONNECTED);
+    Serial.println("WiFi autoConnect result: " + String(res));
     if (!res)
     {
         Serial.println("Failed to connect");

@@ -3,7 +3,12 @@
 PrioDateTime::PrioDateTime(int clkPin, int datPin, int rstPin)
     : _threeWire(datPin, clkPin, rstPin), _rtc(_threeWire)
 {                                    // Initialiseer ThreeWire en RtcDS1302
-    timeSynced = false;              // Standaard niet gesynchroniseerd
+    
+   // Just to supress error message, the library will also do this internally.
+   pinMode(clkPin, OUTPUT);
+   pinMode(rstPin, OUTPUT);
+   
+   timeSynced = false;              // Standaard niet gesynchroniseerd
     _lastSyncTime = 0;               // Laatste synchronisatietijd (in milliseconden)
     _syncInterval = 1 * 3600 * 1000; // Synchroniseer elke 1 uur (1 uur * 3600 seconden * 1000 ms)
     _mutex = xSemaphoreCreateMutex();
@@ -11,6 +16,8 @@ PrioDateTime::PrioDateTime(int clkPin, int datPin, int rstPin)
 
 void PrioDateTime::begin()
 {
+   
+   
     xSemaphoreTake(_mutex, portMAX_DELAY);
     _rtc.Begin();
     if (debug)
