@@ -113,9 +113,37 @@ void PrioWebServer::begin()
         [](AsyncWebServerRequest * request){},
         NULL,
         [this](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) {
-          (void)index;
-          (void)total;
-          this->handleApiImportConfig(request, data, len);
+          String *body = reinterpret_cast<String *>(request->_tempObject);
+          if (index == 0)
+          {
+            if (body != nullptr)
+            {
+              delete body;
+              body = nullptr;
+            }
+            body = new String();
+            if (body != nullptr)
+            {
+              body->reserve(total);
+            }
+            request->_tempObject = body;
+          }
+
+          if (body == nullptr)
+          {
+            request->send(500, "application/json", "{\"ok\":false,\"message\":\"Onvoldoende geheugen voor import\"}");
+            return;
+          }
+
+          body->concat(reinterpret_cast<const char *>(data), len);
+          if ((index + len) < total)
+          {
+            return;
+          }
+
+          this->handleApiImportConfig(request, (uint8_t *)body->c_str(), body->length());
+          delete body;
+          request->_tempObject = nullptr;
       });
 
       // Logo upload endpoint

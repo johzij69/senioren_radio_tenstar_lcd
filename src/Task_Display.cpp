@@ -553,7 +553,7 @@ void DisplayTask(void *parameter)
                 fixedbacklight = true; // Zet de backlight op een vaste waarde
                 // Als de sensor niet gevonden is, gebruik een standaard helderheid
                 Serial.println("Light sensor not found, setting backlight to default brightness.");
-                SetBacklightPWM(128); // Zet backlight op 50% als de sensor niet beschikbaar is
+          //      SetBacklightPWM(128); // Zet backlight op 50% als de sensor niet beschikbaar is
             }
         }
 

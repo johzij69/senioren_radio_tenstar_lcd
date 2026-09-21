@@ -48,7 +48,7 @@ TaskHandle_t dlnaTaskHandle = NULL;      // Task handle for the DLNA discovery/b
 
 
 
-//WiFiManager wm;
+WiFiManager wm;
 
 // Semaphore voor ISR-communicatie
 SemaphoreHandle_t powerButtonSemaphore;
@@ -63,10 +63,7 @@ bool systemLowPower = false;
 void setup()
 {
     Serial.begin(115200); // Initialize serial communication
-      // initialize LED digital pin as an output.
-  // Schakel de Brownout Detector uit
-   // ESP32-S3 Brownout detector uitschakelen
-  //REG_WRITE(RTC_CNTL_BROWN_OUT_REG, 0);
+
   
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, LOW); // Zet de ingebouwde LED uit bij opstarten
@@ -81,7 +78,7 @@ void setup()
     {
         Serial.println("Starting Prio Radio...");
         delay(10000);            // Wait for serial to initialize
-   //     wm.setDebugOutput(true); // Debug-logging aan
+        wm.setDebugOutput(true); // Debug-logging aan
         Serial.println("Debug mode is ON");
     }
 
@@ -135,40 +132,32 @@ void setup()
     }
 
   Serial.println("Continuing with setup wifi");
-   const char* ssid = "WiFi-2.4-E770";
-   const char* password = "wub4yhd65nwb7";
+//    const char* ssid = "WiFi-2.4-E770";
+//    const char* password = "wub4yhd65nwb7";
 
-    WiFi.mode(WIFI_MODE_NULL); // Zorg dat alles uitgezet is
-    delay(100);
-    WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-    // // Reduceer WiFi-zendvermogen (minder interferentie)
-    // WiFi.setTxPower(WIFI_POWER_21dBm); // Experimenteer met lagere waarden
+   // WiFi.mode(WIFI_MODE_NULL); // Zorg dat alles uitgezet is
+    // delay(100);
+    // WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+    // // // Reduceer WiFi-zendvermogen (minder interferentie)
+    //  WiFi.setTxPower(WIFI_POWER_21dBm); // Experimenteer met lagere waarden
     // WiFi.mode(WIFI_STA);
 
-        // wm.setConfigPortalTimeout(120); // Langere timeout
-        // wm.setConnectTimeout(30);       // Verbind timeout
+    wm.setConfigPortalTimeout(120); // Langere timeout
+    wm.setConnectTimeout(30);       // Verbind timeout
     Serial.println("Starting WiFi autoConnect...");
 
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(ssid, password);
-    Serial.println("\nConnecting to WiFi Network ..");
+    // WiFi.mode(WIFI_STA);
+    // WiFi.begin(ssid, password);
+    // Serial.println("\nConnecting to WiFi Network ..");
 
-    while(WiFi.status() != WL_CONNECTED){
-        Serial.print(".");
-        delay(100);
-    }
+    // while(WiFi.status() != WL_CONNECTED){
+    //     Serial.print(".");
+    //     delay(100);
+    // }
 
     Serial.println("\nConnected to the WiFi network");
     Serial.print("Local ESP32 IP: ");
     Serial.println(WiFi.localIP());
-
-
-
-
-
-
- 
-
 
     displayData.loadingState = false;
     strncpy(displayData.title, "Verbinden met WiFi...", sizeof(displayData.title));
@@ -180,8 +169,8 @@ void setup()
     attachInterrupt(digitalPinToInterrupt(POWER_BUTTON_PIN), handlePowerButtonInterrupt, FALLING);
 
    Serial.println("Power button initialized.");
-    //bool res = wm.autoConnect("prio-radio");
-    bool res = (WiFi.status() == WL_CONNECTED);
+    bool res = wm.autoConnect("prio-radio");
+    //bool res = (WiFi.status() == WL_CONNECTED);
     Serial.println("WiFi autoConnect result: " + String(res));
     if (!res)
     {
