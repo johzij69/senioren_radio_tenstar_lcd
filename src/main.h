@@ -33,6 +33,7 @@ bool inStandby = false; // Flag to indicate if the system is in standby mode
 
 
 void handlePowerButtonInterrupt() ;
+void handleSleepButtonInterrupt();
 void CreateAndSendDisplayData(int streamIndex);
 void CreateAndSendAudioData(int streamIndex, int last_volume);
 void printBinary(int v, int num_places);

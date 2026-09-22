@@ -88,13 +88,14 @@ void PrioTft::setAlarmState(const String &state)
 {
     const int areaW = clockAreaWidth();
     const int y = clockAlarmY();
+    const String line = state.startsWith("Sleep:") ? state : ("Alarm: " + state);
 
     tft.setTextFont(4);
     tft.setTextSize(1);
     tft.setTextDatum(TL_DATUM);
     tft.setTextColor(TFT_YELLOW, TFT_BLACK);
     tft.fillRect(CLOCK_AREA_X, y, areaW, tft.fontHeight(), TFT_BLACK);
-    tft.drawString(truncateStringToFit("Alarm: " + state, areaW - 10), CLOCK_AREA_X, y);
+    tft.drawString(truncateStringToFit(line, areaW - 10), CLOCK_AREA_X, y);
 
     tft.setTextDatum(TL_DATUM);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);

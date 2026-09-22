@@ -30,7 +30,9 @@ unsigned long redrawLockoutTime = 0; // Tijdstempel om knopdrukken na redraw te 
 
 static MyPreferences menuPrefs("myRadio"); // voor instellingen die vanuit onMenuAction worden bewaard
 static const char* CLOCK_MODE_KEY = "clock24h";
+static const char* SLEEP_MINUTES_KEY = "sleep_minutes";
 static void updateClockModeMenuLabel();
+static void updateSleepMinutesMenuLabel();
 
 int last_volume_for_menu = 0; // Initialize with your default volume
 int last_volume = 10;
@@ -56,6 +58,22 @@ static void updateClockModeMenuLabel()
 static void updateWebserverMenuLabel()
 {
     myMenu.setActionLabel("stopWebserver", webServer.isRunning() ? "Webserver: aan" : "Webserver: uit");
+}
+
+static void updateSleepMinutesMenuLabel()
+{
+    static char sleepLabel[24];
+    uint32_t sleepMinutes = menuPrefs.getUInt(SLEEP_MINUTES_KEY, SLEEP_DEFAULT_MINUTES);
+    if (sleepMinutes < SLEEP_MIN_MINUTES)
+    {
+        sleepMinutes = SLEEP_DEFAULT_MINUTES;
+    }
+    if (sleepMinutes > SLEEP_MAX_MINUTES)
+    {
+        sleepMinutes = SLEEP_MAX_MINUTES;
+    }
+    snprintf(sleepLabel, sizeof(sleepLabel), "Sleep: %lu min", (unsigned long)sleepMinutes);
+    myMenu.setActionLabel("setSleepMinutes", sleepLabel);
 }
 
 int huidigePWN = 100;                             // beginwaarde
@@ -88,6 +106,7 @@ const char* menuJson = R"(
   {
     "label": "Other",
     "items": [
+            { "label": "Sleep", "action": "setSleepMinutes" },
       { "label": "Stop Webserver", "action": "stopWebserver" }
     ]
   },
@@ -165,6 +184,7 @@ void DisplayTask(void *parameter)
     menuPrefs.begin();
     pDateTime.set24HourMode(menuPrefs.readValue(CLOCK_MODE_KEY, 1) != 0);
     updateClockModeMenuLabel();
+    updateSleepMinutesMenuLabel();
     
 
     // for (int attempt = 0; attempt < 5; ++attempt)
@@ -721,6 +741,19 @@ void onMenuAction(const char* action) {
         pDateTime.set24HourMode(use24Hour);
         menuPrefs.writeValue(CLOCK_MODE_KEY, use24Hour ? 1 : 0);
         updateClockModeMenuLabel();
+    } else if (strcmp(action, "setSleepMinutes") == 0) {
+        uint32_t currentSleepMinutes = menuPrefs.getUInt(SLEEP_MINUTES_KEY, SLEEP_DEFAULT_MINUTES);
+        if (currentSleepMinutes < 5 || currentSleepMinutes > SLEEP_MAX_MINUTES)
+        {
+            currentSleepMinutes = SLEEP_DEFAULT_MINUTES;
+        }
+        currentSleepMinutes += 5;
+        if (currentSleepMinutes > SLEEP_MAX_MINUTES)
+        {
+            currentSleepMinutes = 5;
+        }
+        menuPrefs.putUInt(SLEEP_MINUTES_KEY, currentSleepMinutes);
+        updateSleepMinutesMenuLabel();
     } else if (strcmp(action, "stopWebserver") == 0) {
         webServer.setEnabled(!webServer.isRunning());
         updateWebserverMenuLabel();
@@ -737,6 +770,7 @@ void onMenuOpen() {
     isMenuActive = true;
     last_volume_for_menu = rotaryInstance.current_value; // SYNC
     updateWebserverMenuLabel(); // webserver start pas na deze task, dus label hier verversen
+    updateSleepMinutesMenuLabel();
     Serial.println("Menu Opened - Pausing Player UI updates");
 }
 

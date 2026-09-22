@@ -43,6 +43,13 @@
 // Power Button
 #define POWER_BUTTON_PIN 46
 
+// Sleep button
+#define SLEEP_BUTTON_PIN 40
+
+#define SLEEP_MIN_MINUTES 1
+#define SLEEP_MAX_MINUTES 180
+#define SLEEP_DEFAULT_MINUTES 30
+
 // Input panel
 #define TOPPANEL_INT_PIN 45 
 #define TOPPANEL_SDA 47

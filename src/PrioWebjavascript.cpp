@@ -953,20 +953,26 @@ String getAlarmScript(String ip)
   return script;
 }
 
-String getSettingsScript(String ip, int snoozeButtonIndex)
+String getSettingsScript(String ip, int snoozeButtonIndex, int sleepMinutes)
 {
   String script PROGMEM = R"SETTINGS(
     <script>
       const contentContainer = document.getElementById("content-container");
 
       function renderSettings(data) {
-        const current = Number(data.snoozeButtonIndex ?? @SNOOZE_BTN@);
+        const currentSnoozeButtonIndex = Number(data.snoozeButtonIndex ?? @SNOOZE_BTN@);
+        const currentSleepMinutes = Number(data.sleepMinutes ?? @SLEEP_MINUTES@);
         contentContainer.innerHTML = `
           <h2>Instellingen</h2>
           <div class="stream_item" style="max-width:520px;">
             <div class="edit-label">Snooze knop index (PCF8575)</div>
-            <input id="snoozeButtonIndex" class="input_short" type="number" min="0" max="15" value="${current}" />
+            <input id="snoozeButtonIndex" class="input_short" type="number" min="0" max="15" value="${currentSnoozeButtonIndex}" />
             <div style="margin-top:8px;font-size:13px;">Gebruik een knop die niet als preset gebruikt wordt.</div>
+          </div>
+          <div class="stream_item" style="max-width:520px; margin-top:12px;">
+            <div class="edit-label">Sleep tijd (minuten)</div>
+            <input id="sleepMinutes" class="input_short" type="number" min="1" max="180" value="${currentSleepMinutes}" />
+            <div style="margin-top:8px;font-size:13px;">Bij standby start de sleep-knop de laatst gespeelde stream voor deze duur.</div>
           </div>
           <div style="margin-top:12px;display:flex;gap:10px;">
             <button onclick="saveSettings()">Opslaan</button>
@@ -986,12 +992,13 @@ String getSettingsScript(String ip, int snoozeButtonIndex)
 
       async function saveSettings() {
         const snoozeButtonIndex = Number(document.getElementById("snoozeButtonIndex").value);
+        const sleepMinutes = Number(document.getElementById("sleepMinutes").value);
         const response = await fetch("/api/settings", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ snoozeButtonIndex }),
+          body: JSON.stringify({ snoozeButtonIndex, sleepMinutes }),
         });
 
         if (!response.ok) {
@@ -1019,6 +1026,7 @@ String getSettingsScript(String ip, int snoozeButtonIndex)
 
   searchAndReplace(&script, String("@ip"), ip);
   searchAndReplace(&script, String("@SNOOZE_BTN@"), String(snoozeButtonIndex));
+  searchAndReplace(&script, String("@SLEEP_MINUTES@"), String(sleepMinutes));
   return script;
 }
 

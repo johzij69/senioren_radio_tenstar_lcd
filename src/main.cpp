@@ -52,11 +52,125 @@ WiFiManager wm;
 
 // Semaphore voor ISR-communicatie
 SemaphoreHandle_t powerButtonSemaphore;
+SemaphoreHandle_t sleepButtonSemaphore;
 
 // Flags used for power unctions
 volatile unsigned long lastInterruptTime = 0;
+volatile unsigned long lastSleepInterruptTime = 0;
 const unsigned long debounceDelay = 200; // ms
 bool systemLowPower = false;
+
+static bool sleepSessionActive = false;
+static unsigned long sleepSessionDeadlineMs = 0;
+
+static void getDisplayStatusText(char *out, size_t outSize)
+{
+    if (sleepSessionActive)
+    {
+        long remainingMs = (long)(sleepSessionDeadlineMs - millis());
+        if (remainingMs < 0)
+        {
+            remainingMs = 0;
+        }
+
+        // Toon alleen hele minuten om schermflikkering door seconde-updates te beperken.
+        unsigned long remainingMinutes = ((unsigned long)remainingMs + 59999UL) / 60000UL;
+        snprintf(out, outSize, "Sleep: %lu min", remainingMinutes);
+        return;
+    }
+
+    alarmManager.getDisplayStatusText(time(nullptr), out, outSize);
+}
+
+static uint16_t clampSleepMinutes(int minutes)
+{
+    if (minutes < SLEEP_MIN_MINUTES)
+    {
+        return SLEEP_DEFAULT_MINUTES;
+    }
+    if (minutes > SLEEP_MAX_MINUTES)
+    {
+        return SLEEP_MAX_MINUTES;
+    }
+    return (uint16_t)minutes;
+}
+
+static uint16_t getConfiguredSleepMinutes()
+{
+    return clampSleepMinutes((int)myPrefs.getUInt("sleep_minutes", SLEEP_DEFAULT_MINUTES));
+}
+
+static void enterStandbyMode()
+{
+    sleepSessionActive = false;
+    systemLowPower = true;
+    inStandby = true;
+    displayData.standbyState = true;
+    strncpy(displayData.currenTime, pDateTime.getTime(), sizeof(displayData.currenTime));
+    displayData.currenTime[sizeof(displayData.currenTime) - 1] = '\0';
+    strncpy(displayData.currenDate, pDateTime.getDayDate(), sizeof(displayData.currenDate));
+    displayData.currenDate[sizeof(displayData.currenDate) - 1] = '\0';
+    SendDataToDisplay();
+    stopAudio();
+    pauseAudioTask();
+}
+
+static void leaveStandbyModeAndResumePlayback()
+{
+    systemLowPower = false;
+    inStandby = false;
+    displayData.standbyState = false;
+    CreateAndSendDisplayData(stream_index);
+    resumeAudioTask();
+    playStream(stream_index);
+}
+
+static void startSleepSessionFromStandby()
+{
+    if (!inStandby)
+    {
+        return;
+    }
+
+    if (UrlManagerInstance.streamCount == 0)
+    {
+        Serial.println("Sleep niet gestart: geen streams beschikbaar");
+        return;
+    }
+
+    uint16_t sleepMinutes = getConfiguredSleepMinutes();
+    int rememberedStreamIndex = (int)myPrefs.getUInt("stream_index", 0);
+    if (rememberedStreamIndex < 0 || rememberedStreamIndex >= (int)UrlManagerInstance.streamCount)
+    {
+        rememberedStreamIndex = 0;
+    }
+
+    systemLowPower = false;
+    inStandby = false;
+    displayData.standbyState = false;
+    resumeAudioTask();
+    playStream(rememberedStreamIndex);
+
+    sleepSessionActive = true;
+    sleepSessionDeadlineMs = millis() + ((unsigned long)sleepMinutes * 60UL * 1000UL);
+    Serial.println("Sleep gestart voor " + String(sleepMinutes) + " minuten");
+}
+
+static void handleSleepSessionTimeout()
+{
+    if (!sleepSessionActive)
+    {
+        return;
+    }
+
+    if ((long)(millis() - sleepSessionDeadlineMs) < 0)
+    {
+        return;
+    }
+
+    Serial.println("Sleep timer klaar, terug naar standby");
+    enterStandbyMode();
+}
 
 //Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 
@@ -167,6 +281,11 @@ void setup()
     pinMode(POWER_BUTTON_PIN, INPUT_PULLUP);
     powerButtonSemaphore = xSemaphoreCreateBinary();
     attachInterrupt(digitalPinToInterrupt(POWER_BUTTON_PIN), handlePowerButtonInterrupt, FALLING);
+
+    // sleep button
+    pinMode(SLEEP_BUTTON_PIN, INPUT_PULLUP);
+    sleepButtonSemaphore = xSemaphoreCreateBinary();
+    attachInterrupt(digitalPinToInterrupt(SLEEP_BUTTON_PIN), handleSleepButtonInterrupt, FALLING);
 
    Serial.println("Power button initialized.");
     bool res = wm.autoConnect("prio-radio");
@@ -294,34 +413,29 @@ void loop()
 
         if (systemLowPower)
         {
-            Serial.println("⏻ Naar slaapstand...");
-            inStandby = true;                // Zet de standby status
-            displayData.standbyState = true; // Zet de standby state in display data
-            // Task_Display.cpp's standbyState render path shows currenTime/currenDate
-            // as-is instead of re-reading the RTC (that refresh only happens on the
-            // normal-player path) - without this, standby could show whatever
-            // updateClockDisplay() last cached, up to a minute stale (or older).
-            strncpy(displayData.currenTime, pDateTime.getTime(), sizeof(displayData.currenTime));
-            displayData.currenTime[sizeof(displayData.currenTime) - 1] = '\0';
-            strncpy(displayData.currenDate, pDateTime.getDayDate(), sizeof(displayData.currenDate));
-            displayData.currenDate[sizeof(displayData.currenDate) - 1] = '\0';
-            SendDataToDisplay();             // Stuur de display data naar de queue
-            // Webserver blijft actief in standby; alleen audio wordt gepauzeerd.
-            stopAudio();
-            pauseAudioTask(); // Pause the audio task
+            Serial.println("Naar standby...");
+            enterStandbyMode();
         }
         else
         {
-            inStandby = false; // Zet de standby status uit
-                               //           displayData.standbyState = false; // Zet de standby state uit in display data
-            CreateAndSendDisplayData(stream_index);
-            Serial.println("⏻ Systeem hervatten...");
-            Serial.println("resuming audio task");
-            resumeAudioTask();
-            Serial.println("resuming audio");
-            playStream(stream_index);
+            Serial.println("Systeem hervatten...");
+            leaveStandbyModeAndResumePlayback();
         }
     }
+
+    if (xSemaphoreTake(sleepButtonSemaphore, 0) == pdTRUE)
+    {
+        if (inStandby)
+        {
+            startSleepSessionFromStandby();
+        }
+        else
+        {
+            Serial.println("Sleep-knop genegeerd: radio is niet in standby");
+        }
+    }
+
+    handleSleepSessionTimeout();
 
 
     vTaskDelay(1 / portTICK_PERIOD_MS); // Adjust the delay as needed (e.g., 10ms)
@@ -337,7 +451,9 @@ void handleInputPanelButton(int buttonIndex)
 
     if (buttonIndex >= 0 && buttonIndex < (int)UrlManagerInstance.streamCount)
     {
-        playStream(buttonIndex);
+        //playStream(buttonIndex);
+        // We mounted the button panel the wrong way, so this is the software fix. ;-)
+        playStream((UrlManagerInstance.streamCount-1) - buttonIndex);
     }
     else
     {
@@ -408,9 +524,9 @@ void checkAndRunAlarms()
         return;
     }
 
-    // Het getoonde tijdstip verschuift zodra een alarm voorbij is, dus periodiek herzien.
+    // Het getoonde tijdstip verschuift zodra een alarm voorbij is, of de sleep-timer aftelt.
     char statusText[sizeof(displayData.alarmState)];
-    alarmManager.getDisplayStatusText(now, statusText, sizeof(statusText));
+    getDisplayStatusText(statusText, sizeof(statusText));
     if (strncmp(statusText, displayData.alarmState, sizeof(statusText)) != 0)
     {
         strncpy(displayData.alarmState, statusText, sizeof(displayData.alarmState));
@@ -430,6 +546,7 @@ void triggerAlarmPlayback(const AlarmManager::AlarmEntry &alarm, bool fromSnooze
         refreshAlarmDisplayState();
     strncpy(displayData.alarmState, fromSnooze ? "Snooze actief" : "Alarm actief", sizeof(displayData.alarmState));
 
+    sleepSessionActive = false;
     systemLowPower = false;
     inStandby = false;
     displayData.standbyState = false;
@@ -468,7 +585,7 @@ void snoozeActiveAlarm()
 
 void refreshAlarmDisplayState(bool sendToDisplay)
 {
-    alarmManager.getDisplayStatusText(time(nullptr), displayData.alarmState, sizeof(displayData.alarmState));
+    getDisplayStatusText(displayData.alarmState, sizeof(displayData.alarmState));
 
     if (sendToDisplay)
     {
@@ -491,6 +608,22 @@ void IRAM_ATTR handlePowerButtonInterrupt()
 
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
         xSemaphoreGiveFromISR(powerButtonSemaphore, &xHigherPriorityTaskWoken);
+        if (xHigherPriorityTaskWoken)
+        {
+            portYIELD_FROM_ISR();
+        }
+    }
+}
+
+void IRAM_ATTR handleSleepButtonInterrupt()
+{
+    unsigned long currentTime = millis();
+    if (currentTime - lastSleepInterruptTime > debounceDelay)
+    {
+        lastSleepInterruptTime = currentTime;
+
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        xSemaphoreGiveFromISR(sleepButtonSemaphore, &xHigherPriorityTaskWoken);
         if (xHigherPriorityTaskWoken)
         {
             portYIELD_FROM_ISR();

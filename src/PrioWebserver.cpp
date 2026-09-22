@@ -357,9 +357,18 @@ void PrioWebServer::handleInstellingen(AsyncWebServerRequest *request)
   String mybigString = "";
 
   int snoozeButtonIndex = (int)preferences.getUInt("snooze_btn_idx", 10);
+  int sleepMinutes = (int)preferences.getUInt("sleep_minutes", SLEEP_DEFAULT_MINUTES);
+  if (sleepMinutes < SLEEP_MIN_MINUTES)
+  {
+    sleepMinutes = SLEEP_DEFAULT_MINUTES;
+  }
+  if (sleepMinutes > SLEEP_MAX_MINUTES)
+  {
+    sleepMinutes = SLEEP_MAX_MINUTES;
+  }
 
   String h_start PROGMEM = getHtmlStart();
-  String h_script PROGMEM = getSettingsScript(this->ip, snoozeButtonIndex);
+  String h_script PROGMEM = getSettingsScript(this->ip, snoozeButtonIndex, sleepMinutes);
   String h_body PROGMEM = setHtmlBody(body, h_script);
   String h_end PROGMEM = getHtmlEnd();
 
@@ -500,6 +509,7 @@ void PrioWebServer::handleApiSettings(AsyncWebServerRequest *request)
 {
   JsonDocument doc;
   doc["snoozeButtonIndex"] = preferences.getUInt("snooze_btn_idx", 10);
+  doc["sleepMinutes"] = preferences.getUInt("sleep_minutes", SLEEP_DEFAULT_MINUTES);
   doc["volume"] = preferences.readValue("volume", DEF_VOLUME);
   doc["streamIndex"] = preferences.getUInt("stream_index", 0);
 
@@ -517,6 +527,7 @@ void PrioWebServer::handleApiExportConfig(AsyncWebServerRequest *request)
 
   JsonObject settings = doc["settings"].to<JsonObject>();
   settings["snoozeButtonIndex"] = preferences.getUInt("snooze_btn_idx", 10);
+  settings["sleepMinutes"] = preferences.getUInt("sleep_minutes", SLEEP_DEFAULT_MINUTES);
   settings["volume"] = preferences.readValue("volume", DEF_VOLUME);
   settings["streamIndex"] = preferences.getUInt("stream_index", 0);
 
@@ -627,6 +638,11 @@ void PrioWebServer::handleApiImportConfig(AsyncWebServerRequest *request, uint8_
     preferences.putUInt("snooze_btn_idx", (uint32_t)snoozeButtonIndex);
     alarmSnoozeButtonIndex = (uint8_t)snoozeButtonIndex;
 
+    int sleepMinutes = settings["sleepMinutes"].is<int>() ? settings["sleepMinutes"].as<int>() : SLEEP_DEFAULT_MINUTES;
+    if (sleepMinutes < SLEEP_MIN_MINUTES) sleepMinutes = SLEEP_DEFAULT_MINUTES;
+    if (sleepMinutes > SLEEP_MAX_MINUTES) sleepMinutes = SLEEP_MAX_MINUTES;
+    preferences.putUInt("sleep_minutes", (uint32_t)sleepMinutes);
+
     int volume = settings["volume"].is<int>() ? settings["volume"].as<int>() : DEF_VOLUME;
     if (volume < MIN_VOLUME) volume = MIN_VOLUME;
     if (volume > MAX_VOLUME) volume = MAX_VOLUME;
@@ -669,7 +685,15 @@ void PrioWebServer::handleSaveSettings(AsyncWebServerRequest *request, uint8_t *
     return;
   }
 
+  int sleepMinutes = doc["sleepMinutes"].is<int>() ? doc["sleepMinutes"].as<int>() : SLEEP_DEFAULT_MINUTES;
+  if (sleepMinutes < SLEEP_MIN_MINUTES || sleepMinutes > SLEEP_MAX_MINUTES)
+  {
+    request->send(400, "application/json", "{\"ok\":false,\"message\":\"sleepMinutes moet 1..180 zijn\"}");
+    return;
+  }
+
   preferences.putUInt("snooze_btn_idx", (uint32_t)snoozeButtonIndex);
+  preferences.putUInt("sleep_minutes", (uint32_t)sleepMinutes);
   alarmSnoozeButtonIndex = (uint8_t)snoozeButtonIndex;
   request->send(200, "application/json", "{\"ok\":true}");
 }
