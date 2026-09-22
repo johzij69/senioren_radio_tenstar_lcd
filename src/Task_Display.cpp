@@ -404,7 +404,7 @@ void DisplayTask(void *parameter)
 
             if (prevTime != _displayData.currenTime || prevDate != _displayData.currenDate) {
                 if (_displayData.standbyState) {
-                    prioTft.showStandbyTime(_displayData.currenTime, _displayData.currenDate);
+                    prioTft.showStandbyTime(_displayData.currenTime, _displayData.currenDate, _displayData.alarmState);
                 } else {
                     prioTft.showTime(_displayData.currenTime, _displayData.currenDate);
                 }
@@ -474,7 +474,7 @@ void DisplayTask(void *parameter)
                     _displayData.currenTime[sizeof(_displayData.currenTime) - 1] = '\0';
                     strncpy(_displayData.currenDate, pDateTime.getDayDate(), sizeof(_displayData.currenDate));
                     _displayData.currenDate[sizeof(_displayData.currenDate) - 1] = '\0';
-                    prioTft.showStandbyTime(_displayData.currenTime, _displayData.currenDate);
+                    prioTft.showStandbyTime(_displayData.currenTime, _displayData.currenDate, _displayData.alarmState);
                     prevTime = _displayData.currenTime;
                     prevDate = _displayData.currenDate;
                     Serial.println("Display: Standby state active");

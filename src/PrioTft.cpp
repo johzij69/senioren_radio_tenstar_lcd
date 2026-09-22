@@ -199,7 +199,7 @@ void PrioTft::showTime(const String &time, const String &dayDate)
 
 //     }
 
-void PrioTft::showStandbyTime(const String &time, const String &dayDate)
+void PrioTft::showStandbyTime(const String &time, const String &dayDate, const String &alarmState)
 {
     // String fontPath = "/Oswald124.vlw";
     
@@ -258,6 +258,16 @@ void PrioTft::showStandbyTime(const String &time, const String &dayDate)
     tft.setFreeFont(FSS18);
     String compactDayDate = truncateStringToFit(dayDate, tft.width() - 20);
     tft.drawString(compactDayDate, centerX, dateY);
+
+    int alarmY = dateY + tft.fontHeight() + 12;
+    tft.setTextColor(TFT_YELLOW);
+    String alarmLine = alarmState;
+    if (!alarmLine.startsWith("Sleep:"))
+    {
+        alarmLine = "Alarm: " + alarmLine;
+    }
+    tft.drawString(truncateStringToFit(alarmLine, tft.width() - 20), centerX, alarmY);
+    tft.setTextColor(TFT_WHITE);
 
     tft.setTextDatum(MC_DATUM);
     tft.setTextFont(4);

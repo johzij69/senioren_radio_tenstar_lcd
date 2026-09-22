@@ -56,7 +56,7 @@ public:
     void showLoadingState();
     void showCenteredMessage(const String &text);
     void showStandbyState();
-    void showStandbyTime(const String &time, const String &dayDate);
+    void showStandbyTime(const String &time, const String &dayDate, const String &alarmState);
     String truncateStringToFit(const String &text, int maxWidth);
 };
 
