@@ -90,6 +90,7 @@ void PrioTft::setAlarmState(const String &state)
     const int y = clockAlarmY();
     const String line = state.startsWith("Sleep:") ? state : ("Alarm: " + state);
 
+    tft.setFreeFont(NULL);
     tft.setTextFont(4);
     tft.setTextSize(1);
     tft.setTextDatum(TL_DATUM);
@@ -148,6 +149,7 @@ int PrioTft::clockAreaWidth()
 
 int PrioTft::clockDateY()
 {
+    tft.setFreeFont(NULL);
     tft.setTextFont(8);
     tft.setTextSize(1);
     return CLOCK_TIME_Y + tft.fontHeight() + CLOCK_GAP;
@@ -158,6 +160,7 @@ int PrioTft::clockAlarmY()
     int y = clockDateY();
     tft.setFreeFont(FSS18);
     y += tft.fontHeight() + 6;
+    tft.setFreeFont(NULL);
     tft.setTextFont(4);
     return y;
 }
@@ -168,6 +171,7 @@ void PrioTft::showTime(const String &time, const String &dayDate)
     const int areaW = clockAreaWidth();
     const int timeY = CLOCK_TIME_Y;
 
+    tft.setFreeFont(NULL);
     tft.setTextDatum(TL_DATUM);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.setTextFont(8);
@@ -182,6 +186,7 @@ void PrioTft::showTime(const String &time, const String &dayDate)
     tft.fillRect(areaX, dateY, areaW, tft.fontHeight(), TFT_BLACK);
     tft.drawString(truncateStringToFit(dayDate, areaW - 10), areaX, dateY);
 
+    tft.setFreeFont(NULL);
     tft.setTextDatum(TL_DATUM);
     tft.setTextFont(4);
     tft.setTextSize(1);
@@ -270,6 +275,7 @@ void PrioTft::showStandbyTime(const String &time, const String &dayDate, const S
     tft.setTextColor(TFT_WHITE);
 
     tft.setTextDatum(MC_DATUM);
+    tft.setFreeFont(NULL);
     tft.setTextFont(4);
     tft.setTextSize(1);
 }

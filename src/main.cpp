@@ -63,6 +63,8 @@ bool systemLowPower = false;
 static bool sleepSessionActive = false;
 static unsigned long sleepSessionDeadlineMs = 0;
 
+void refreshAlarmDisplayState(bool sendToDisplay);
+
 static void getDisplayStatusText(char *out, size_t outSize)
 {
     if (sleepSessionActive)
@@ -106,6 +108,8 @@ static void enterStandbyMode()
     systemLowPower = true;
     inStandby = true;
     displayData.standbyState = true;
+    alarmManager.stopRinging();
+    refreshAlarmDisplayState(false);
     strncpy(displayData.currenTime, pDateTime.getTime(), sizeof(displayData.currenTime));
     displayData.currenTime[sizeof(displayData.currenTime) - 1] = '\0';
     strncpy(displayData.currenDate, pDateTime.getDayDate(), sizeof(displayData.currenDate));
@@ -425,7 +429,11 @@ void loop()
 
     if (xSemaphoreTake(sleepButtonSemaphore, 0) == pdTRUE)
     {
-        if (inStandby)
+        if (alarmManager.isRinging())
+        {
+            snoozeActiveAlarm();
+        }
+        else if (inStandby)
         {
             startSleepSessionFromStandby();
         }

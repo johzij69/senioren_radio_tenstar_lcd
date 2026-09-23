@@ -31,8 +31,8 @@ void PrioWebServer::begin()
   /* root page , which handles overzicht */
   server.on("/", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleRoot(request); });
 
-    /* instellingen page , which handles instellingen */
-    server.on("/instellingen", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleInstellingen(request); });
+  /* instellingen page , which handles instellingen */
+  server.on("/instellingen", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleInstellingen(request); });
 
   /* import / export page */
   server.on("/importexport", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleImportExportPage(request); });
