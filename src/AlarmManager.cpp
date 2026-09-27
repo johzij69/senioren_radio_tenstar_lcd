@@ -83,7 +83,6 @@ bool AlarmManager::updateFromJson(uint8_t *data, size_t len, uint32_t streamCoun
 
     return true;
 }
-
 bool AlarmManager::parseFromJsonDocument(JsonDocument &doc, uint32_t streamCount, String &errorMessage)
 {
     if (!doc["alarms"].is<JsonArray>())
@@ -113,17 +112,22 @@ bool AlarmManager::parseFromJsonDocument(JsonDocument &doc, uint32_t streamCount
         JsonObject obj = value.as<JsonObject>();
 
         AlarmEntry alarm;
-        alarm.id = obj["id"].is<uint8_t>() ? obj["id"].as<uint8_t>() : parsedCount;
+        // ROBUSTE PARSING: gebruik 'int' om ArduinoJson type-mismatches te voorkomen
+        alarm.id = obj["id"].is<int>() ? (uint8_t)obj["id"].as<int>() : parsedCount;
         alarm.enabled = obj["enabled"].is<bool>() ? obj["enabled"].as<bool>() : true;
-        alarm.hour = obj["hour"].is<uint8_t>() ? obj["hour"].as<uint8_t>() : 7;
-        alarm.minute = obj["minute"].is<uint8_t>() ? obj["minute"].as<uint8_t>() : 0;
-        alarm.streamIndex = obj["streamIndex"].is<uint8_t>() ? obj["streamIndex"].as<uint8_t>() : 0;
-        alarm.volume = obj["volume"].is<uint8_t>() ? obj["volume"].as<uint8_t>() : 12;
-        alarm.snoozeMinutes = obj["snoozeMinutes"].is<uint8_t>() ? obj["snoozeMinutes"].as<uint8_t>() : 10;
+        alarm.hour = obj["hour"].is<int>() ? (uint8_t)obj["hour"].as<int>() : 7;
+        alarm.minute = obj["minute"].is<int>() ? (uint8_t)obj["minute"].as<int>() : 0;
+        alarm.streamIndex = obj["streamIndex"].is<int>() ? (uint8_t)obj["streamIndex"].as<int>() : 0;
+        alarm.volume = obj["volume"].is<int>() ? (uint8_t)obj["volume"].as<int>() : 12;
+        alarm.snoozeMinutes = obj["snoozeMinutes"].is<int>() ? (uint8_t)obj["snoozeMinutes"].as<int>() : 10;
 
         String modeString = obj["mode"].is<const char *>() ? String((const char *)obj["mode"]) : String("daily");
         alarm.mode = modeFromString(modeString);
-        alarm.dayMask = obj["dayMask"].is<uint8_t>() ? obj["dayMask"].as<uint8_t>() : 0x7F;
+        
+        // DayMask robuust inlezen
+        int parsedMask = obj["dayMask"].is<int>() ? obj["dayMask"].as<int>() : 0x7F;
+        alarm.dayMask = (uint8_t)parsedMask;
+        
         alarm.dayMask = normalizeDayMask(alarm.mode, alarm.dayMask);
         alarm.lastTriggeredMinuteKey = -1;
 
@@ -166,6 +170,90 @@ bool AlarmManager::parseFromJsonDocument(JsonDocument &doc, uint32_t streamCount
     stopRinging();
     return true;
 }
+
+    // ... (rest van de functie blijft ongewijzigd)
+// bool AlarmManager::parseFromJsonDocument(JsonDocument &doc, uint32_t streamCount, String &errorMessage)
+// {
+//     if (!doc["alarms"].is<JsonArray>())
+//     {
+//         errorMessage = "JSON moet een alarms array bevatten";
+//         return false;
+//     }
+
+//     JsonArray incoming = doc["alarms"].as<JsonArray>();
+//     if (incoming.size() > MAX_ALARMS)
+//     {
+//         errorMessage = "Te veel alarmen";
+//         return false;
+//     }
+
+//     AlarmEntry parsed[MAX_ALARMS];
+//     uint8_t parsedCount = 0;
+
+//     for (JsonVariant value : incoming)
+//     {
+//         if (!value.is<JsonObject>())
+//         {
+//             errorMessage = "Alarm item heeft ongeldig formaat";
+//             return false;
+//         }
+
+//         JsonObject obj = value.as<JsonObject>();
+
+//         AlarmEntry alarm;
+//         alarm.id = obj["id"].is<uint8_t>() ? obj["id"].as<uint8_t>() : parsedCount;
+//         alarm.enabled = obj["enabled"].is<bool>() ? obj["enabled"].as<bool>() : true;
+//         alarm.hour = obj["hour"].is<uint8_t>() ? obj["hour"].as<uint8_t>() : 7;
+//         alarm.minute = obj["minute"].is<uint8_t>() ? obj["minute"].as<uint8_t>() : 0;
+//         alarm.streamIndex = obj["streamIndex"].is<uint8_t>() ? obj["streamIndex"].as<uint8_t>() : 0;
+//         alarm.volume = obj["volume"].is<uint8_t>() ? obj["volume"].as<uint8_t>() : 12;
+//         alarm.snoozeMinutes = obj["snoozeMinutes"].is<uint8_t>() ? obj["snoozeMinutes"].as<uint8_t>() : 10;
+
+//         String modeString = obj["mode"].is<const char *>() ? String((const char *)obj["mode"]) : String("daily");
+//         alarm.mode = modeFromString(modeString);
+//         alarm.dayMask = obj["dayMask"].is<uint8_t>() ? obj["dayMask"].as<uint8_t>() : 0x7F;
+//         alarm.dayMask = normalizeDayMask(alarm.mode, alarm.dayMask);
+//         alarm.lastTriggeredMinuteKey = -1;
+
+//         if (!validateAlarm(alarm, streamCount, errorMessage))
+//         {
+//             return false;
+//         }
+
+//         parsed[parsedCount++] = alarm;
+//     }
+
+//     uint8_t perDayCounter[7] = {0, 0, 0, 0, 0, 0, 0};
+//     for (uint8_t i = 0; i < parsedCount; i++)
+//     {
+//         if (!parsed[i].enabled)
+//         {
+//             continue;
+//         }
+
+//         for (uint8_t day = 0; day < 7; day++)
+//         {
+//             if (isDayActiveForAlarm(parsed[i], day))
+//             {
+//                 perDayCounter[day]++;
+//                 if (perDayCounter[day] > MAX_ALARMS_PER_DAY)
+//                 {
+//                     errorMessage = "Maximaal 5 alarmen per dag toegestaan";
+//                     return false;
+//                 }
+//             }
+//         }
+//     }
+
+//     alarmCount = parsedCount;
+//     for (uint8_t i = 0; i < alarmCount; i++)
+//     {
+//         alarms[i] = parsed[i];
+//     }
+
+//     stopRinging();
+//     return true;
+// }
 
 void AlarmManager::appendAlarmsJson(JsonArray &array) const
 {

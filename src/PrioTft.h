@@ -15,8 +15,12 @@
 class PrioTft {
 private:
 
+    int wifiSignalPercent = -1;
+    int bufferFillPercent = -1;
 
-
+    void drawTopStatusWidgets();
+    void drawWifiIndicator(int startX, int baseY, int width, int height);
+    void drawBufferIndicator(int startX, int baseY, int blockCount, int blockWidth, int blockHeight, int blockGap);
 public:
     TFT_eSPI tft; // TFT scherm object
     PrioBar pBar; // Volume balk object
@@ -38,6 +42,7 @@ public:
     void init();
     void loop();  // Update het scherm
     void showLocalIp(const String &ip); // Toon het IP adres op het scherm
+    void setWifiSignalStrength(int percent);
     void setVolume(int _cur_volume);
     void setTitle(const String &title);
     void setLogo(const String &url);

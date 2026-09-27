@@ -40,6 +40,7 @@ void AdjustBackLight(Adafruit_VEML7700 veml);
 void SetBacklightPWM(int brightness);
 int mapLuxToPWM(float lux);
 void setup_backlight() ;
+static int rssiToPercent(int32_t rssi);
 struct DisplayData {
     char title[100];
     char logo[255];

@@ -36,6 +36,8 @@ static void updateSleepMinutesMenuLabel();
 
 int last_volume_for_menu = 0; // Initialize with your default volume
 int last_volume = 10;
+int prevWifiPercent = -1;
+int wifiPercent = 0;
 
 PrioRotaryMenu myMenu(prioTft.tft); // Create a RotaryMenu instance using the TFT object from PrioTft
 PrioDateTime pDateTime(RTC_CLK_PIN, RTC_DAT_PIN, RTC_RST_PIN);
@@ -187,31 +189,31 @@ void DisplayTask(void *parameter)
     updateSleepMinutesMenuLabel();
     
 
-    // for (int attempt = 0; attempt < 5; ++attempt)
-    // {
-    //     Serial.print("DisplayTask: Initializing light sensor, attempt ");
-    //     Serial.println(attempt + 1);
+    for (int attempt = 0; attempt < 5; ++attempt)
+    {
+        Serial.print("DisplayTask: Initializing light sensor, attempt ");
+        Serial.println(attempt + 1);
         
-    //     if (veml.begin())
-    //     {
-    //         sensorFound = true;
-    //         break;
-    //     }
-    //     Serial.println("Sensor not found, retrying...");
-    //     vTaskDelay(500 / portTICK_PERIOD_MS);
-    // }
+        if (veml.begin())
+        {
+            sensorFound = true;
+            break;
+        }
+        Serial.println("Sensor not found, retrying...");
+        vTaskDelay(500 / portTICK_PERIOD_MS);
+    }
 
-    // //  sensorFound = false; // Probeer de sensor te initialiseren
-    // if (!sensorFound)
-    // {
-    //     Serial.println("Light sensor not found after 5 attempts, continuing without sensor.");
-    // }
-    // else
-    // {
-    //     Serial.println("Light Sensor found");
-    //     veml.setGain(VEML7700_GAIN_1);
-    //     veml.setIntegrationTime(VEML7700_IT_100MS);
-    // }
+    //  sensorFound = false; // Probeer de sensor te initialiseren
+    if (!sensorFound)
+    {
+        Serial.println("Light sensor not found after 5 attempts, continuing without sensor.");
+    }
+    else
+    {
+        Serial.println("Light Sensor found");
+        veml.setGain(VEML7700_GAIN_1);
+        veml.setIntegrationTime(VEML7700_IT_100MS);
+    }
     setup_backlight(); // Initialiseer de backlight
 
     // Zet het event om aan te geven dat de DisplayTask is gestart
@@ -431,6 +433,8 @@ void DisplayTask(void *parameter)
             _displayData.currenDate[sizeof(_displayData.currenDate) - 1] = '\0';
             prioTft.showTime(_displayData.currenTime, _displayData.currenDate);
             prioTft.setVolume(last_volume); // Gebruik de lokale actuele volume
+            wifiPercent = rssiToPercent(WiFi.RSSI());
+            prioTft.setWifiSignalStrength(wifiPercent);
 
             // Reset de 'prev' variabelen. 
             // Hierdoor worden toekomstige updates vanuit de Main Task (via de queue) 
@@ -553,6 +557,13 @@ void DisplayTask(void *parameter)
                         prevTime = _displayData.currenTime;
                         prevDate = _displayData.currenDate;
                     }
+
+                    wifiPercent = rssiToPercent(WiFi.RSSI());
+                    if (wifiPercent != prevWifiPercent) {
+                        prioTft.setWifiSignalStrength(wifiPercent);
+                        prevWifiPercent = wifiPercent;
+                    }
+
                 }
             }
         }
@@ -692,7 +703,7 @@ void setup_backlight()
 int mapLuxToPWM(float lux)
 {
     // Minimale en maximale lux-waarden in jouw omgeving
-    const float minLux = 20.0;   // Donkere kamer
+    const float minLux = 10.0;   // Donkere kamer
     const float maxLux = 1000.0; // Zeer heldere ruimte / daglicht
 
     // Beperk lux tot binnen bereik
@@ -703,7 +714,7 @@ int mapLuxToPWM(float lux)
 
     // Inverse mapping: hoe meer licht, hoe minder backlight
     // Minder lux = meer helderheid, dus PWM = 255 bij minLux, 0 bij maxLux
-    int targetPWM = map(lux, minLux, maxLux, 30, 255); // 30 als minimum brightness voor zichtbaarheid
+    int targetPWM = map(lux, minLux, maxLux, 15, 255); // 30 als minimum brightness voor zichtbaarheid
 
     // Beperk PWM tot veilige grenzen
     if (targetPWM < 30)
@@ -803,14 +814,17 @@ void onMenuClose() {
     rotaryInstance.current_value_changed = false;
     rotaryInstance.getAndResetRotationCounter();
     last_volume_for_menu = last_volume; // SYNC
-
-
-
-   
-
-
 }
-
+static int rssiToPercent(int32_t rssi)
+{
+    if (rssi >= -30) {
+        return 100;
+    }
+    if (rssi <= -100) {
+        return 0;
+    }
+    return (int)((rssi + 100) * 100 / 70);
+}
 // Interrupt routine just sets a flag when rotation is detected
 void IRAM_ATTR checkVolume()
 {

@@ -46,6 +46,99 @@ void PrioTft::showStandbyState()
     tft.setTextFont(4);
     tft.setTextSize(1);
 }
+void PrioTft::drawTopStatusWidgets()
+{
+    const int topY = 1;
+    const int availableWidth = tft.width() - pBar.width_set;
+    const int rightMargin = 4;
+    const int innerGap = 8;
+    const int widgetBandHeight = tft.fontHeight();
+    const int verticalOffset = 2;
+
+    const int wifiWidth = 24;
+    const int wifiHeight = 21;
+
+    const int bufferBlockCount = 5;
+    const int bufferBlockWidth = 4;
+    const int bufferBlockHeight = 17;
+    const int bufferBlockGap = 2;
+    const int bufferWidth = (bufferBlockCount * bufferBlockWidth) + ((bufferBlockCount - 1) * bufferBlockGap);
+
+    const int totalWidth = wifiWidth + innerGap + bufferWidth;
+    const int startX = availableWidth - totalWidth - rightMargin;
+    const int endX = availableWidth - 1;
+
+    tft.fillRect(startX - 2, topY, (endX - startX) + 4, widgetBandHeight, TFT_GREYBLUE);
+
+    const int widgetBaseY = topY + widgetBandHeight - 1 - verticalOffset;
+
+    int bufferFillBlocks = 0;
+    if (bufferFillPercent > 0) {
+        bufferFillBlocks = (bufferFillPercent + 19) / 20;
+    }
+    if (bufferFillBlocks > bufferBlockCount) {
+        bufferFillBlocks = bufferBlockCount;
+    }
+
+    drawBufferIndicator(startX, widgetBaseY, bufferFillBlocks, bufferBlockWidth, bufferBlockHeight, bufferBlockGap);
+    drawWifiIndicator(startX + bufferWidth + innerGap, widgetBaseY, wifiWidth, wifiHeight);
+}
+void PrioTft::drawWifiIndicator(int startX, int baseY, int width, int height)
+{
+    int bars = 0;
+    if (wifiSignalPercent >= 75) {
+        bars = 4;
+    } else if (wifiSignalPercent >= 50) {
+        bars = 3;
+    } else if (wifiSignalPercent >= 25) {
+        bars = 2;
+    } else if (wifiSignalPercent > 0) {
+        bars = 1;
+    }
+
+    const int totalBars = 4;
+    const int barWidth = 3;
+    const int barGap = 2;
+    const int maxBarHeight = height;
+
+    tft.drawRect(startX - 1, baseY - maxBarHeight, width, maxBarHeight + 1, TFT_LIGHTGREY);
+
+    for (int i = 0; i < totalBars; ++i) {
+        int barHeight = ((i + 1) * maxBarHeight) / totalBars;
+        int x = startX + (i * (barWidth + barGap));
+        int y = baseY - barHeight;
+        uint16_t color = (i < bars) ? TFT_WHITE : TFT_LIGHTGREY;
+        tft.fillRect(x, y, barWidth, barHeight, color);
+    }
+}
+void PrioTft::drawBufferIndicator(int startX, int baseY, int blockCount, int blockWidth, int blockHeight, int blockGap)
+{
+    for (int i = 0; i < 5; ++i) {
+        int x = startX + i * (blockWidth + blockGap);
+        int y = baseY - blockHeight;
+        uint16_t fillColor = (i < blockCount) ? TFT_WHITE : TFT_GREYBLUE;
+        tft.fillRect(x, y, blockWidth, blockHeight, fillColor);
+        tft.drawRect(x, y, blockWidth, blockHeight, TFT_LIGHTGREY);
+    }
+}
+
+
+void PrioTft::setWifiSignalStrength(int percent)
+{
+    if (percent < 0) {
+        percent = 0;
+    }
+    if (percent > 100) {
+        percent = 100;
+    }
+
+    if (wifiSignalPercent == percent) {
+        return;
+    }
+
+    wifiSignalPercent = percent;
+    drawTopStatusWidgets();
+}
 
 void PrioTft::loop()
 {

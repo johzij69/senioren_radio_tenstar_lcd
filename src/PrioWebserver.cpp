@@ -874,9 +874,9 @@ String PrioWebServer::getHtmlStart()
 
 String PrioWebServer::getTopMenu()
 {
-
   String html PROGMEM = R"(
-  <div class='top-menu'>
+  <div class='top-menu' id='topMenu'>
+    <button class='hamburger' id='hamburgerBtn' aria-label='Menu'>&#9776;</button>
     <a href='/'>Overzicht</a>
     <a href='/inpustream'>Voeg toe</a>
     <a href='/alarmen'>Alarmen</a>
@@ -886,6 +886,11 @@ String PrioWebServer::getTopMenu()
     <span class='alarm-badge alarm-uit' id='alarm-status-badge'>Alarm: uit</span>
   </div>
   <script>
+    // Hamburger menu toggle voor mobiel
+    document.getElementById('hamburgerBtn').addEventListener('click', function() {
+      document.getElementById('topMenu').classList.toggle('mobile-active');
+    });
+
     (function () {
       const badge = document.getElementById("alarm-status-badge");
 

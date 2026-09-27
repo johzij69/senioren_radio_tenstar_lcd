@@ -830,7 +830,7 @@ String getAlarmScript(String ip)
         bindAlarmInputs();
       }
 
-      function bindAlarmInputs() {
+            function bindAlarmInputs() {
         document.querySelectorAll("[data-field]").forEach((el) => {
           el.addEventListener("change", (event) => {
             const idx = Number(event.target.dataset.index);
@@ -866,6 +866,16 @@ String getAlarmScript(String ip)
                 alarm.dayMask &= ~(1 << dayIndex);
               }
 
+              // NIEUW: Schakel automatisch over naar 'custom' als de gebruiker handmatig dagen wijzigt.
+              // Dit voorkomt dat de C++ backend de dayMask overschrijft met de standaardwaarden van daily/weekdays/weekend.
+              if (alarm.mode !== "custom" && alarm.mode !== "weekly") {
+                alarm.mode = "custom";
+                const modeSelect = document.querySelector(`select[data-field="mode"][data-index="${event.target.dataset.index}"]`);
+                if (modeSelect) {
+                  modeSelect.value = "custom";
+                }
+              }
+
               if (alarm.mode === "weekly") {
                 alarm.dayMask = 1 << dayIndex;
                 renderAlarmList();
@@ -883,7 +893,7 @@ String getAlarmScript(String ip)
           });
         });
       }
-
+        
       async function saveAlarms() {
         try {
           const payload = { alarms };
