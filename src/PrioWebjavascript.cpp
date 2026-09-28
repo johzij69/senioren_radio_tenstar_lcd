@@ -690,7 +690,11 @@ String getAlarmScript(String ip)
         if (mode === "daily") return 0x7f;
         if (mode === "weekdays") return 0x3e;
         if (mode === "weekend") return 0x41;
-        if (mode === "weekly" || mode === "once") {
+        if (mode === "once") {
+          if (currentMask !== 0 && (currentMask & (currentMask - 1)) === 0) return currentMask;
+          return 1 << ((new Date().getDay() + 1) % 7);
+        }
+        if (mode === "weekly") {
           for (let i = 0; i < 7; i++) {
             if ((currentMask & (1 << i)) !== 0) return 1 << i;
           }
@@ -862,6 +866,11 @@ String getAlarmScript(String ip)
               alarm.snoozeMinutes = Number(event.target.value);
             } else if (field === "dayMask") {
               const dayIndex = Number(event.target.dataset.day);
+              if (alarm.mode === "weekly" || alarm.mode === "once") {
+                alarm.dayMask = 1 << dayIndex;
+                renderAlarmList();
+                return;
+              }
               if (event.target.checked) {
                 alarm.dayMask |= 1 << dayIndex;
               } else {
@@ -878,11 +887,6 @@ String getAlarmScript(String ip)
                 }
               }
 
-              if (alarm.mode === "weekly" || alarm.mode === "once") {
-                alarm.dayMask = 1 << dayIndex;
-                renderAlarmList();
-                return;
-              }
             }
           });
         });
