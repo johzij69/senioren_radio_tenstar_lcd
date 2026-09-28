@@ -380,6 +380,11 @@ bool AlarmManager::poll(time_t now, AlarmEntry &triggeredAlarm, bool &fromSnooze
         snoozePending = false;
         snoozeAlarmId = -1;
         triggeredAlarm = alarm;
+        if (alarm.mode == REPEAT_ONCE)
+        {
+            alarm.enabled = false;
+            saveToPreferences();
+        }
         return true;
     }
 
@@ -619,6 +624,10 @@ AlarmManager::RepeatMode AlarmManager::modeFromString(const String &modeString)
     {
         return REPEAT_CUSTOM;
     }
+    if (modeString == "once")
+    {
+        return REPEAT_ONCE;
+    }
     return REPEAT_DAILY;
 }
 
@@ -634,6 +643,8 @@ const char *AlarmManager::modeDebugLabel(RepeatMode mode)
         return "weekly";
     case REPEAT_CUSTOM:
         return "custom";
+    case REPEAT_ONCE:
+        return "once";
     case REPEAT_DAILY:
     default:
         return "daily";
@@ -652,6 +663,8 @@ String AlarmManager::modeToString(RepeatMode mode)
         return "weekly";
     case REPEAT_CUSTOM:
         return "custom";
+    case REPEAT_ONCE:
+        return "once";
     case REPEAT_DAILY:
     default:
         return "daily";
@@ -669,6 +682,7 @@ uint8_t AlarmManager::normalizeDayMask(RepeatMode mode, uint8_t dayMask)
     case REPEAT_WEEKEND:
         return 0x41; // Sun + Sat
     case REPEAT_WEEKLY:
+    case REPEAT_ONCE:
     {
         if ((dayMask & 0x7F) == 0)
         {

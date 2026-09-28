@@ -9,6 +9,7 @@ static String alarmModeToString(AlarmManager::RepeatMode mode) {
         case AlarmManager::REPEAT_WEEKEND:  return "weekend";
         case AlarmManager::REPEAT_WEEKLY:   return "weekly";
         case AlarmManager::REPEAT_CUSTOM:   return "custom";
+        case AlarmManager::REPEAT_ONCE:     return "once";
         default: return "daily";
     }
 }
@@ -23,6 +24,7 @@ void AlarmSetup::start() {
     _listSelection = 0;
     _prevListSelection = -1;
     _scrollOffset = 0;
+    _editScrollOffset = 0;
     _selectedAlarmIndex = -1;
     _selectedField = 0;
     _prevField = -1;
@@ -69,7 +71,7 @@ void AlarmSetup::onRotaryDelta(int delta) {
                     break;
                 case FIELD_REPEAT: {
                     int modeIdx = (int)_editAlarm.mode;
-                    modeIdx = (modeIdx + delta + 5) % 5;
+                    modeIdx = (modeIdx + delta % 6 + 6) % 6;
                     _editAlarm.mode = (AlarmManager::RepeatMode)modeIdx;
                     switch (_editAlarm.mode) {
                         case AlarmManager::REPEAT_DAILY:    _editAlarm.dayMask = 0x7F; break;
@@ -77,9 +79,17 @@ void AlarmSetup::onRotaryDelta(int delta) {
                         case AlarmManager::REPEAT_WEEKEND:  _editAlarm.dayMask = 0x41; break;
                         case AlarmManager::REPEAT_WEEKLY:   _editAlarm.dayMask = 0x02; break;
                         case AlarmManager::REPEAT_CUSTOM:   _editAlarm.dayMask = 0x7F; break;
+                        case AlarmManager::REPEAT_ONCE:     _editAlarm.dayMask = 0x02; break;
                     }
                     break;
                 }
+                case FIELD_DAY:
+                    if (_editAlarm.mode == AlarmManager::REPEAT_ONCE || _editAlarm.mode == AlarmManager::REPEAT_WEEKLY) {
+                        int day = 0;
+                        while ((_editAlarm.dayMask & (1 << day)) == 0 && day < 6) day++;
+                        _editAlarm.dayMask = 1 << ((day + delta % 7 + 7) % 7);
+                    }
+                    break;
                 case FIELD_SNOOZE:
                     _editAlarm.snoozeMinutes = constrain(_editAlarm.snoozeMinutes + delta, 0, 120);
                     break;
@@ -257,21 +267,28 @@ void AlarmSetup::drawAlarmListItem(int index, bool selected) {
 }
 
 void AlarmSetup::drawEditForm(bool fullRedraw) {
+    bool pageChanged = updatePageOffset(_selectedField, FIELD_COUNT, 8, _editScrollOffset);
     if (fullRedraw) {
         drawHeader(_selectedAlarmIndex >= 0 ? "Alarm Bewerken" : "Nieuw Alarm");
-        for (int i = 0; i < FIELD_COUNT; i++) {
-            drawEditField(i, (i == _selectedField), _editMode && (i == _selectedField));
-        }
         _tft->setTextColor(TFT_LIGHTGREY, BG_COLOR);
         _tft->setTextDatum(BC_DATUM);
         _tft->setTextSize(1);
         _tft->drawString("Draai = aanpassen  |  Druk = bevestig/veld  |  Lang = terug", 240, 315);
+    }
+    if (fullRedraw || pageChanged) {
+        _tft->fillRect(10, 50, 460, 240, BG_COLOR);
+        for (int i = _editScrollOffset; i < _editScrollOffset + 8 && i < FIELD_COUNT; i++) {
+            drawEditField(i, (i == _selectedField), _editMode && (i == _selectedField));
+        }
     } else {
         if (_prevField != _selectedField || _prevEditMode != _editMode) {
             if (_prevField >= 0) drawEditField(_prevField, false, false);
             drawEditField(_selectedField, true, _editMode);
         } else if (_editMode && _selectedField == _prevField) {
             drawEditField(_selectedField, true, true);
+            if (_selectedField == FIELD_REPEAT && FIELD_DAY < _editScrollOffset + 8 && FIELD_DAY >= _editScrollOffset) {
+                drawEditField(FIELD_DAY, false, false);
+            }
         }
     }
 }
@@ -279,7 +296,7 @@ void AlarmSetup::drawEditForm(bool fullRedraw) {
 void AlarmSetup::drawEditField(int field, bool selected, bool editing) {
     int startY = 50;
     int itemHeight = 30;
-    int y = startY + field * itemHeight;
+    int y = startY + (field - _editScrollOffset) * itemHeight;
 
     uint16_t bg = selected ? (editing ? EDIT_COLOR : HIGHLIGHT_COLOR) : BG_COLOR;
     _tft->fillRect(10, y + 2, 460, itemHeight - 4, bg);
@@ -323,6 +340,17 @@ void AlarmSetup::drawEditField(int field, bool selected, bool editing) {
             label = "Herhalen";
             value = getRepeatLabel(_editAlarm.mode);
             break;
+        case FIELD_DAY: {
+            label = "Dag";
+            static const char* dayNames[] = {"Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"};
+            value = "n.v.t.";
+            if (_editAlarm.mode == AlarmManager::REPEAT_ONCE || _editAlarm.mode == AlarmManager::REPEAT_WEEKLY) {
+                for (int day = 0; day < 7; day++) {
+                    if (_editAlarm.dayMask & (1 << day)) { value = dayNames[day]; break; }
+                }
+            }
+            break;
+        }
         case FIELD_SNOOZE:
             label = "Snooze";
             snprintf(buf, sizeof(buf), "%d min", _editAlarm.snoozeMinutes);
@@ -456,6 +484,7 @@ const char* AlarmSetup::getRepeatLabel(AlarmManager::RepeatMode mode) {
         case AlarmManager::REPEAT_WEEKEND:  return "Weekend";
         case AlarmManager::REPEAT_WEEKLY:   return "Wekelijks";
         case AlarmManager::REPEAT_CUSTOM:   return "Aangepast";
+        case AlarmManager::REPEAT_ONCE:     return "Eenmalig";
         default: return "Onbekend";
     }
 }

@@ -44,6 +44,7 @@ private:
         FIELD_STREAM,
         FIELD_VOLUME,
         FIELD_REPEAT,
+        FIELD_DAY,
         FIELD_SNOOZE,
         FIELD_ENABLED,
         FIELD_SAVE,
@@ -56,6 +57,7 @@ private:
     int _selectedField = 0;
     int _listSelection = 0;
     int _scrollOffset = 0;
+    int _editScrollOffset = 0;
 
     static constexpr int LIST_START_Y = 50;
     static constexpr int ITEM_HEIGHT = 40;

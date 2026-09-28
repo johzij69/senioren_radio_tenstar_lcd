@@ -18,7 +18,8 @@ public:
         REPEAT_WEEKDAYS = 1,
         REPEAT_WEEKEND = 2,
         REPEAT_WEEKLY = 3,
-        REPEAT_CUSTOM = 4
+        REPEAT_CUSTOM = 4,
+        REPEAT_ONCE = 5
     };
 
     enum RuntimeStatus : uint8_t

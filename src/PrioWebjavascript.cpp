@@ -657,6 +657,7 @@ String getAlarmScript(String ip)
         { value: "weekend", label: "Weekend" },
         { value: "weekly", label: "Wekelijks" },
         { value: "custom", label: "Aangepast" },
+        { value: "once", label: "Eenmalig" },
       ];
 
       let streams = [];
@@ -689,7 +690,7 @@ String getAlarmScript(String ip)
         if (mode === "daily") return 0x7f;
         if (mode === "weekdays") return 0x3e;
         if (mode === "weekend") return 0x41;
-        if (mode === "weekly") {
+        if (mode === "weekly" || mode === "once") {
           for (let i = 0; i < 7; i++) {
             if ((currentMask & (1 << i)) !== 0) return 1 << i;
           }
@@ -814,7 +815,8 @@ String getAlarmScript(String ip)
               ${dayNames
                 .map((name, dayIndex) => {
                   const checked = (alarm.dayMask & (1 << dayIndex)) !== 0 ? "checked" : "";
-                  return `<label class="alarm-day"><input type="checkbox" data-field="dayMask" data-day="${dayIndex}" data-index="${idx}" ${checked}/> ${name}</label>`;
+                  const singleDay = alarm.mode === "weekly" || alarm.mode === "once";
+                  return `<label class="alarm-day"><input type="${singleDay ? "radio" : "checkbox"}" ${singleDay ? `name="alarm-day-${idx}"` : ""} data-field="dayMask" data-day="${dayIndex}" data-index="${idx}" ${checked}/> ${name}</label>`;
                 })
                 .join("")}
             </div>
@@ -876,7 +878,7 @@ String getAlarmScript(String ip)
                 }
               }
 
-              if (alarm.mode === "weekly") {
+              if (alarm.mode === "weekly" || alarm.mode === "once") {
                 alarm.dayMask = 1 << dayIndex;
                 renderAlarmList();
                 return;
