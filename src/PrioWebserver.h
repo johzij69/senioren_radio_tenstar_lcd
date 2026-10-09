@@ -13,6 +13,19 @@
 #include "LittleFS.h"
 #include "fetchImage.h"
 
+struct OtaStatusSnapshot
+{
+  String currentVersion;
+  String latestVersion;
+  String sourceBaseUrl;
+  String lastError;
+  String updateMessage;
+  bool updateAvailable;
+  bool checkInProgress;
+  bool updateInProgress;
+  uint32_t uptimeSeconds;
+  uint32_t lastCheckAgeSeconds;
+};
 
 
 class PrioWebServer
@@ -52,6 +65,7 @@ private:
   void handleDeleteStream(AsyncWebServerRequest *request);
   void handleInstellingen(AsyncWebServerRequest *request);
   void handleImportExportPage(AsyncWebServerRequest *request);
+  void handleContactPage(AsyncWebServerRequest *request);
   void handleSynctime(AsyncWebServerRequest *request);
   void handleAlarmPage(AsyncWebServerRequest *request);
   void handleApiAlarms(AsyncWebServerRequest *request);
@@ -60,6 +74,9 @@ private:
   void handleApiImportConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len);
   void handleSaveAlarms(AsyncWebServerRequest *request, uint8_t *data, size_t len);
   void handleApiSettings(AsyncWebServerRequest *request);
+  void handleApiOtaStatus(AsyncWebServerRequest *request);
+  void handleApiOtaCheck(AsyncWebServerRequest *request);
+  void handleApiOtaUpdate(AsyncWebServerRequest *request, uint8_t *data, size_t len);
   void handleSaveSettings(AsyncWebServerRequest *request, uint8_t *data, size_t len);
   void handleUploadLogo(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final);
   void handleUploadLogoReplace(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final);
@@ -70,6 +87,24 @@ private:
 
 
   void handleApi(AsyncWebServerRequest *request);
+  bool checkOtaVersion();
+  bool startOtaCheckAsync();
+  bool startOtaUpdateAsync(String &message);
+  bool runOtaUpdate(String &message);
+  OtaStatusSnapshot getOtaStatusSnapshot();
+  static void otaCheckTaskEntry(void *param);
+  void otaCheckTaskBody();
+  static void otaUpdateTaskEntry(void *param);
+  void otaUpdateTaskBody();
+
+  String otaLatestVersion;
+  String otaSourceBaseUrl;
+  String otaLastError;
+  String otaLastUpdateMessage;
+  bool otaUpdateAvailable = false;
+  volatile bool otaCheckInProgress = false;
+  volatile bool otaUpdateInProgress = false;
+  unsigned long otaLastCheckMs = 0;
 };
 
 #endif

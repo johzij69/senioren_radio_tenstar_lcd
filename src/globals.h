@@ -50,6 +50,11 @@
 #define SLEEP_MAX_MINUTES 180
 #define SLEEP_DEFAULT_MINUTES 30
 
+#define BACKLIGHT_PERCENT_MIN 0
+#define BACKLIGHT_PERCENT_MAX 100
+#define BACKLIGHT_MIN_PERCENT_DEFAULT 12
+#define BACKLIGHT_MAX_PERCENT_DEFAULT 100
+
 // Input panel
 #define TOPPANEL_INT_PIN 45 
 #define TOPPANEL_SDA 47
@@ -66,6 +71,9 @@
 
 
 extern int last_volume;
+
+extern volatile uint8_t gBacklightMinPercent;
+extern volatile uint8_t gBacklightMaxPercent;
 
 
 

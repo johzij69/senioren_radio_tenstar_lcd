@@ -31,8 +31,15 @@ unsigned long redrawLockoutTime = 0; // Tijdstempel om knopdrukken na redraw te 
 static MyPreferences menuPrefs("myRadio"); // voor instellingen die vanuit onMenuAction worden bewaard
 static const char* CLOCK_MODE_KEY = "clock24h";
 static const char* SLEEP_MINUTES_KEY = "sleep_minutes";
+static const char* BACKLIGHT_MIN_PERCENT_KEY = "bl_min_pct";
+static const char* BACKLIGHT_MAX_PERCENT_KEY = "bl_max_pct";
+volatile uint8_t gBacklightMinPercent = BACKLIGHT_MIN_PERCENT_DEFAULT;
+volatile uint8_t gBacklightMaxPercent = BACKLIGHT_MAX_PERCENT_DEFAULT;
 static void updateClockModeMenuLabel();
 static void updateSleepMinutesMenuLabel();
+static void updateBacklightMinMenuLabel();
+static void updateBacklightMaxMenuLabel();
+static void loadBacklightRangeFromPreferences();
 
 int last_volume_for_menu = 0; // Initialize with your default volume
 int last_volume = 10;
@@ -78,6 +85,38 @@ static void updateSleepMinutesMenuLabel()
     myMenu.setActionLabel("setSleepMinutes", sleepLabel);
 }
 
+static void updateBacklightMinMenuLabel()
+{
+    static char minLabel[28];
+    snprintf(minLabel, sizeof(minLabel), "Backlight min: %u%%", (unsigned)gBacklightMinPercent);
+    myMenu.setActionLabel("setBacklightMin", minLabel);
+}
+
+static void updateBacklightMaxMenuLabel()
+{
+    static char maxLabel[28];
+    snprintf(maxLabel, sizeof(maxLabel), "Backlight max: %u%%", (unsigned)gBacklightMaxPercent);
+    myMenu.setActionLabel("setBacklightMax", maxLabel);
+}
+
+static void loadBacklightRangeFromPreferences()
+{
+    int minPct = (int)menuPrefs.getUInt(BACKLIGHT_MIN_PERCENT_KEY, BACKLIGHT_MIN_PERCENT_DEFAULT);
+    int maxPct = (int)menuPrefs.getUInt(BACKLIGHT_MAX_PERCENT_KEY, BACKLIGHT_MAX_PERCENT_DEFAULT);
+
+    minPct = constrain(minPct, BACKLIGHT_PERCENT_MIN, BACKLIGHT_PERCENT_MAX);
+    maxPct = constrain(maxPct, BACKLIGHT_PERCENT_MIN, BACKLIGHT_PERCENT_MAX);
+    if (minPct > maxPct)
+    {
+        int tmp = minPct;
+        minPct = maxPct;
+        maxPct = tmp;
+    }
+
+    gBacklightMinPercent = (uint8_t)minPct;
+    gBacklightMaxPercent = (uint8_t)maxPct;
+}
+
 int huidigePWN = 100;                             // beginwaarde
 const ledc_channel_t pwmChannel = LEDC_CHANNEL_0; // Kanaal 0-7
 
@@ -109,6 +148,8 @@ const char* menuJson = R"(
     "label": "Other",
     "items": [
             { "label": "Sleep", "action": "setSleepMinutes" },
+            { "label": "Backlight min", "action": "setBacklightMin" },
+            { "label": "Backlight max", "action": "setBacklightMax" },
       { "label": "Stop Webserver", "action": "stopWebserver" }
     ]
   },
@@ -185,8 +226,11 @@ void DisplayTask(void *parameter)
     myMenu.loadMenu(menuJson);
     menuPrefs.begin();
     pDateTime.set24HourMode(menuPrefs.readValue(CLOCK_MODE_KEY, 1) != 0);
+    loadBacklightRangeFromPreferences();
     updateClockModeMenuLabel();
     updateSleepMinutesMenuLabel();
+    updateBacklightMinMenuLabel();
+    updateBacklightMaxMenuLabel();
     
 
     for (int attempt = 0; attempt < 5; ++attempt)
@@ -712,15 +756,19 @@ int mapLuxToPWM(float lux)
     if (lux > maxLux)
         lux = maxLux;
 
-    // Inverse mapping: hoe meer licht, hoe minder backlight
-    // Minder lux = meer helderheid, dus PWM = 255 bij minLux, 0 bij maxLux
-    int targetPWM = map(lux, minLux, maxLux, 15, 255); // 30 als minimum brightness voor zichtbaarheid
+    int minPct = constrain((int)gBacklightMinPercent, BACKLIGHT_PERCENT_MIN, BACKLIGHT_PERCENT_MAX);
+    int maxPct = constrain((int)gBacklightMaxPercent, BACKLIGHT_PERCENT_MIN, BACKLIGHT_PERCENT_MAX);
+    if (minPct > maxPct)
+    {
+        int tmp = minPct;
+        minPct = maxPct;
+        maxPct = tmp;
+    }
 
-    // Beperk PWM tot veilige grenzen
-    if (targetPWM < 30)
-        targetPWM = 30;
-    if (targetPWM > 255)
-        targetPWM = 255;
+    float scaled = (lux - minLux) / (maxLux - minLux);
+    int targetPercent = round(minPct + scaled * (maxPct - minPct));
+    targetPercent = constrain(targetPercent, BACKLIGHT_PERCENT_MIN, BACKLIGHT_PERCENT_MAX);
+    int targetPWM = (targetPercent * 255) / 100;
 
     if (targetPWM > huidigePWN)
         huidigePWN = min(huidigePWN + FADE_STEP, targetPWM);
@@ -765,6 +813,26 @@ void onMenuAction(const char* action) {
         }
         menuPrefs.putUInt(SLEEP_MINUTES_KEY, currentSleepMinutes);
         updateSleepMinutesMenuLabel();
+    } else if (strcmp(action, "setBacklightMin") == 0) {
+        int minPct = ((int)gBacklightMinPercent + 5) % 101;
+        int maxPct = (int)gBacklightMaxPercent;
+        if (minPct > maxPct)
+        {
+            minPct = BACKLIGHT_PERCENT_MIN;
+        }
+        gBacklightMinPercent = (uint8_t)minPct;
+        menuPrefs.putUInt(BACKLIGHT_MIN_PERCENT_KEY, (uint32_t)gBacklightMinPercent);
+        updateBacklightMinMenuLabel();
+    } else if (strcmp(action, "setBacklightMax") == 0) {
+        int minPct = (int)gBacklightMinPercent;
+        int maxPct = ((int)gBacklightMaxPercent + 5) % 101;
+        if (maxPct < minPct)
+        {
+            maxPct = BACKLIGHT_PERCENT_MAX;
+        }
+        gBacklightMaxPercent = (uint8_t)maxPct;
+        menuPrefs.putUInt(BACKLIGHT_MAX_PERCENT_KEY, (uint32_t)gBacklightMaxPercent);
+        updateBacklightMaxMenuLabel();
     } else if (strcmp(action, "stopWebserver") == 0) {
         webServer.setEnabled(!webServer.isRunning());
         updateWebserverMenuLabel();
@@ -782,6 +850,8 @@ void onMenuOpen() {
     last_volume_for_menu = rotaryInstance.current_value; // SYNC
     updateWebserverMenuLabel(); // webserver start pas na deze task, dus label hier verversen
     updateSleepMinutesMenuLabel();
+    updateBacklightMinMenuLabel();
+    updateBacklightMaxMenuLabel();
     Serial.println("Menu Opened - Pausing Player UI updates");
 }
 

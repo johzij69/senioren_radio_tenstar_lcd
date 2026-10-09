@@ -1,6 +1,19 @@
 #include "PrioWebServer.h"
+#include <HTTPClient.h>
+#include <HTTPUpdate.h>
+#include <WiFiClient.h>
+#include <WiFiClientSecure.h>
+
+#ifndef FIRMWARE_VERSION
+#define FIRMWARE_VERSION "dev"
+#endif
 
 static const char *WEBSERVER_ENABLED_KEY = "websrv_on";
+static const char *OTA_BASE_URLS[] = {
+  "http://ota.prio-ict.local/webradio",
+  "https://ota.prio-ict.nl/webradio"
+};
+static const size_t OTA_BASE_URL_COUNT = sizeof(OTA_BASE_URLS) / sizeof(OTA_BASE_URLS[0]);
 
 void refreshAlarmDisplayState(bool sendToDisplay);
 
@@ -37,6 +50,9 @@ void PrioWebServer::begin()
   /* import / export page */
   server.on("/importexport", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleImportExportPage(request); });
 
+  /* contact / ota page */
+  server.on("/contact", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleContactPage(request); });
+
   /* alarm configuration page */
   server.on("/alarmen", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleAlarmPage(request); });
 
@@ -52,6 +68,8 @@ void PrioWebServer::begin()
   server.on("/api/alarmstatus", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleApiAlarmStatus(request); });
 
   server.on("/api/settings", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleApiSettings(request); });
+
+  server.on("/api/ota/status", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleApiOtaStatus(request); });
 
   server.on("/api/config/export", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleApiExportConfig(request); });
 
@@ -106,6 +124,10 @@ void PrioWebServer::begin()
           (void)total;
           this->handleSaveSettings(request, data, len);
       });
+
+      server.on("/api/ota/check", HTTP_POST, [this](AsyncWebServerRequest *request){ this->handleApiOtaCheck(request); });
+
+      server.on("/api/ota/update", HTTP_POST, [this](AsyncWebServerRequest *request){ this->handleApiOtaUpdate(request, nullptr, 0); });
 
       server.on(
         "/api/config/import",
@@ -358,6 +380,8 @@ void PrioWebServer::handleInstellingen(AsyncWebServerRequest *request)
 
   int snoozeButtonIndex = (int)preferences.getUInt("snooze_btn_idx", 10);
   int sleepMinutes = (int)preferences.getUInt("sleep_minutes", SLEEP_DEFAULT_MINUTES);
+  int backlightMinPercent = (int)preferences.getUInt("bl_min_pct", BACKLIGHT_MIN_PERCENT_DEFAULT);
+  int backlightMaxPercent = (int)preferences.getUInt("bl_max_pct", BACKLIGHT_MAX_PERCENT_DEFAULT);
   if (sleepMinutes < SLEEP_MIN_MINUTES)
   {
     sleepMinutes = SLEEP_DEFAULT_MINUTES;
@@ -366,9 +390,31 @@ void PrioWebServer::handleInstellingen(AsyncWebServerRequest *request)
   {
     sleepMinutes = SLEEP_MAX_MINUTES;
   }
+  if (backlightMinPercent < BACKLIGHT_PERCENT_MIN)
+  {
+    backlightMinPercent = BACKLIGHT_MIN_PERCENT_DEFAULT;
+  }
+  if (backlightMinPercent > BACKLIGHT_PERCENT_MAX)
+  {
+    backlightMinPercent = BACKLIGHT_PERCENT_MAX;
+  }
+  if (backlightMaxPercent < BACKLIGHT_PERCENT_MIN)
+  {
+    backlightMaxPercent = BACKLIGHT_MAX_PERCENT_DEFAULT;
+  }
+  if (backlightMaxPercent > BACKLIGHT_PERCENT_MAX)
+  {
+    backlightMaxPercent = BACKLIGHT_MAX_PERCENT_DEFAULT;
+  }
+  if (backlightMinPercent > backlightMaxPercent)
+  {
+    int tmp = backlightMinPercent;
+    backlightMinPercent = backlightMaxPercent;
+    backlightMaxPercent = tmp;
+  }
 
   String h_start PROGMEM = getHtmlStart();
-  String h_script PROGMEM = getSettingsScript(this->ip, snoozeButtonIndex, sleepMinutes);
+  String h_script PROGMEM = getSettingsScript(this->ip, snoozeButtonIndex, sleepMinutes, backlightMinPercent, backlightMaxPercent);
   String h_body PROGMEM = setHtmlBody(body, h_script);
   String h_end PROGMEM = getHtmlEnd();
 
@@ -387,6 +433,24 @@ void PrioWebServer::handleImportExportPage(AsyncWebServerRequest *request)
 
   String h_start PROGMEM = getHtmlStart();
   String h_script PROGMEM = getImportExportScript(this->ip);
+  String h_body PROGMEM = setHtmlBody(body, h_script);
+  String h_end PROGMEM = getHtmlEnd();
+
+  mybigString.concat(h_start);
+  mybigString.concat(h_body);
+  mybigString.concat(h_end);
+
+  request->send(200, "text/html", mybigString.c_str());
+  mybigString = "";
+}
+
+void PrioWebServer::handleContactPage(AsyncWebServerRequest *request)
+{
+  String body PROGMEM = R"(<div id="content-container" class="content"></div>)";
+  String mybigString = "";
+
+  String h_start PROGMEM = getHtmlStart();
+  String h_script PROGMEM = getContactScript(this->ip);
   String h_body PROGMEM = setHtmlBody(body, h_script);
   String h_end PROGMEM = getHtmlEnd();
 
@@ -510,6 +574,8 @@ void PrioWebServer::handleApiSettings(AsyncWebServerRequest *request)
   JsonDocument doc;
   doc["snoozeButtonIndex"] = preferences.getUInt("snooze_btn_idx", 10);
   doc["sleepMinutes"] = preferences.getUInt("sleep_minutes", SLEEP_DEFAULT_MINUTES);
+  doc["backlightMinPercent"] = preferences.getUInt("bl_min_pct", BACKLIGHT_MIN_PERCENT_DEFAULT);
+  doc["backlightMaxPercent"] = preferences.getUInt("bl_max_pct", BACKLIGHT_MAX_PERCENT_DEFAULT);
   doc["volume"] = preferences.readValue("volume", DEF_VOLUME);
   doc["streamIndex"] = preferences.getUInt("stream_index", 0);
 
@@ -528,6 +594,8 @@ void PrioWebServer::handleApiExportConfig(AsyncWebServerRequest *request)
   JsonObject settings = doc["settings"].to<JsonObject>();
   settings["snoozeButtonIndex"] = preferences.getUInt("snooze_btn_idx", 10);
   settings["sleepMinutes"] = preferences.getUInt("sleep_minutes", SLEEP_DEFAULT_MINUTES);
+  settings["backlightMinPercent"] = preferences.getUInt("bl_min_pct", BACKLIGHT_MIN_PERCENT_DEFAULT);
+  settings["backlightMaxPercent"] = preferences.getUInt("bl_max_pct", BACKLIGHT_MAX_PERCENT_DEFAULT);
   settings["volume"] = preferences.readValue("volume", DEF_VOLUME);
   settings["streamIndex"] = preferences.getUInt("stream_index", 0);
 
@@ -643,6 +711,23 @@ void PrioWebServer::handleApiImportConfig(AsyncWebServerRequest *request, uint8_
     if (sleepMinutes > SLEEP_MAX_MINUTES) sleepMinutes = SLEEP_MAX_MINUTES;
     preferences.putUInt("sleep_minutes", (uint32_t)sleepMinutes);
 
+    int backlightMinPercent = settings["backlightMinPercent"].is<int>() ? settings["backlightMinPercent"].as<int>() : BACKLIGHT_MIN_PERCENT_DEFAULT;
+    int backlightMaxPercent = settings["backlightMaxPercent"].is<int>() ? settings["backlightMaxPercent"].as<int>() : BACKLIGHT_MAX_PERCENT_DEFAULT;
+    if (backlightMinPercent < BACKLIGHT_PERCENT_MIN) backlightMinPercent = BACKLIGHT_MIN_PERCENT_DEFAULT;
+    if (backlightMinPercent > BACKLIGHT_PERCENT_MAX) backlightMinPercent = BACKLIGHT_PERCENT_MAX;
+    if (backlightMaxPercent < BACKLIGHT_PERCENT_MIN) backlightMaxPercent = BACKLIGHT_MAX_PERCENT_DEFAULT;
+    if (backlightMaxPercent > BACKLIGHT_PERCENT_MAX) backlightMaxPercent = BACKLIGHT_MAX_PERCENT_DEFAULT;
+    if (backlightMinPercent > backlightMaxPercent)
+    {
+      int tmp = backlightMinPercent;
+      backlightMinPercent = backlightMaxPercent;
+      backlightMaxPercent = tmp;
+    }
+    preferences.putUInt("bl_min_pct", (uint32_t)backlightMinPercent);
+    preferences.putUInt("bl_max_pct", (uint32_t)backlightMaxPercent);
+    gBacklightMinPercent = (uint8_t)backlightMinPercent;
+    gBacklightMaxPercent = (uint8_t)backlightMaxPercent;
+
     int volume = settings["volume"].is<int>() ? settings["volume"].as<int>() : DEF_VOLUME;
     if (volume < MIN_VOLUME) volume = MIN_VOLUME;
     if (volume > MAX_VOLUME) volume = MAX_VOLUME;
@@ -692,8 +777,32 @@ void PrioWebServer::handleSaveSettings(AsyncWebServerRequest *request, uint8_t *
     return;
   }
 
+  int backlightMinPercent = doc["backlightMinPercent"].is<int>() ? doc["backlightMinPercent"].as<int>() : BACKLIGHT_MIN_PERCENT_DEFAULT;
+  if (backlightMinPercent < BACKLIGHT_PERCENT_MIN || backlightMinPercent > BACKLIGHT_PERCENT_MAX)
+  {
+    request->send(400, "application/json", "{\"ok\":false,\"message\":\"backlightMinPercent moet 0..100 zijn\"}");
+    return;
+  }
+
+  int backlightMaxPercent = doc["backlightMaxPercent"].is<int>() ? doc["backlightMaxPercent"].as<int>() : BACKLIGHT_MAX_PERCENT_DEFAULT;
+  if (backlightMaxPercent < BACKLIGHT_PERCENT_MIN || backlightMaxPercent > BACKLIGHT_PERCENT_MAX)
+  {
+    request->send(400, "application/json", "{\"ok\":false,\"message\":\"backlightMaxPercent moet 0..100 zijn\"}");
+    return;
+  }
+
+  if (backlightMinPercent > backlightMaxPercent)
+  {
+    request->send(400, "application/json", "{\"ok\":false,\"message\":\"backlightMinPercent mag niet groter zijn dan backlightMaxPercent\"}");
+    return;
+  }
+
   preferences.putUInt("snooze_btn_idx", (uint32_t)snoozeButtonIndex);
   preferences.putUInt("sleep_minutes", (uint32_t)sleepMinutes);
+  preferences.putUInt("bl_min_pct", (uint32_t)backlightMinPercent);
+  preferences.putUInt("bl_max_pct", (uint32_t)backlightMaxPercent);
+  gBacklightMinPercent = (uint8_t)backlightMinPercent;
+  gBacklightMaxPercent = (uint8_t)backlightMaxPercent;
   alarmSnoozeButtonIndex = (uint8_t)snoozeButtonIndex;
   request->send(200, "application/json", "{\"ok\":true}");
 }
@@ -846,6 +955,343 @@ void PrioWebServer::handleRefreshLogo(AsyncWebServerRequest *request, uint8_t *d
   request->send(503, "application/json", response);
 }
 
+OtaStatusSnapshot PrioWebServer::getOtaStatusSnapshot()
+{
+  OtaStatusSnapshot status;
+  status.currentVersion = FIRMWARE_VERSION;
+  status.latestVersion = otaLatestVersion;
+  status.sourceBaseUrl = otaSourceBaseUrl;
+  status.lastError = otaLastError;
+  status.updateMessage = otaLastUpdateMessage;
+  status.updateAvailable = otaUpdateAvailable;
+  status.checkInProgress = otaCheckInProgress;
+  status.updateInProgress = otaUpdateInProgress;
+  status.uptimeSeconds = millis() / 1000UL;
+  status.lastCheckAgeSeconds = otaLastCheckMs == 0 ? 0 : (uint32_t)((millis() - otaLastCheckMs) / 1000UL);
+  return status;
+}
+
+void PrioWebServer::otaCheckTaskEntry(void *param)
+{
+  PrioWebServer *self = static_cast<PrioWebServer *>(param);
+  if (self != nullptr)
+  {
+    self->otaCheckTaskBody();
+  }
+  vTaskDelete(nullptr);
+}
+
+void PrioWebServer::otaCheckTaskBody()
+{
+  checkOtaVersion();
+  otaCheckInProgress = false;
+}
+
+void PrioWebServer::otaUpdateTaskEntry(void *param)
+{
+  PrioWebServer *self = static_cast<PrioWebServer *>(param);
+  if (self != nullptr)
+  {
+    self->otaUpdateTaskBody();
+  }
+  vTaskDelete(nullptr);
+}
+
+void PrioWebServer::otaUpdateTaskBody()
+{
+  String message;
+  bool ok = runOtaUpdate(message);
+  otaLastUpdateMessage = message;
+  if (!ok && message.length() == 0)
+  {
+    otaLastUpdateMessage = "OTA update mislukt";
+  }
+  otaUpdateInProgress = false;
+}
+
+bool PrioWebServer::startOtaCheckAsync()
+{
+  if (otaUpdateInProgress)
+  {
+    otaLastError = "OTA update is bezig";
+    return false;
+  }
+
+  if (otaCheckInProgress)
+  {
+    return true;
+  }
+
+  otaCheckInProgress = true;
+  BaseType_t taskOk = xTaskCreatePinnedToCore(
+      PrioWebServer::otaCheckTaskEntry,
+      "ota_check",
+      12288,
+      this,
+      1,
+      nullptr,
+      1);
+
+  if (taskOk != pdPASS)
+  {
+    otaCheckInProgress = false;
+    otaLastError = "Kon OTA checktask niet starten";
+    return false;
+  }
+
+  return true;
+}
+
+bool PrioWebServer::startOtaUpdateAsync(String &message)
+{
+  if (otaUpdateInProgress)
+  {
+    message = "OTA update is al bezig";
+    return true;
+  }
+
+  if (otaCheckInProgress)
+  {
+    message = "Wacht tot OTA versiecontrole klaar is";
+    return false;
+  }
+
+  otaUpdateInProgress = true;
+  otaLastUpdateMessage = "OTA update gestart";
+
+  BaseType_t taskOk = xTaskCreatePinnedToCore(
+      PrioWebServer::otaUpdateTaskEntry,
+      "ota_update",
+      16384,
+      this,
+      1,
+      nullptr,
+      1);
+
+  if (taskOk != pdPASS)
+  {
+    otaUpdateInProgress = false;
+    otaLastUpdateMessage = "Kon OTA updatetaak niet starten";
+    message = otaLastUpdateMessage;
+    return false;
+  }
+
+  message = "OTA update gestart";
+  return true;
+}
+
+bool PrioWebServer::checkOtaVersion()
+{
+  otaLastError = "";
+
+  for (size_t i = 0; i < OTA_BASE_URL_COUNT; i++)
+  {
+    const String baseUrl = OTA_BASE_URLS[i];
+    const String manifestUrl = baseUrl + "/version.json";
+    int statusCode = -1;
+    String payload;
+
+    if (manifestUrl.startsWith("https://"))
+    {
+      WiFiClientSecure client;
+      client.setInsecure();
+      HTTPClient http;
+      http.setTimeout(4000);
+      if (!http.begin(client, manifestUrl))
+      {
+        otaLastError = "Kan OTA manifest niet openen: " + manifestUrl;
+        continue;
+      }
+      statusCode = http.GET();
+      if (statusCode > 0)
+      {
+        payload = http.getString();
+      }
+      http.end();
+    }
+    else
+    {
+      WiFiClient client;
+      HTTPClient http;
+      http.setTimeout(4000);
+      if (!http.begin(client, manifestUrl))
+      {
+        otaLastError = "Kan OTA manifest niet openen: " + manifestUrl;
+        continue;
+      }
+      statusCode = http.GET();
+      if (statusCode > 0)
+      {
+        payload = http.getString();
+      }
+      http.end();
+    }
+
+    delay(1);
+
+    if (statusCode != 200)
+    {
+      otaLastError = "OTA manifest HTTP status " + String(statusCode) + " op " + manifestUrl;
+      continue;
+    }
+
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, payload);
+    if (err)
+    {
+      otaLastError = "OTA manifest JSON ongeldig op " + manifestUrl;
+      continue;
+    }
+
+    String latestVersion = doc["version"].is<const char *>() ? String((const char *)doc["version"]) : String("");
+    if (latestVersion.length() == 0)
+    {
+      otaLastError = "OTA manifest mist veld 'version' op " + manifestUrl;
+      continue;
+    }
+
+    otaLatestVersion = latestVersion;
+    otaSourceBaseUrl = baseUrl;
+    otaUpdateAvailable = otaLatestVersion != String(FIRMWARE_VERSION);
+    otaLastCheckMs = millis();
+    otaLastError = "";
+    return true;
+  }
+
+  otaLastCheckMs = millis();
+  otaUpdateAvailable = false;
+  return false;
+}
+
+bool PrioWebServer::runOtaUpdate(String &message)
+{
+  bool foundManifest = checkOtaVersion();
+  String selectedBaseUrl = otaSourceBaseUrl;
+
+  if (!foundManifest)
+  {
+    for (size_t i = 0; i < OTA_BASE_URL_COUNT; i++)
+    {
+      selectedBaseUrl = OTA_BASE_URLS[i];
+      if (selectedBaseUrl.length() > 0)
+      {
+        break;
+      }
+    }
+  }
+
+  if (selectedBaseUrl.length() == 0)
+  {
+    message = "Geen OTA URL beschikbaar";
+    return false;
+  }
+
+  String firmwareUrl = selectedBaseUrl + "/firmware.bin";
+  Serial.println("[OTA] Update gestart vanaf: " + firmwareUrl);
+
+  t_httpUpdate_return result;
+  if (firmwareUrl.startsWith("https://"))
+  {
+    WiFiClientSecure client;
+    client.setInsecure();
+    result = httpUpdate.update(client, firmwareUrl);
+  }
+  else
+  {
+    WiFiClient client;
+    result = httpUpdate.update(client, firmwareUrl);
+  }
+
+  switch (result)
+  {
+  case HTTP_UPDATE_FAILED:
+    message = "OTA mislukt: " + httpUpdate.getLastErrorString();
+    otaLastError = message;
+    return false;
+  case HTTP_UPDATE_NO_UPDATES:
+    message = "Server meldt geen update (firmware is mogelijk gelijk).";
+    otaLastError = "";
+    return true;
+  case HTTP_UPDATE_OK:
+    message = "OTA update succesvol. Apparaat herstart nu.";
+    otaLastError = "";
+    return true;
+  default:
+    message = "Onbekende OTA status";
+    otaLastError = message;
+    return false;
+  }
+}
+
+void PrioWebServer::handleApiOtaStatus(AsyncWebServerRequest *request)
+{
+  OtaStatusSnapshot status = getOtaStatusSnapshot();
+
+  JsonDocument doc;
+  doc["currentVersion"] = status.currentVersion;
+  doc["latestVersion"] = status.latestVersion;
+  doc["sourceBaseUrl"] = status.sourceBaseUrl;
+  doc["lastError"] = status.lastError;
+  doc["updateMessage"] = status.updateMessage;
+  doc["updateAvailable"] = status.updateAvailable;
+  doc["checkInProgress"] = status.checkInProgress;
+  doc["updateInProgress"] = status.updateInProgress;
+  doc["uptimeSeconds"] = status.uptimeSeconds;
+  doc["lastCheckAgeSeconds"] = status.lastCheckAgeSeconds;
+
+  String response;
+  serializeJson(doc, response);
+  request->send(200, "application/json", response);
+}
+
+void PrioWebServer::handleApiOtaCheck(AsyncWebServerRequest *request)
+{
+  bool ok = startOtaCheckAsync();
+  OtaStatusSnapshot status = getOtaStatusSnapshot();
+
+  JsonDocument doc;
+  doc["ok"] = ok;
+  doc["message"] = ok ? "OTA controle gestart" : (status.lastError.length() > 0 ? status.lastError : "OTA controle kon niet starten");
+  doc["inProgress"] = status.checkInProgress;
+
+  JsonObject st = doc["status"].to<JsonObject>();
+  st["currentVersion"] = status.currentVersion;
+  st["latestVersion"] = status.latestVersion;
+  st["sourceBaseUrl"] = status.sourceBaseUrl;
+  st["lastError"] = status.lastError;
+  st["updateMessage"] = status.updateMessage;
+  st["updateAvailable"] = status.updateAvailable;
+  st["checkInProgress"] = status.checkInProgress;
+  st["updateInProgress"] = status.updateInProgress;
+  st["uptimeSeconds"] = status.uptimeSeconds;
+  st["lastCheckAgeSeconds"] = status.lastCheckAgeSeconds;
+
+  String response;
+  serializeJson(doc, response);
+  request->send(ok ? 202 : 503, "application/json", response);
+}
+
+void PrioWebServer::handleApiOtaUpdate(AsyncWebServerRequest *request, uint8_t *data, size_t len)
+{
+  (void)data;
+  (void)len;
+
+  String message;
+  bool ok = startOtaUpdateAsync(message);
+
+  JsonDocument doc;
+  doc["ok"] = ok;
+  doc["message"] = message;
+  doc["inProgress"] = otaUpdateInProgress;
+  doc["currentVersion"] = String(FIRMWARE_VERSION);
+  doc["latestVersion"] = otaLatestVersion;
+  doc["sourceBaseUrl"] = otaSourceBaseUrl;
+
+  String response;
+  serializeJson(doc, response);
+  request->send(ok ? 202 : 500, "application/json", response);
+}
+
 String PrioWebServer::createHtmlPage(String body)
 {
 
@@ -882,7 +1328,7 @@ String PrioWebServer::getTopMenu()
     <a href='/alarmen'>Alarmen</a>
     <a href='/instellingen'>Instellingen</a>
     <a href='/importexport'>Import/Export</a>
-    <a href='#'>Contact</a>
+    <a href='/contact'>Contact</a>
     <span class='alarm-badge alarm-uit' id='alarm-status-badge'>Alarm: uit</span>
   </div>
   <script>

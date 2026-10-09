@@ -1,0 +1,12 @@
+services:
+  ota-app:
+    image: docker1.prio-ict.local:5001/prio-ict/ota_server:0.0.2 
+    restart: unless-stopped
+    environment:
+      OTA_DATA_ROOT: /srv/ota
+      OTA_VERSION: 0.0.0
+      OTA_PORT: 8000
+    volumes:
+      - ./data:/srv/ota
+    ports:
+      - "8096:8000"

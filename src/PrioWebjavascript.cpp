@@ -969,7 +969,7 @@ String getAlarmScript(String ip)
   return script;
 }
 
-String getSettingsScript(String ip, int snoozeButtonIndex, int sleepMinutes)
+String getSettingsScript(String ip, int snoozeButtonIndex, int sleepMinutes, int backlightMinPercent, int backlightMaxPercent)
 {
   String script PROGMEM = R"SETTINGS(
     <script>
@@ -978,6 +978,8 @@ String getSettingsScript(String ip, int snoozeButtonIndex, int sleepMinutes)
       function renderSettings(data) {
         const currentSnoozeButtonIndex = Number(data.snoozeButtonIndex ?? @SNOOZE_BTN@);
         const currentSleepMinutes = Number(data.sleepMinutes ?? @SLEEP_MINUTES@);
+        const currentBacklightMinPercent = Number(data.backlightMinPercent ?? @BL_MIN@);
+        const currentBacklightMaxPercent = Number(data.backlightMaxPercent ?? @BL_MAX@);
         contentContainer.innerHTML = `
           <h2>Instellingen</h2>
           <div class="stream_item" style="max-width:520px;">
@@ -989,6 +991,16 @@ String getSettingsScript(String ip, int snoozeButtonIndex, int sleepMinutes)
             <div class="edit-label">Sleep tijd (minuten)</div>
             <input id="sleepMinutes" class="input_short" type="number" min="1" max="180" value="${currentSleepMinutes}" />
             <div style="margin-top:8px;font-size:13px;">Bij standby start de sleep-knop de laatst gespeelde stream voor deze duur.</div>
+          </div>
+          <div class="stream_item" style="max-width:520px; margin-top:12px;">
+            <div class="edit-label">Backlight range (%)</div>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              <label for="backlightMinPercent">Min</label>
+              <input id="backlightMinPercent" class="input_short" type="number" min="0" max="100" value="${currentBacklightMinPercent}" />
+              <label for="backlightMaxPercent">Max</label>
+              <input id="backlightMaxPercent" class="input_short" type="number" min="0" max="100" value="${currentBacklightMaxPercent}" />
+            </div>
+            <div style="margin-top:8px;font-size:13px;">De lichtsensor dimt binnen dit bereik. Gebruik lagere waarden voor een donkerdere nachtstand.</div>
           </div>
           <div style="margin-top:12px;display:flex;gap:10px;">
             <button onclick="saveSettings()">Opslaan</button>
@@ -1009,12 +1021,14 @@ String getSettingsScript(String ip, int snoozeButtonIndex, int sleepMinutes)
       async function saveSettings() {
         const snoozeButtonIndex = Number(document.getElementById("snoozeButtonIndex").value);
         const sleepMinutes = Number(document.getElementById("sleepMinutes").value);
+        const backlightMinPercent = Number(document.getElementById("backlightMinPercent").value);
+        const backlightMaxPercent = Number(document.getElementById("backlightMaxPercent").value);
         const response = await fetch("/api/settings", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ snoozeButtonIndex, sleepMinutes }),
+          body: JSON.stringify({ snoozeButtonIndex, sleepMinutes, backlightMinPercent, backlightMaxPercent }),
         });
 
         if (!response.ok) {
@@ -1043,6 +1057,184 @@ String getSettingsScript(String ip, int snoozeButtonIndex, int sleepMinutes)
   searchAndReplace(&script, String("@ip"), ip);
   searchAndReplace(&script, String("@SNOOZE_BTN@"), String(snoozeButtonIndex));
   searchAndReplace(&script, String("@SLEEP_MINUTES@"), String(sleepMinutes));
+  searchAndReplace(&script, String("@BL_MIN@"), String(backlightMinPercent));
+  searchAndReplace(&script, String("@BL_MAX@"), String(backlightMaxPercent));
+  return script;
+}
+
+String getContactScript(String ip)
+{
+  String script PROGMEM = R"CONTACT(
+    <script>
+      const contentContainer = document.getElementById("content-container");
+
+      function formatUptime(seconds) {
+        const s = Number(seconds || 0);
+        const days = Math.floor(s / 86400);
+        const hours = Math.floor((s % 86400) / 3600);
+        const minutes = Math.floor((s % 3600) / 60);
+        const secs = s % 60;
+        return `${days}d ${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m ${String(secs).padStart(2, "0")}s`;
+      }
+
+      function statusText(data) {
+        if (data.checkInProgress) {
+          return "Controle op nieuwe versie bezig...";
+        }
+        if (data.updateAvailable) {
+          return `Nieuwe versie beschikbaar: ${data.latestVersion}`;
+        }
+        if (data.latestVersion && data.latestVersion.length > 0) {
+          return `Firmware is actueel (${data.latestVersion})`;
+        }
+        return data.lastError && data.lastError.length > 0 ? `Controle mislukt: ${data.lastError}` : "Nog niet gecontroleerd";
+      }
+
+      function render(data) {
+        contentContainer.innerHTML = `
+          <h2>ESP32 Contact</h2>
+          <div class="stream_item" style="max-width:680px;">
+            <div class="edit-label">Firmware versie</div>
+            <div id="fw-version" style="font-size:18px;margin-top:6px;">${data.currentVersion || "onbekend"}</div>
+          </div>
+          <div class="stream_item" style="max-width:680px; margin-top:12px;">
+            <div class="edit-label">Uptime</div>
+            <div id="uptime-value" style="font-size:18px;margin-top:6px;">${formatUptime(data.uptimeSeconds)}</div>
+          </div>
+          <div class="stream_item" style="max-width:680px; margin-top:12px;">
+            <div class="edit-label">OTA status</div>
+            <div id="ota-status" style="margin-top:6px;">${statusText(data)}</div>
+            <div style="margin-top:8px;font-size:13px;">Server: ${data.sourceBaseUrl || "n.v.t."}</div>
+            <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;">
+              <button onclick="checkOta()">Controleer nieuwe versie</button>
+              <button onclick="startOtaUpdate()">Update firmware</button>
+            </div>
+            <div id="ota-update-note" style="margin-top:10px;font-size:13px;color:#444;"></div>
+          </div>
+        `;
+      }
+
+      async function fetchStatus() {
+        const response = await fetch("http://@ip/api/ota/status");
+        if (!response.ok) {
+          throw new Error("Kon OTA status niet laden");
+        }
+        return await response.json();
+      }
+
+      async function waitForCheckCompletion(maxWaitMs = 60000) {
+        const start = Date.now();
+        while (Date.now() - start < maxWaitMs) {
+          try {
+            const status = await fetchStatus();
+            render(status);
+            if (!status.checkInProgress) {
+              return status;
+            }
+          } catch (e) {
+            // Keep polling until timeout so transient network errors do not fail the check immediately.
+          }
+          await new Promise((resolve) => setTimeout(resolve, 700));
+        }
+
+        const statusEl = document.getElementById("ota-status");
+        if (statusEl) {
+          statusEl.textContent = "OTA server niet bereikbaar (timeout > 60s).";
+        }
+        return null;
+      }
+
+      async function loadPage() {
+        const status = await fetchStatus();
+        render(status);
+      }
+
+      async function checkOta(silent = false) {
+        try {
+          const response = await fetch("/api/ota/check", { method: "POST" });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.ok) {
+            if (!silent) {
+              alert(data.message || "OTA controle mislukt");
+            }
+            return;
+          }
+          if (data.status) {
+            render(data.status);
+          }
+          const finalStatus = await waitForCheckCompletion();
+          if (finalStatus) {
+            render(finalStatus);
+          }
+        } catch (e) {
+          if (!silent) {
+            alert("OTA controle mislukt");
+          }
+        }
+      }
+
+      async function startOtaUpdate() {
+        try {
+          const status = await fetchStatus();
+          const note = document.getElementById("ota-update-note");
+          if (note) {
+            if (status.latestVersion && status.currentVersion === status.latestVersion) {
+              note.textContent = "Opmerking: huidige firmwareversie is gelijk aan de nieuwste versie.";
+            } else {
+              note.textContent = "";
+            }
+          }
+
+          const confirmMsg = status.currentVersion === status.latestVersion && status.latestVersion
+            ? `Huidige versie (${status.currentVersion}) is gelijk aan de nieuwste versie.\n\nWeet je zeker dat je de firmware wilt updaten?`
+            : `Weet je zeker dat je de firmware wilt updaten naar ${status.latestVersion || "de nieuwste versie"}?`;
+
+          if (!confirm(confirmMsg)) {
+            return;
+          }
+
+          const response = await fetch("/api/ota/update", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ force: true }),
+          });
+
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.ok) {
+            alert(data.message || "OTA update mislukt");
+            return;
+          }
+
+          if (note) {
+            note.textContent = data.message || "OTA update gestart";
+          }
+          alert(data.message || "OTA update gestart. Het apparaat zal herstarten na een succesvolle update.");
+        } catch (e) {
+          alert("OTA update gestart of verbinding verbroken tijdens herstart.");
+        }
+      }
+
+      loadPage().catch((error) => {
+        console.error(error);
+        alert("Contact pagina kon niet geladen worden");
+      });
+
+      setInterval(async () => {
+        try {
+          const data = await fetchStatus();
+          const uptimeEl = document.getElementById("uptime-value");
+          if (uptimeEl) {
+            uptimeEl.textContent = formatUptime(data.uptimeSeconds);
+          }
+        } catch (e) {
+          // ignore transient polling errors
+        }
+      }, 5000);
+    </script>)CONTACT";
+
+  searchAndReplace(&script, String("@ip"), ip);
   return script;
 }
 

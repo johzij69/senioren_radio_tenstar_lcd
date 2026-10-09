@@ -1,0 +1,9 @@
+# Publieke URL met TLS op poort 443
+ota.prio-ict.nl {
+    reverse_proxy ota-app:8000
+}
+
+# Interne URL zonder TLS op poort 80
+http://ota.prio-ict.local {
+    reverse_proxy ota-app:8000
+}
