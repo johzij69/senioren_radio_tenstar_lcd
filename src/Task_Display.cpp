@@ -527,7 +527,8 @@ void DisplayTask(void *parameter)
             }
             if (_displayData.loadingState)
             {
-                prioTft.showLoadingState();
+                // for now we skip the loading state, it does not show because loading is to fast ;-)
+               // prioTft.showLoadingState();
                 Serial.println("Display: Loading state active");
             }
             else

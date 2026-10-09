@@ -10,8 +10,8 @@
 
 static const char *WEBSERVER_ENABLED_KEY = "websrv_on";
 static const char *OTA_BASE_URLS[] = {
-  "http://ota.prio-ict.local/webradio",
-  "https://ota.prio-ict.nl/webradio"
+  "https://ota.prio-ict.nl/webradio",
+  "http://ota.prio-ict.local/webradio"
 };
 static const size_t OTA_BASE_URL_COUNT = sizeof(OTA_BASE_URLS) / sizeof(OTA_BASE_URLS[0]);
 
@@ -1177,24 +1177,36 @@ bool PrioWebServer::checkOtaVersion()
 
 bool PrioWebServer::runOtaUpdate(String &message)
 {
+  if (WiFi.status() != WL_CONNECTED)
+  {
+    message = "WiFi niet verbonden; OTA update afgebroken";
+    otaLastError = message;
+    return false;
+  }
+
   bool foundManifest = checkOtaVersion();
   String selectedBaseUrl = otaSourceBaseUrl;
 
   if (!foundManifest)
   {
+    selectedBaseUrl = "";
     for (size_t i = 0; i < OTA_BASE_URL_COUNT; i++)
     {
-      selectedBaseUrl = OTA_BASE_URLS[i];
-      if (selectedBaseUrl.length() > 0)
+      const String candidate = OTA_BASE_URLS[i];
+      if (candidate.length() == 0)
       {
-        break;
+        continue;
       }
+
+      selectedBaseUrl = candidate;
+      break;
     }
   }
 
   if (selectedBaseUrl.length() == 0)
   {
-    message = "Geen OTA URL beschikbaar";
+    message = "Geen geldige OTA bron beschikbaar";
+    otaLastError = message;
     return false;
   }
 

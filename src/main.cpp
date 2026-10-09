@@ -321,12 +321,8 @@ void setup()
             ; // Blokkeer als display niet start
     }
 
-  Serial.println("Continuing with setup wifi");
-//    const char* ssid = "WiFi-2.4-E770";
-//    const char* password = "wub4yhd65nwb7";
+    Serial.println("Continuing with setup wifi");
 
-   // WiFi.mode(WIFI_MODE_NULL); // Zorg dat alles uitgezet is
-    // delay(100);
     // WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
     // // // Reduceer WiFi-zendvermogen (minder interferentie)
     //  WiFi.setTxPower(WIFI_POWER_21dBm); // Experimenteer met lagere waarden
@@ -335,16 +331,6 @@ void setup()
     wm.setConfigPortalTimeout(120); // Langere timeout
     wm.setConnectTimeout(30);       // Verbind timeout
     Serial.println("Starting WiFi autoConnect...");
-
-    // WiFi.mode(WIFI_STA);
-    // WiFi.begin(ssid, password);
-    // Serial.println("\nConnecting to WiFi Network ..");
-
-    // while(WiFi.status() != WL_CONNECTED){
-    //     Serial.print(".");
-    //     delay(100);
-    // }
-
     Serial.println("\nConnected to the WiFi network");
     Serial.print("Local ESP32 IP: ");
     Serial.println(WiFi.localIP());

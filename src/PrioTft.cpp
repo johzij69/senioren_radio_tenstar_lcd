@@ -404,15 +404,15 @@ void PrioTft::showCenteredMessage(const String &text)
 
 void PrioTft::showLoadingState()
 {
-    tft.setTextFont(8);
-    tft.setTextSize(1);
-    // Width must reserve the volume bar's rightmost pBar.width_set columns, same
-    // as clearLine()/clearLogoLine()/clearGreenLine() do - this one didn't, so it
-    // painted over the bar's sprite until the next setVolume() redrew it.
-    tft.fillRect(10, 90, tft.width() - (pBar.width_set + 10), tft.fontHeight(), TFT_BLACK);
-    tft.setCursor(10, 90);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    tft.println("Loading....");
-    tft.setTextFont(4);
-    tft.setTextSize(1);
+    // tft.setTextFont(8);
+    // tft.setTextSize(1);
+    // // Width must reserve the volume bar's rightmost pBar.width_set columns, same
+    // // as clearLine()/clearLogoLine()/clearGreenLine() do - this one didn't, so it
+    // // painted over the bar's sprite until the next setVolume() redrew it.
+    // tft.fillRect(10, 90, tft.width() - (pBar.width_set + 10), tft.fontHeight(), TFT_BLACK);
+    // tft.setCursor(10, 90);
+    // tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    // tft.println("Loading....");
+    // tft.setTextFont(4);
+    // tft.setTextSize(1);
 }
