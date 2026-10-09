@@ -74,6 +74,7 @@ extern int last_volume;
 
 extern volatile uint8_t gBacklightMinPercent;
 extern volatile uint8_t gBacklightMaxPercent;
+extern volatile bool gFirmwareUpdateInProgress;
 
 
 

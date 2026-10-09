@@ -46,6 +46,10 @@ TaskHandle_t audioTaskHandle = NULL;     // Task handle for the audio task
 TaskHandle_t webServerTaskHandle = NULL; // Task handle for the webserver task
 TaskHandle_t dlnaTaskHandle = NULL;      // Task handle for the DLNA discovery/browse task
 
+volatile bool gFirmwareUpdateInProgress = false;
+static bool audioWasSuspendedBeforeOta = false;
+static bool dlnaWasSuspendedBeforeOta = false;
+
 
 
 WiFiManager wm;
@@ -64,6 +68,74 @@ static bool sleepSessionActive = false;
 static unsigned long sleepSessionDeadlineMs = 0;
 
 void refreshAlarmDisplayState(bool sendToDisplay);
+
+void enterFirmwareUpdateMode()
+{
+    if (gFirmwareUpdateInProgress)
+    {
+        return;
+    }
+
+    gFirmwareUpdateInProgress = true;
+    Serial.println("[OTA] Firmware update modus actief");
+
+    if (audioTaskHandle != NULL)
+    {
+        audioWasSuspendedBeforeOta = (eTaskGetState(audioTaskHandle) == eSuspended);
+        if (!audioWasSuspendedBeforeOta)
+        {
+            AudioData stopCmd = {};
+            stopCmd.command = CMD_STOP;
+            stopCmd.url[0] = '\0';
+            stopCmd.volume = 0;
+            stopCmd.isDlnaTrack = false;
+            xQueueSend(AudioQueue, &stopCmd, pdMS_TO_TICKS(100));
+            vTaskDelay(pdMS_TO_TICKS(200));
+            vTaskSuspend(audioTaskHandle);
+            Serial.println("[OTA] Audio task gepauzeerd");
+        }
+    }
+
+    if (dlnaTaskHandle != NULL)
+    {
+        dlnaWasSuspendedBeforeOta = (eTaskGetState(dlnaTaskHandle) == eSuspended);
+        if (!dlnaWasSuspendedBeforeOta)
+        {
+            vTaskSuspend(dlnaTaskHandle);
+            Serial.println("[OTA] DLNA task gepauzeerd");
+        }
+    }
+
+    SendDataToDisplay();
+}
+
+void leaveFirmwareUpdateMode()
+{
+    if (!gFirmwareUpdateInProgress)
+    {
+        return;
+    }
+
+    gFirmwareUpdateInProgress = false;
+    Serial.println("[OTA] Firmware update modus verlaten");
+
+    if (dlnaTaskHandle != NULL && !dlnaWasSuspendedBeforeOta && eTaskGetState(dlnaTaskHandle) == eSuspended)
+    {
+        vTaskResume(dlnaTaskHandle);
+        Serial.println("[OTA] DLNA task hervat");
+    }
+
+    if (audioTaskHandle != NULL && !audioWasSuspendedBeforeOta && eTaskGetState(audioTaskHandle) == eSuspended)
+    {
+        vTaskResume(audioTaskHandle);
+        Serial.println("[OTA] Audio task hervat");
+    }
+
+    audioWasSuspendedBeforeOta = false;
+    dlnaWasSuspendedBeforeOta = false;
+
+    SendDataToDisplay();
+}
 
 static void getDisplayStatusText(char *out, size_t outSize)
 {
@@ -393,6 +465,12 @@ void setup()
 /* main loop ;-) */
 void loop()
 {
+    if (gFirmwareUpdateInProgress)
+    {
+        vTaskDelay(50 / portTICK_PERIOD_MS);
+        return;
+    }
+
     // checkSync() zelf gooit alleen elk uur (zie PrioDateTime::_syncInterval) een
     // echte NTP-sync eruit; deze aanroep is dus goedkoop om elke loop te doen en
     // is - samen met de onvoorwaardelijke sync in PrioDateTime::begin() - de enige

@@ -271,6 +271,24 @@ void DisplayTask(void *parameter)
 
     while (true)
     {
+        static bool otaOverlayShown = false;
+
+        if (gFirmwareUpdateInProgress)
+        {
+            if (!otaOverlayShown)
+            {
+                prioTft.showCenteredMessage("Firmware update bezig...");
+                otaOverlayShown = true;
+            }
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+            continue;
+        }
+
+        if (otaOverlayShown)
+        {
+            otaOverlayShown = false;
+            forcePlayerRedraw = true;
+        }
     
         // 1. BELANGRIJK: Update de button status voor debounce verwerking
         rotary_button.loop();

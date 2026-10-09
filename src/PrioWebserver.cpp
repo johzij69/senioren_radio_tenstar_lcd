@@ -16,6 +16,8 @@ static const char *OTA_BASE_URLS[] = {
 static const size_t OTA_BASE_URL_COUNT = sizeof(OTA_BASE_URLS) / sizeof(OTA_BASE_URLS[0]);
 
 void refreshAlarmDisplayState(bool sendToDisplay);
+extern void enterFirmwareUpdateMode();
+extern void leaveFirmwareUpdateMode();
 
 PrioWebServer::PrioWebServer(UrlManager &urlManager, AlarmManager &alarmManager, MyPreferences &preferences, int port)
   : urlManager(urlManager), alarmManager(alarmManager), preferences(preferences), server(port)
@@ -999,6 +1001,8 @@ void PrioWebServer::otaUpdateTaskEntry(void *param)
 
 void PrioWebServer::otaUpdateTaskBody()
 {
+  enterFirmwareUpdateMode();
+
   String message;
   bool ok = runOtaUpdate(message);
   otaLastUpdateMessage = message;
@@ -1006,6 +1010,14 @@ void PrioWebServer::otaUpdateTaskBody()
   {
     otaLastUpdateMessage = "OTA update mislukt";
   }
+
+  // Bij een echte succesvolle flash volgt doorgaans een reboot; bij falen of
+  // "geen update" gaan we terug naar normale bedrijfsmodus.
+  if (!ok || !otaLastUpdateMessage.startsWith("OTA update succesvol"))
+  {
+    leaveFirmwareUpdateMode();
+  }
+
   otaUpdateInProgress = false;
 }
 
