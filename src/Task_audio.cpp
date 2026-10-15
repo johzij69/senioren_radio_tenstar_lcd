@@ -2,6 +2,9 @@
 #include "Audio.h"
 #include "Task_Shared.h"
 #include "globals.h"
+#include "AlarmAudio.h"
+#include <LittleFS.h>
+#include <WiFi.h>
 
 extern QueueHandle_t AudioEventQueue;
 
@@ -33,6 +36,8 @@ void AudioTask(void *parameter)
     int current_volume = MIN_VOLUME;
     bool paused = false;
     bool wasRunning = false;
+    bool alarmPlayback = false;
+    bool localAlarm = false;
 
     QueueHandle_t AudioQueue = static_cast<QueueHandle_t>(parameter);
 
@@ -77,6 +82,8 @@ void AudioTask(void *parameter)
                 Serial.printf("[AUDIO] CMD_PLAY - URL: '%s', Volume: %d\n", audioData.url, audioData.volume);
                 Serial.printf("[AUDIO] Current URL: '%s', Current Volume: %d\n", current_url, current_volume);
                 s_currentIsDlna = audioData.isDlnaTrack;
+                alarmPlayback = audioData.isAlarm;
+                localAlarm = false;
 
                 if (audioData.volume != current_volume)
                 {
@@ -85,7 +92,7 @@ void AudioTask(void *parameter)
                     Serial.printf("Volume aangepast naar: %d\n", current_volume);
                 }
 
-                if (audioData.url[0] != '\0')
+                if (audioData.url[0] != '\0' || alarmPlayback)
                 {
                     Serial.println("[AUDIO] Starting/restarting stream");
                     Serial.printf("[AUDIO] Heap: %d | Largest block: %d | PSRAM: %d\n",
@@ -103,7 +110,21 @@ void AudioTask(void *parameter)
                                   ESP.getFreeHeap(), ESP.getMaxAllocHeap());
 
                     // Audio library volgt redirects vanzelf! Geen eigen resolver nodig.
-                    bool connected = audio->connecttohost(audioData.url);
+                    bool connected = false;
+                    if (!alarmPlayback || (WiFi.status() == WL_CONNECTED && audioData.url[0] != '\0'))
+                    {
+                        connected = audio->connecttohost(audioData.url);
+                    }
+                    if (alarmPlayback && !connected)
+                    {
+                        connected = audio->connecttoFS(LittleFS, AlarmAudio::PATH);
+                        if (connected)
+                        {
+                            audio->setFileLoop(true);
+                            localAlarm = true;
+                        }
+                        else Serial.println("[ALARM] Lokaal alarmbestand ontbreekt of kan niet worden afgespeeld");
+                    }
                     Serial.printf("[AUDIO] connecttohost returned: %d\n", connected);
                     Serial.printf("[AUDIO] Heap after connect: %d | Largest block: %d\n",
                                   ESP.getFreeHeap(), ESP.getMaxAllocHeap());
@@ -125,12 +146,18 @@ void AudioTask(void *parameter)
 
             case CMD_STOP:
                 Serial.println("Audio STOP commando ontvangen");
+                alarmPlayback = false;
+                localAlarm = false;
                 audio->stopSong();
                 current_url[0] = '\0';
                 paused = false;
+                wasRunning = false;
+                xEventGroupSetBits(taskEvents, AUDIO_STOPPED_BIT);
                 break;
 
             case CMD_PREPARE_OTA:
+                alarmPlayback = false;
+                localAlarm = false;
                 audio->prepareForFirmwareUpdate();
                 current_url[0] = '\0';
                 paused = false;
@@ -176,6 +203,15 @@ void AudioTask(void *parameter)
 
         if (!gFirmwareUpdateInProgress)
         {
+            if (alarmPlayback && !localAlarm && WiFi.status() != WL_CONNECTED)
+            {
+                if (audio->connecttoFS(LittleFS, AlarmAudio::PATH))
+                {
+                    audio->setFileLoop(true);
+                    localAlarm = true;
+                }
+                else alarmPlayback = false;
+            }
             audio->loop();
         }
 

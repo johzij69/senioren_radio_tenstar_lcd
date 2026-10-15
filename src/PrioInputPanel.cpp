@@ -40,13 +40,11 @@ void PrioInputPanel::setButtonPressedCallback(ButtonPressedCallback callback) {
 
 void PrioInputPanel::readPresetButtons() {
   // Lees de status van de PCF8575
-  Wire.beginTransmission(_address);
   if (Wire.requestFrom(_address, 2) == 2) { // Lees 2 bytes (16 pinnen)
     // Lees de eerste byte (P0-P7)
     uint8_t buttonStates1 = Wire.read();
     // Lees de tweede byte (P8-P15)
     uint8_t buttonStates2 = Wire.read();
-    Wire.endTransmission();
 
     // Combineer de twee bytes tot een 16-bit waarde
     uint16_t buttonStates = (buttonStates2 << 8) | buttonStates1;
@@ -69,7 +67,6 @@ void PrioInputPanel::readPresetButtons() {
     }
   } else {
     Serial.println("I2C fout: Kan PCF8575 niet uitlezen!");
-    Wire.endTransmission(); // Zorg ervoor dat de I2C-transmissie wordt beëindigd
   }
 }
 

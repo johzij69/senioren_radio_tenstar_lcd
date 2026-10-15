@@ -1,4 +1,5 @@
 #include "PrioDateTime.h"
+#include <sys/time.h>
 
 PrioDateTime::PrioDateTime(int clkPin, int datPin, int rstPin)
     : _threeWire(datPin, clkPin, rstPin), _rtc(_threeWire)
@@ -26,7 +27,31 @@ void PrioDateTime::begin()
         delay(5000); // Wacht 1 seconde voor de initialisatie
     }
     bool wasValid = _rtc.IsDateTimeValid();
+    RtcDateTime rtcTime = _rtc.GetDateTime();
+    if (!_rtc.GetIsRunning()) _rtc.SetIsRunning(true);
     xSemaphoreGive(_mutex);
+
+    setenv("TZ", "CET-1CEST,M3.5.0/2,M10.5.0/3", 1);
+    tzset();
+    if (wasValid)
+    {
+        struct tm rtcInfo = {};
+        rtcInfo.tm_year = rtcTime.Year() - 1900;
+        rtcInfo.tm_mon = rtcTime.Month() - 1;
+        rtcInfo.tm_mday = rtcTime.Day();
+        rtcInfo.tm_hour = rtcTime.Hour();
+        rtcInfo.tm_min = rtcTime.Minute();
+        rtcInfo.tm_sec = rtcTime.Second();
+        rtcInfo.tm_isdst = -1;
+        struct timeval systemTime = {mktime(&rtcInfo), 0};
+        settimeofday(&systemTime, nullptr);
+    }
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        Serial.println(wasValid ? "[ALARM] Offline systeemklok ingesteld vanuit RTC" : "[ALARM] WAARSCHUWING: geen WiFi en geen geldige RTC-tijd");
+        _lastSyncTime = millis();
+        return;
+    }
 
     // "Valid" alleen betekent dat de RTC-chip niet is gecrasht/leeg is - niet dat
     // de opgeslagen tijd ook klopt. Zonder deze onvoorwaardelijke sync bleef een
@@ -45,7 +70,13 @@ void PrioDateTime::begin()
 }
 
 bool PrioDateTime::syncTime()
-{    Serial.println("Synchroniseren met NTP-server...");
+{
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        _lastSyncTime = millis();
+        return false;
+    }
+    Serial.println("Synchroniseren met NTP-server...");
 
     // Gebruik een volledige TZ-regel voor Nederland (CET/CEST met DST)
     configTzTime("CET-1CEST,M3.5.0/2,M10.5.0/3", "pool.ntp.org", "time.nist.gov");

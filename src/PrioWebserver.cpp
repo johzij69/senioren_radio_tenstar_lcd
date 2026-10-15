@@ -1,5 +1,7 @@
 #include "PrioWebServer.h"
 #include "NetworkSettings.h"
+#include "AlarmAudio.h"
+#include <new>
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
 #include <WiFiClient.h>
@@ -16,6 +18,27 @@ static const char *OTA_BASE_URLS[] = {
   "http://ota.prio-ict.local/webradio"
 };
 static const size_t OTA_BASE_URL_COUNT = sizeof(OTA_BASE_URLS) / sizeof(OTA_BASE_URLS[0]);
+
+struct AlarmAudioUpload
+{
+  File file;
+  size_t received = 0;
+  size_t expected = 0;
+  bool owner = false;
+  bool complete = false;
+  int status = 200;
+  String error;
+};
+
+static size_t alarmAudioUploadLimit()
+{
+  size_t total = LittleFS.totalBytes();
+  size_t used = LittleFS.usedBytes();
+  size_t freeBytes = total > used ? total - used : 0;
+  if (freeBytes <= AlarmAudio::RESERVED_BYTES) return 0;
+  size_t available = freeBytes - AlarmAudio::RESERVED_BYTES;
+  return available < AlarmAudio::MAX_BYTES ? available : AlarmAudio::MAX_BYTES;
+}
 
 void refreshAlarmDisplayState(bool sendToDisplay);
 extern bool enterFirmwareUpdateMode();
@@ -115,6 +138,15 @@ void PrioWebServer::begin()
   server.on("/api/alarmstatus", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleApiAlarmStatus(request); });
 
   server.on("/api/settings", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleApiSettings(request); });
+
+  server.on("/api/alarm-audio", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    handleAlarmAudioStatus(request);
+  });
+  server.on("/api/alarm-audio", HTTP_POST,
+    [this](AsyncWebServerRequest *request) { finishAlarmAudioUpload(request); }, nullptr,
+    [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+      handleAlarmAudioUpload(request, data, len, index, total);
+    });
 
   server.on("/api/ota/status", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleApiOtaStatus(request); });
 
@@ -1002,6 +1034,149 @@ void PrioWebServer::handleRefreshLogo(AsyncWebServerRequest *request, uint8_t *d
   request->send(503, "application/json", response);
 }
 
+void PrioWebServer::handleAlarmAudioStatus(AsyncWebServerRequest *request)
+{
+  JsonDocument doc;
+  File file = LittleFS.open(AlarmAudio::PATH, "r");
+  doc["exists"] = static_cast<bool>(file);
+  doc["size"] = file ? file.size() : 0;
+  doc["maxBytes"] = AlarmAudio::MAX_BYTES;
+  doc["uploadLimitBytes"] = alarmAudioUploadLimit();
+  doc["busy"] = alarmAudioUploadBusy.load() || otaUpdateInProgress.load() ||
+    alarmManager.getRuntimeStatus() != AlarmManager::STATUS_OFF;
+  doc["format"] = "mp3";
+  String json;
+  serializeJson(doc, json);
+  AsyncWebServerResponse *response = request->beginResponse(200, "application/json", json);
+  response->addHeader("Cache-Control", "no-store");
+  request->send(response);
+}
+
+void PrioWebServer::clearAlarmAudioUpload(AsyncWebServerRequest *request)
+{
+  auto *upload = static_cast<AlarmAudioUpload *>(request->_tempObject);
+  request->_tempObject = nullptr;
+  if (!upload) return;
+  if (upload->owner)
+  {
+    upload->file.close();
+    LittleFS.remove(AlarmAudio::TEMP_PATH);
+    alarmAudioUploadBusy = false;
+  }
+  delete upload;
+}
+
+void PrioWebServer::handleAlarmAudioUpload(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+{
+  if (index == 0)
+  {
+    auto *upload = new (std::nothrow) AlarmAudioUpload();
+    if (!upload) return;
+    request->_tempObject = upload;
+    request->onDisconnect([this, request]() { clearAlarmAudioUpload(request); });
+    bool expected = false;
+    upload->owner = alarmAudioUploadBusy.compare_exchange_strong(expected, true);
+    upload->expected = total;
+    String name = request->hasParam("name") ? request->getParam("name")->value() : String("");
+    name.toLowerCase();
+    if (!upload->owner || otaUpdateInProgress || gFirmwareUpdateInProgress ||
+        alarmManager.getRuntimeStatus() != AlarmManager::STATUS_OFF)
+    {
+      upload->status = 409;
+      upload->error = "Upload niet mogelijk tijdens een alarm, firmware-update of andere upload";
+    }
+    else if (!name.endsWith(".mp3"))
+    {
+      upload->status = 415;
+      upload->error = "Alleen MP3-bestanden zijn toegestaan";
+    }
+    else if (total == 0 || total > AlarmAudio::MAX_BYTES || request->contentLength() != total)
+    {
+      upload->status = 413;
+      upload->error = "MP3 moet 1 tot 524288 bytes groot zijn";
+    }
+    else
+    {
+      LittleFS.remove(AlarmAudio::TEMP_PATH);
+      if (total > alarmAudioUploadLimit())
+      {
+        upload->status = 507;
+        upload->error = "Onvoldoende vrije ruimte; het bestaande alarmbestand blijft behouden";
+      }
+      else
+      {
+        upload->file = LittleFS.open(AlarmAudio::TEMP_PATH, "w");
+        if (!upload->file)
+        {
+          upload->status = 500;
+          upload->error = "Tijdelijk alarmbestand kon niet worden geopend";
+        }
+      }
+    }
+  }
+  auto *upload = static_cast<AlarmAudioUpload *>(request->_tempObject);
+  if (!upload || upload->status != 200) return;
+  if (index != upload->received || len > AlarmAudio::MAX_BYTES - upload->received ||
+      len > upload->expected - upload->received)
+  {
+    upload->status = 413;
+    upload->error = "Upload overschrijdt de toegestane grootte of is onvolledig";
+    return;
+  }
+  if (upload->file.write(data, len) != len)
+  {
+    upload->status = 507;
+    upload->error = "Schrijven mislukt; het bestaande alarmbestand blijft behouden";
+    return;
+  }
+  upload->received += len;
+  if (upload->received == upload->expected)
+  {
+    upload->file.close();
+    File candidate = LittleFS.open(AlarmAudio::TEMP_PATH, "r");
+    if (!AlarmAudio::hasMp3Header(candidate))
+    {
+      upload->status = 415;
+      upload->error = "Geen herkenbaar MP3-bestand met volledige MPEG Layer III-frames";
+      return;
+    }
+    upload->complete = true;
+  }
+}
+
+void PrioWebServer::finishAlarmAudioUpload(AsyncWebServerRequest *request)
+{
+  auto *upload = static_cast<AlarmAudioUpload *>(request->_tempObject);
+  int status = upload ? upload->status : 400;
+  String message = upload ? upload->error : String("Geen audiobestand ontvangen");
+  if (upload && status == 200)
+  {
+    if (!upload->complete)
+    {
+      status = 400;
+      message = "Upload is onvolledig; het bestaande alarmbestand blijft behouden";
+    }
+    else if (gFirmwareUpdateInProgress || otaUpdateInProgress || alarmManager.getRuntimeStatus() != AlarmManager::STATUS_OFF)
+    {
+      status = 409;
+      message = "Alarm of update gestart; het bestaande alarmbestand blijft behouden";
+    }
+    else if (!LittleFS.rename(AlarmAudio::TEMP_PATH, AlarmAudio::PATH))
+    {
+      status = 500;
+      message = "Vervangen van het alarmbestand mislukt";
+    }
+    else message = "Offline alarmbestand vervangen";
+  }
+  JsonDocument doc;
+  doc["ok"] = status == 200;
+  doc["message"] = message;
+  String json;
+  serializeJson(doc, json);
+  clearAlarmAudioUpload(request);
+  request->send(status, "application/json", json);
+}
+
 OtaStatusSnapshot PrioWebServer::getOtaStatusSnapshot()
 {
   OtaStatusSnapshot status;
@@ -1093,6 +1268,11 @@ bool PrioWebServer::startOtaCheckAsync()
 
 bool PrioWebServer::startOtaUpdateAsync(String &message)
 {
+  if (alarmAudioUploadBusy)
+  {
+    message = "Wacht tot de upload van het alarmbestand klaar is";
+    return false;
+  }
   if (otaUpdateInProgress)
   {
     message = "OTA update is al bezig";

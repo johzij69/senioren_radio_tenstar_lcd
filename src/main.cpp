@@ -372,11 +372,10 @@ void setup()
     if (!res)
     {
         Serial.println("Failed to connect");
-        Serial.println("[ERROR] Verbinden mislukt. Config portal gestart.");
+        Serial.println("[ALARM] Geen WiFi; radio start met lokale alarmondersteuning");
         // Maak een functie om de foutmelding weer te geven op het tft scherm
-        strncpy(displayData.title, "Verbinden met Failed...", sizeof(displayData.title));
+        strncpy(displayData.title, "Offline - alarm beschikbaar", sizeof(displayData.title));
         xQueueSend(DisplayQueue, &displayData, portMAX_DELAY);
-        return;
     }
     else
     {
@@ -389,6 +388,7 @@ void setup()
         Serial.println(WiFi.dnsIP());
         Serial.print("Gateway address: ");
         Serial.println(WiFi.gatewayIP());
+    }
 
         myPrefs.begin();
         alarmManager.begin();
@@ -455,14 +455,18 @@ void setup()
         Serial.println("DLNA task started");
 
         // Play the last used stream
-        playStream(stream_index);
+        if (res && UrlManagerInstance.streamCount > 0)
+        {
+            playStream(stream_index);
+        }
+        else
+        {
+            displayData.loadingState = false;
+            refreshAlarmDisplayState(true);
+        }
 
 
 
-    }
-
-
-    
 }
 
 /* main loop ;-) */
@@ -631,12 +635,6 @@ void checkAndRunAlarms()
 
 void triggerAlarmPlayback(const AlarmManager::AlarmEntry &alarm, bool fromSnooze)
 {
-    if (alarm.streamIndex >= UrlManagerInstance.streamCount)
-    {
-        Serial.println("Alarm genegeerd: ongeldige streamIndex");
-        return;
-    }
-
         refreshAlarmDisplayState();
     strncpy(displayData.alarmState, fromSnooze ? "Snooze actief" : "Alarm actief", sizeof(displayData.alarmState));
 
@@ -659,8 +657,19 @@ void triggerAlarmPlayback(const AlarmManager::AlarmEntry &alarm, bool fromSnooze
     audioData.volume = alarmVolume;
     myPrefs.writeValue("volume", alarmVolume);
 //todo pas alarm volume door aan audiocontrol
-    playAudio(UrlManagerInstance.Streams[stream_index].url.c_str());
-    CreateAndSendDisplayData(stream_index);
+    AudioData command = {};
+    command.command = CMD_PLAY;
+    command.volume = alarmVolume;
+    command.isAlarm = true;
+    if (alarm.streamIndex < UrlManagerInstance.streamCount)
+    {
+        strlcpy(command.url, UrlManagerInstance.Streams[alarm.streamIndex].url.c_str(), sizeof(command.url));
+        CreateAndSendDisplayData(stream_index);
+    }
+    if (xQueueSend(AudioQueue, &command, pdMS_TO_TICKS(100)) != pdTRUE)
+    {
+        Serial.println("[ALARM] Audiowachtrij vol; alarm kon niet starten");
+    }
 }
 
 void snoozeActiveAlarm()

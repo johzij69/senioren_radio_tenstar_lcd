@@ -985,6 +985,7 @@ String getSettingsScript(String ip, int snoozeButtonIndex, int sleepMinutes, int
   String script PROGMEM = R"SETTINGS(
     <script>
       const contentContainer = document.getElementById("content-container");
+      let alarmAudioStatus = null;
 
       function renderSettings(data) {
         const currentSnoozeButtonIndex = Number(data.snoozeButtonIndex ?? @SNOOZE_BTN@);
@@ -1017,7 +1018,91 @@ String getSettingsScript(String ip, int snoozeButtonIndex, int sleepMinutes, int
             <button onclick="saveSettings()">Opslaan</button>
             <button onclick="syncTime()">Tijd synchroniseren</button>
           </div>
+          <section aria-labelledby="alarm-audio-heading" style="margin-top:24px;padding-top:12px;border-top:1px solid #ccc;">
+            <h3 id="alarm-audio-heading">Offline alarmbestand</h3>
+            <p id="alarm-audio-current">Bestandstatus ophalen...</p>
+            <form id="alarm-audio-form">
+              <label for="alarm-audio-file">MP3 (maximaal 512 KiB)</label>
+              <input id="alarm-audio-file" type="file" accept=".mp3,audio/mpeg" style="display:block;max-width:100%;margin:8px 0;" disabled>
+              <button id="alarm-audio-upload" type="submit" disabled>&#8593; Bestand vervangen</button>
+              <progress id="alarm-audio-progress" aria-label="Upload voortgang" style="max-width:100%;margin-top:8px;" hidden></progress>
+              <p id="alarm-audio-message" role="status" aria-live="polite" style="overflow-wrap:anywhere;"></p>
+            </form>
+          </section>
         `;
+        document.getElementById("alarm-audio-file").addEventListener("change", validateAlarmAudioFile);
+        document.getElementById("alarm-audio-form").addEventListener("submit", uploadAlarmAudio);
+      }
+
+      async function loadAlarmAudioStatus() {
+        const response = await fetch("/api/alarm-audio", { cache: "no-store" });
+        if (!response.ok) throw new Error("Alarmbestandstatus kon niet worden opgehaald");
+        alarmAudioStatus = await response.json();
+        const current = document.getElementById("alarm-audio-current");
+        current.textContent = alarmAudioStatus.exists ?
+          `noalarm.mp3: ${(alarmAudioStatus.size / 1024).toFixed(1)} KiB` : "Geen offline alarmbestand aanwezig";
+        document.getElementById("alarm-audio-file").disabled = alarmAudioStatus.busy;
+        validateAlarmAudioFile();
+      }
+
+      function validateAlarmAudioFile() {
+        const file = document.getElementById("alarm-audio-file").files[0];
+        const button = document.getElementById("alarm-audio-upload");
+        const message = document.getElementById("alarm-audio-message");
+        button.disabled = true;
+        if (!alarmAudioStatus) return false;
+        if (alarmAudioStatus.busy) {
+          message.textContent = "Niet beschikbaar tijdens een alarm, update of andere upload";
+          return false;
+        }
+        if (!file) { message.textContent = ""; return false; }
+        if (!file.name.toLowerCase().endsWith(".mp3")) {
+          message.textContent = "Alleen MP3-bestanden zijn toegestaan";
+          return false;
+        }
+        const maximum = Math.min(524288, alarmAudioStatus.maxBytes, alarmAudioStatus.uploadLimitBytes);
+        if (file.size === 0 || file.size > maximum) {
+          message.textContent = `Bestand te groot of leeg. Momenteel maximaal ${Math.floor(maximum / 1024)} KiB beschikbaar`;
+          return false;
+        }
+        message.textContent = `${file.name}: ${(file.size / 1024).toFixed(1)} KiB`;
+        button.disabled = false;
+        return true;
+      }
+
+      async function uploadAlarmAudio(event) {
+        event.preventDefault();
+        const input = document.getElementById("alarm-audio-file");
+        const button = document.getElementById("alarm-audio-upload");
+        const message = document.getElementById("alarm-audio-message");
+        const progress = document.getElementById("alarm-audio-progress");
+        button.disabled = true;
+        try {
+          await loadAlarmAudioStatus();
+          if (!validateAlarmAudioFile()) return;
+          const file = input.files[0];
+          input.disabled = true;
+          button.disabled = true;
+          progress.hidden = false;
+          message.textContent = "Alarmbestand uploaden en controleren...";
+          const response = await fetch(`/api/alarm-audio?name=${encodeURIComponent(file.name)}`, {
+            method: "POST", headers: { "Content-Type": "audio/mpeg" }, body: file,
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.message || "Upload mislukt");
+          input.value = "";
+          await loadAlarmAudioStatus();
+          message.textContent = result.message;
+        } catch (error) {
+          message.textContent = error.message;
+        } finally {
+          progress.hidden = true;
+          input.disabled = Boolean(alarmAudioStatus?.busy);
+          const selected = input.files[0];
+          button.disabled = !selected || !alarmAudioStatus || alarmAudioStatus.busy ||
+            !selected.name.toLowerCase().endsWith(".mp3") || selected.size === 0 ||
+            selected.size > Math.min(524288, alarmAudioStatus.maxBytes, alarmAudioStatus.uploadLimitBytes);
+        }
       }
 
       async function loadSettings() {
@@ -1027,6 +1112,9 @@ String getSettingsScript(String ip, int snoozeButtonIndex, int sleepMinutes, int
         }
         const data = await response.json();
         renderSettings(data);
+        loadAlarmAudioStatus().catch((error) => {
+          document.getElementById("alarm-audio-message").textContent = error.message;
+        });
       }
 
       async function saveSettings() {

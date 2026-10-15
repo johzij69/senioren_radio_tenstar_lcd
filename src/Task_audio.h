@@ -19,6 +19,7 @@ struct AudioData {
     int volume = 10; // Default volume
     AudioCommandType command = CMD_NONE;
     bool isDlnaTrack = false; // set by playAudio(url, true) - see audio_eof_stream in Task_audio.cpp
+    bool isAlarm = false;
 };
 
 // Outbound events from AudioTask, mirroring the DlnaEvent/DlnaEventQueue pattern.

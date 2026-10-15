@@ -77,6 +77,10 @@ private:
   void handleApiImportConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len);
   void handleSaveAlarms(AsyncWebServerRequest *request, uint8_t *data, size_t len);
   void handleApiSettings(AsyncWebServerRequest *request);
+  void handleAlarmAudioStatus(AsyncWebServerRequest *request);
+  void handleAlarmAudioUpload(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
+  void finishAlarmAudioUpload(AsyncWebServerRequest *request);
+  void clearAlarmAudioUpload(AsyncWebServerRequest *request);
   void handleApiOtaStatus(AsyncWebServerRequest *request);
   void handleApiOtaCheck(AsyncWebServerRequest *request);
   void handleApiOtaUpdate(AsyncWebServerRequest *request, uint8_t *data, size_t len);
@@ -107,6 +111,7 @@ private:
   std::atomic<bool> otaUpdateInProgress{false};
   std::atomic<bool> otaCheckRequested{false};
   std::atomic<bool> otaUpdateRequested{false};
+  std::atomic<bool> alarmAudioUploadBusy{false};
   unsigned long otaLastCheckMs = 0;
 };
 
