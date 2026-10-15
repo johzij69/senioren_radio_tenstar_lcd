@@ -10,6 +10,7 @@
 #define AUDIO_STARTED_BIT (1 << 2)
 #define AUDIO_STOPPED_BIT (1 << 3)
 #define AUDIO_PAUSED_BIT (1 << 4)
+#define AUDIO_OTA_READY_BIT (1 << 6)
 #define MENU_CLOSED_REQUEST_DATA_BIT (1 << 5) 
 
 // Declareer de event group als extern

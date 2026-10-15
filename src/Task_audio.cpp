@@ -54,6 +54,22 @@ void AudioTask(void *parameter)
         AudioData audioData;
         if (xQueueReceive(AudioQueue, &audioData, 0) == pdTRUE)
         {
+            if (gFirmwareUpdateInProgress && audioData.command != CMD_PREPARE_OTA)
+            {
+                if (audioData.command == CMD_PLAY || audioData.command == CMD_RESUME)
+                {
+                    xEventGroupSetBits(taskEvents, AUDIO_STARTED_BIT);
+                }
+                else if (audioData.command == CMD_STOP)
+                {
+                    xEventGroupSetBits(taskEvents, AUDIO_STOPPED_BIT);
+                }
+                else if (audioData.command == CMD_PAUSE)
+                {
+                    xEventGroupSetBits(taskEvents, AUDIO_PAUSED_BIT);
+                }
+                continue;
+            }
             Serial.printf("Audio commando ontvangen: %d\n", audioData.command);
             switch (audioData.command)
             {
@@ -114,6 +130,14 @@ void AudioTask(void *parameter)
                 paused = false;
                 break;
 
+            case CMD_PREPARE_OTA:
+                audio->prepareForFirmwareUpdate();
+                current_url[0] = '\0';
+                paused = false;
+                wasRunning = false;
+                xEventGroupSetBits(taskEvents, AUDIO_OTA_READY_BIT);
+                break;
+
             case CMD_PAUSE:
                 Serial.println("Audio PAUSE commando ontvangen");
                 if (!paused)
@@ -150,7 +174,10 @@ void AudioTask(void *parameter)
             }
         }
 
-        audio->loop();
+        if (!gFirmwareUpdateInProgress)
+        {
+            audio->loop();
+        }
 
         bool isNowRunning = audio->isRunning();
 

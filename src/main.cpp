@@ -70,31 +70,41 @@ static unsigned long sleepSessionDeadlineMs = 0;
 
 void refreshAlarmDisplayState(bool sendToDisplay);
 
-void enterFirmwareUpdateMode()
+bool enterFirmwareUpdateMode()
 {
     if (gFirmwareUpdateInProgress)
     {
-        return;
+        return true;
     }
 
     gFirmwareUpdateInProgress = true;
     Serial.println("[OTA] Firmware update modus actief");
+    audioWasSuspendedBeforeOta = audioTaskHandle != NULL && eTaskGetState(audioTaskHandle) == eSuspended;
+    dlnaWasSuspendedBeforeOta = dlnaTaskHandle != NULL && eTaskGetState(dlnaTaskHandle) == eSuspended;
+    SendDataToDisplay();
 
     if (audioTaskHandle != NULL)
     {
-        audioWasSuspendedBeforeOta = (eTaskGetState(audioTaskHandle) == eSuspended);
-        if (!audioWasSuspendedBeforeOta)
+        xEventGroupClearBits(taskEvents, AUDIO_OTA_READY_BIT);
+        if (audioWasSuspendedBeforeOta)
         {
-            AudioData stopCmd = {};
-            stopCmd.command = CMD_STOP;
-            stopCmd.url[0] = '\0';
-            stopCmd.volume = 0;
-            stopCmd.isDlnaTrack = false;
-            xQueueSend(AudioQueue, &stopCmd, pdMS_TO_TICKS(100));
-            vTaskDelay(pdMS_TO_TICKS(200));
-            vTaskSuspend(audioTaskHandle);
-            Serial.println("[OTA] Audio task gepauzeerd");
+            vTaskResume(audioTaskHandle);
         }
+        AudioData stopCmd = {};
+        stopCmd.command = CMD_PREPARE_OTA;
+        if (xQueueSend(AudioQueue, &stopCmd, pdMS_TO_TICKS(250)) != pdTRUE)
+        {
+            Serial.println("[OTA] Audio vrijgeven kon niet worden aangevraagd");
+            return false;
+        }
+        EventBits_t bits = xEventGroupWaitBits(taskEvents, AUDIO_OTA_READY_BIT, pdTRUE, pdTRUE, pdMS_TO_TICKS(15000));
+        if ((bits & AUDIO_OTA_READY_BIT) == 0)
+        {
+            Serial.println("[OTA] Timeout bij vrijgeven audio-geheugen");
+            return false;
+        }
+        vTaskSuspend(audioTaskHandle);
+        Serial.println("[OTA] Audioverbinding en decoderbuffers vrijgegeven");
     }
 
     if (dlnaTaskHandle != NULL)
@@ -108,6 +118,7 @@ void enterFirmwareUpdateMode()
     }
 
     SendDataToDisplay();
+    return true;
 }
 
 void leaveFirmwareUpdateMode()
@@ -833,7 +844,7 @@ void startWebServerTask()
         xTaskCreate(
             webServerTask,         // Task function
             "webServerTask",       // Name of the task
-            5120,                  // Stack size in words
+            12288,
             (void *)&webServer,    // Task parameter
             5,                     // Priority of the task
             &webServerTaskHandle); // Task handle

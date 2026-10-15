@@ -16,6 +16,7 @@ void webServerTask(void *parameter)
     while (true)
     {
         NetworkSettings::poll();
+        webserver->processOtaRequests();
         vTaskDelay(100 / portTICK_PERIOD_MS); // Adjust the delay as needed
     }
 }

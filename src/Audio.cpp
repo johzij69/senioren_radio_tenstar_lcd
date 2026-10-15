@@ -2197,8 +2197,9 @@ uint32_t Audio::stopSong() {
                 m_streamType = ST_NONE;
                 pos = getFilePos() - inBufferFilled();
             }
-            // if(_client->connected()) _client->stop();
         }
+        client.stop();
+        clientsecure.stop();
         if(audiofile) {
             // added this before putting 'm_f_localfile = false' in stopSong(); shoulf never occur....
             AUDIO_INFO("Closing audio file \"%s\"", audiofile.name());

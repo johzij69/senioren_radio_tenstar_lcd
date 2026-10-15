@@ -46,7 +46,7 @@ void startDlnaTask();
 void SendDataToDisplay();
 void pauseAudioTask();
 void resumeAudioTask(); 
-void enterFirmwareUpdateMode();
+bool enterFirmwareUpdateMode();
 void leaveFirmwareUpdateMode();
 void playStream(int presetNumber);
 void handleInputPanelButton(int buttonIndex);

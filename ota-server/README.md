@@ -109,3 +109,35 @@ Na PlatformIO build staat firmware meestal op:
 Voor OTA deploy:
 
 cp .pio/build/stable/firmware.bin ota-server/data/webradio/firmware.bin
+
+## OTA en vrij geheugen
+
+Een melding `BIGNUM - Memory allocation failed` betekent dat de TLS-handshake
+geen geheugen kan reserveren. De daaropvolgende `connection refused` is dan
+een gevolg van die mislukte handshake, niet noodzakelijk een weigering door
+de OTA-server. Vrije PSRAM alleen bewijst niet dat er genoeg intern geheugen
+of een voldoende groot aaneengesloten blok beschikbaar is.
+
+De firmware verwerkt OTA-verzoeken in de bestaande webservertask, buiten de
+AsyncWebServer-callbacks. Er wordt bij een update geen extra taskstack meer
+gereserveerd. Voor de download geeft de audiotask zijn verbindingen en
+decoderbuffers vrij en bevestigt dit met een event. Bij een timeout wordt
+de update afgebroken. De seriele log toont daarna het vrije interne geheugen,
+het grootste vrije interne blok en de vrije PSRAM.
+
+Alleen `HTTP_UPDATE_OK` veroorzaakt een expliciete herstart. Een ontbrekend
+manifest, mislukte download of antwoord zonder update herstart de ESP niet;
+de fout blijft beschikbaar via `/api/ota/status`. Na een mislukte poging
+kun je de radiozender opnieuw starten.
+
+Installeer een reparatie voor een defect OTA-pad zo nodig eenmalig via USB.
+Publiceer daarna voor een volgende test uitsluitend de applicatie
+`firmware.bin`, niet de gecombineerde `firmware.factory.bin`. Het manifest
+moet dezelfde versie noemen als `FIRMWARE_VERSION` in de gepubliceerde build;
+alleen de versie op de server aanpassen verandert de versie in de firmware
+niet. Een geslaagde update kan anders toch een oude versietekst tonen.
+
+Controleer op het apparaat met een spelende HTTPS-zender dat de audioresources
+worden vrijgegeven, de flash slaagt en de nieuwe versie na herstart verschijnt.
+Test daarnaast een onbereikbare OTA-server: de fout moet zichtbaar blijven
+zonder automatische herstart.

@@ -2,6 +2,7 @@
 #define PrioWebServer_H
 
 #include <ESPAsyncWebServer.h>
+#include <atomic>
 #include "UrlManager.h"
 #include "favicon.h"
 #include "ArduinoJson.h"
@@ -34,6 +35,7 @@ public:
   PrioWebServer(UrlManager &urlManager, AlarmManager &alarmManager, MyPreferences &preferences, int port);
 
   void begin();
+  void processOtaRequests();
   // Zet de listener aan/uit zonder de handlers opnieuw te registreren; de stand
   // wordt bewaard en bij begin() weer toegepast.
   void setEnabled(bool enabled);
@@ -91,11 +93,9 @@ private:
   bool checkOtaVersion();
   bool startOtaCheckAsync();
   bool startOtaUpdateAsync(String &message);
-  bool runOtaUpdate(String &message);
+  bool runOtaUpdate(String &message, bool &updated);
   OtaStatusSnapshot getOtaStatusSnapshot();
-  static void otaCheckTaskEntry(void *param);
   void otaCheckTaskBody();
-  static void otaUpdateTaskEntry(void *param);
   void otaUpdateTaskBody();
 
   String otaLatestVersion;
@@ -103,8 +103,10 @@ private:
   String otaLastError;
   String otaLastUpdateMessage;
   bool otaUpdateAvailable = false;
-  volatile bool otaCheckInProgress = false;
-  volatile bool otaUpdateInProgress = false;
+  std::atomic<bool> otaCheckInProgress{false};
+  std::atomic<bool> otaUpdateInProgress{false};
+  std::atomic<bool> otaCheckRequested{false};
+  std::atomic<bool> otaUpdateRequested{false};
   unsigned long otaLastCheckMs = 0;
 };
 

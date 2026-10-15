@@ -4,6 +4,7 @@
 #include <HTTPUpdate.h>
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
+#include <esp_heap_caps.h>
 
 #ifndef FIRMWARE_VERSION
 #define FIRMWARE_VERSION "dev"
@@ -17,7 +18,7 @@ static const char *OTA_BASE_URLS[] = {
 static const size_t OTA_BASE_URL_COUNT = sizeof(OTA_BASE_URLS) / sizeof(OTA_BASE_URLS[0]);
 
 void refreshAlarmDisplayState(bool sendToDisplay);
-extern void enterFirmwareUpdateMode();
+extern bool enterFirmwareUpdateMode();
 extern void leaveFirmwareUpdateMode();
 
 PrioWebServer::PrioWebServer(UrlManager &urlManager, AlarmManager &alarmManager, MyPreferences &preferences, int port)
@@ -1017,14 +1018,16 @@ OtaStatusSnapshot PrioWebServer::getOtaStatusSnapshot()
   return status;
 }
 
-void PrioWebServer::otaCheckTaskEntry(void *param)
+void PrioWebServer::processOtaRequests()
 {
-  PrioWebServer *self = static_cast<PrioWebServer *>(param);
-  if (self != nullptr)
+  if (otaUpdateRequested.exchange(false))
   {
-    self->otaCheckTaskBody();
+    otaUpdateTaskBody();
   }
-  vTaskDelete(nullptr);
+  else if (otaCheckRequested.exchange(false))
+  {
+    otaCheckTaskBody();
+  }
 }
 
 void PrioWebServer::otaCheckTaskBody()
@@ -1033,35 +1036,40 @@ void PrioWebServer::otaCheckTaskBody()
   otaCheckInProgress = false;
 }
 
-void PrioWebServer::otaUpdateTaskEntry(void *param)
-{
-  PrioWebServer *self = static_cast<PrioWebServer *>(param);
-  if (self != nullptr)
-  {
-    self->otaUpdateTaskBody();
-  }
-  vTaskDelete(nullptr);
-}
-
 void PrioWebServer::otaUpdateTaskBody()
 {
-  enterFirmwareUpdateMode();
+  if (!enterFirmwareUpdateMode())
+  {
+    otaLastUpdateMessage = "OTA afgebroken: audio-geheugen kon niet veilig worden vrijgegeven";
+    otaLastError = otaLastUpdateMessage;
+    leaveFirmwareUpdateMode();
+    otaUpdateInProgress = false;
+    return;
+  }
+
+  Serial.printf("[OTA] Voor download: intern vrij=%u, grootste blok=%u, PSRAM vrij=%u\n",
+    (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+    (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+    (unsigned)ESP.getFreePsram());
 
   String message;
-  bool ok = runOtaUpdate(message);
+  bool updated = false;
+  bool ok = runOtaUpdate(message, updated);
   otaLastUpdateMessage = message;
   if (!ok && message.length() == 0)
   {
     otaLastUpdateMessage = "OTA update mislukt";
   }
 
-  // Bij een echte succesvolle flash volgt doorgaans een reboot; bij falen of
-  // "geen update" gaan we terug naar normale bedrijfsmodus.
-  if (!ok || !otaLastUpdateMessage.startsWith("OTA update succesvol"))
+  Serial.println("[OTA] " + otaLastUpdateMessage);
+  if (ok && updated)
   {
-    leaveFirmwareUpdateMode();
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    ESP.restart();
+    return;
   }
 
+  leaveFirmwareUpdateMode();
   otaUpdateInProgress = false;
 }
 
@@ -1079,22 +1087,7 @@ bool PrioWebServer::startOtaCheckAsync()
   }
 
   otaCheckInProgress = true;
-  BaseType_t taskOk = xTaskCreatePinnedToCore(
-      PrioWebServer::otaCheckTaskEntry,
-      "ota_check",
-      12288,
-      this,
-      1,
-      nullptr,
-      1);
-
-  if (taskOk != pdPASS)
-  {
-    otaCheckInProgress = false;
-    otaLastError = "Kon OTA checktask niet starten";
-    return false;
-  }
-
+  otaCheckRequested = true;
   return true;
 }
 
@@ -1115,23 +1108,7 @@ bool PrioWebServer::startOtaUpdateAsync(String &message)
   otaUpdateInProgress = true;
   otaLastUpdateMessage = "OTA update gestart";
 
-  BaseType_t taskOk = xTaskCreatePinnedToCore(
-      PrioWebServer::otaUpdateTaskEntry,
-      "ota_update",
-      16384,
-      this,
-      1,
-      nullptr,
-      1);
-
-  if (taskOk != pdPASS)
-  {
-    otaUpdateInProgress = false;
-    otaLastUpdateMessage = "Kon OTA updatetaak niet starten";
-    message = otaLastUpdateMessage;
-    return false;
-  }
-
+  otaUpdateRequested = true;
   message = "OTA update gestart";
   return true;
 }
@@ -1219,8 +1196,9 @@ bool PrioWebServer::checkOtaVersion()
   return false;
 }
 
-bool PrioWebServer::runOtaUpdate(String &message)
+bool PrioWebServer::runOtaUpdate(String &message, bool &updated)
 {
+  updated = false;
   if (WiFi.status() != WL_CONNECTED)
   {
     message = "WiFi niet verbonden; OTA update afgebroken";
@@ -1228,24 +1206,13 @@ bool PrioWebServer::runOtaUpdate(String &message)
     return false;
   }
 
-  bool foundManifest = checkOtaVersion();
-  String selectedBaseUrl = otaSourceBaseUrl;
-
-  if (!foundManifest)
+  if (!checkOtaVersion())
   {
-    selectedBaseUrl = "";
-    for (size_t i = 0; i < OTA_BASE_URL_COUNT; i++)
-    {
-      const String candidate = OTA_BASE_URLS[i];
-      if (candidate.length() == 0)
-      {
-        continue;
-      }
-
-      selectedBaseUrl = candidate;
-      break;
-    }
+    message = "OTA manifest niet bereikbaar: " + otaLastError;
+    return false;
   }
+
+  String selectedBaseUrl = otaSourceBaseUrl;
 
   if (selectedBaseUrl.length() == 0)
   {
@@ -1257,23 +1224,25 @@ bool PrioWebServer::runOtaUpdate(String &message)
   String firmwareUrl = selectedBaseUrl + "/firmware.bin";
   Serial.println("[OTA] Update gestart vanaf: " + firmwareUrl);
 
+  HTTPUpdate updater;
+  updater.rebootOnUpdate(false);
   t_httpUpdate_return result;
   if (firmwareUrl.startsWith("https://"))
   {
     WiFiClientSecure client;
     client.setInsecure();
-    result = httpUpdate.update(client, firmwareUrl);
+    result = updater.update(client, firmwareUrl);
   }
   else
   {
     WiFiClient client;
-    result = httpUpdate.update(client, firmwareUrl);
+    result = updater.update(client, firmwareUrl);
   }
 
   switch (result)
   {
   case HTTP_UPDATE_FAILED:
-    message = "OTA mislukt: " + httpUpdate.getLastErrorString();
+    message = "OTA mislukt: " + updater.getLastErrorString();
     otaLastError = message;
     return false;
   case HTTP_UPDATE_NO_UPDATES:
@@ -1281,6 +1250,7 @@ bool PrioWebServer::runOtaUpdate(String &message)
     otaLastError = "";
     return true;
   case HTTP_UPDATE_OK:
+    updated = true;
     message = "OTA update succesvol. Apparaat herstart nu.";
     otaLastError = "";
     return true;
@@ -1350,7 +1320,7 @@ void PrioWebServer::handleApiOtaUpdate(AsyncWebServerRequest *request, uint8_t *
   JsonDocument doc;
   doc["ok"] = ok;
   doc["message"] = message;
-  doc["inProgress"] = otaUpdateInProgress;
+  doc["inProgress"] = otaUpdateInProgress.load();
   doc["currentVersion"] = String(FIRMWARE_VERSION);
   doc["latestVersion"] = otaLatestVersion;
   doc["sourceBaseUrl"] = otaSourceBaseUrl;
