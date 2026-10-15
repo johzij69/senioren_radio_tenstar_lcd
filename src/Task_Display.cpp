@@ -60,6 +60,7 @@ PrioDlnaBrowser dlnaBrowser(prioTft.tft, dlnaClient, playDlnaTrack, resumePrevio
 ezButton rotary_button(ROT_SW_PIN); // Initialize the button with the pin number and mode
 
 #include "NetworkSettings.h"
+#include "I2cBusGuard.h"
 
 static void updateClockModeMenuLabel()
 {
@@ -241,10 +242,13 @@ void DisplayTask(void *parameter)
         Serial.print("DisplayTask: Initializing light sensor, attempt ");
         Serial.println(attempt + 1);
         
-        if (veml.begin())
         {
-            sensorFound = true;
-            break;
+            I2cBusGuard bus;
+            if (bus && veml.begin())
+            {
+                sensorFound = true;
+                break;
+            }
         }
         Serial.println("Sensor not found, retrying...");
         vTaskDelay(500 / portTICK_PERIOD_MS);
@@ -258,8 +262,13 @@ void DisplayTask(void *parameter)
     else
     {
         Serial.println("Light Sensor found");
-        veml.setGain(VEML7700_GAIN_1);
-        veml.setIntegrationTime(VEML7700_IT_100MS);
+        I2cBusGuard bus;
+        if (bus)
+        {
+            veml.setGain(VEML7700_GAIN_1);
+            veml.setIntegrationTime(VEML7700_IT_100MS);
+        }
+        else sensorFound = false;
     }
     setup_backlight(); // Initialiseer de backlight
 
@@ -686,7 +695,12 @@ void cleanStreamTitle(struct DisplayData *data)
 void AdjustBackLight(Adafruit_VEML7700 veml)
 {
     // Pas de helderheid aan op basis van de omgevingslichtsensor
-    float lux = veml.readLux();
+    float lux;
+    {
+        I2cBusGuard bus;
+        if (!bus) return;
+        lux = veml.readLux();
+    }
     int brightness = mapLuxToPWM(lux);
 
     SetBacklightPWM(brightness);

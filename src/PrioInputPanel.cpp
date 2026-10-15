@@ -1,4 +1,5 @@
 #include "PrioInputPanel.h"
+#include "I2cBusGuard.h"
 
 // Initialiseer de static member
 PrioInputPanel* PrioInputPanel::_instance = nullptr;
@@ -9,6 +10,11 @@ PrioInputPanel::PrioInputPanel(uint8_t address, uint8_t intPin, uint8_t sdaPin, 
 }
 
 void PrioInputPanel::begin() {
+  I2cBusGuard bus;
+  if (!bus) {
+    Serial.println("I2C fout: Bus bezet tijdens initialiseren PCF8575");
+    return;
+  }
   // I2C initialiseren
   Wire.begin(_sdaPin, _sclPin);
 
@@ -39,15 +45,21 @@ void PrioInputPanel::setButtonPressedCallback(ButtonPressedCallback callback) {
 }
 
 void PrioInputPanel::readPresetButtons() {
-  // Lees de status van de PCF8575
-  if (Wire.requestFrom(_address, 2) == 2) { // Lees 2 bytes (16 pinnen)
-    // Lees de eerste byte (P0-P7)
+  uint16_t buttonStates;
+  {
+    I2cBusGuard bus;
+    if (!bus) {
+      _keyPressed = true;
+      return;
+    }
+    if (Wire.requestFrom(_address, 2) != 2) {
+      Serial.println("I2C fout: Kan PCF8575 niet uitlezen!");
+      return;
+    }
     uint8_t buttonStates1 = Wire.read();
-    // Lees de tweede byte (P8-P15)
     uint8_t buttonStates2 = Wire.read();
-
-    // Combineer de twee bytes tot een 16-bit waarde
-    uint16_t buttonStates = (buttonStates2 << 8) | buttonStates1;
+    buttonStates = (buttonStates2 << 8) | buttonStates1;
+  }
     // Serial.print("buttonStates: ");
     // printBinary(buttonStates, 16);
 
@@ -65,9 +77,6 @@ void PrioInputPanel::readPresetButtons() {
       }
       i++; // Verhoog de teller
     }
-  } else {
-    Serial.println("I2C fout: Kan PCF8575 niet uitlezen!");
-  }
 }
 
 void PrioInputPanel::printBinary(int v, int num_places) {
