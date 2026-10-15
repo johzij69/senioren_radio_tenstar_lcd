@@ -11,6 +11,7 @@ class AlarmManager
 public:
     static constexpr uint8_t MAX_ALARMS = 35;
     static constexpr uint8_t MAX_ALARMS_PER_DAY = 5;
+    static constexpr uint16_t MAX_AUTO_OFF_MINUTES = 1440;
 
     enum RepeatMode : uint8_t
     {
@@ -40,6 +41,7 @@ public:
         RepeatMode mode = REPEAT_DAILY;
         uint8_t dayMask = 0x7F; // Bit0=Sun .. Bit6=Sat
         uint8_t snoozeMinutes = 10;
+        uint16_t autoOffMinutes = 0;
         int32_t lastTriggeredMinuteKey = -1;
     };
 
@@ -53,6 +55,7 @@ public:
 
     bool poll(time_t now, AlarmEntry &triggeredAlarm, bool &fromSnooze);
     bool snoozeCurrentAlarm(time_t now, time_t &snoozeUntilOut);
+    bool stopIfAutoOffExpired(time_t now);
 
     void stopRinging();
     bool isRinging() const;
@@ -79,6 +82,7 @@ private:
     bool snoozePending;
     time_t snoozeUntil;
     int snoozeAlarmId;
+    time_t autoOffAt;
 
     bool loadFromPreferences();
     bool parseFromJsonDocument(JsonDocument &doc, uint32_t streamCount, String &errorMessage);

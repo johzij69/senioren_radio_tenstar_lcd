@@ -2,11 +2,12 @@
 
 constexpr uint8_t AlarmManager::MAX_ALARMS;
 constexpr uint8_t AlarmManager::MAX_ALARMS_PER_DAY;
+constexpr uint16_t AlarmManager::MAX_AUTO_OFF_MINUTES;
 
 const char *AlarmManager::PREF_KEY = "alarms_json";
 
 AlarmManager::AlarmManager(MyPreferences &preferences)
-    : prefs(preferences), alarmCount(0), alarmRinging(false), currentAlarmId(-1), snoozePending(false), snoozeUntil(0), snoozeAlarmId(-1)
+    : prefs(preferences), alarmCount(0), alarmRinging(false), currentAlarmId(-1), snoozePending(false), snoozeUntil(0), snoozeAlarmId(-1), autoOffAt(0)
 {
 }
 
@@ -120,6 +121,17 @@ bool AlarmManager::parseFromJsonDocument(JsonDocument &doc, uint32_t streamCount
         alarm.streamIndex = obj["streamIndex"].is<int>() ? (uint8_t)obj["streamIndex"].as<int>() : 0;
         alarm.volume = obj["volume"].is<int>() ? (uint8_t)obj["volume"].as<int>() : 12;
         alarm.snoozeMinutes = obj["snoozeMinutes"].is<int>() ? (uint8_t)obj["snoozeMinutes"].as<int>() : 10;
+
+        if (!obj["autoOffMinutes"].isNull())
+        {
+            if (!obj["autoOffMinutes"].is<int>() || obj["autoOffMinutes"].as<int>() < 0 ||
+                obj["autoOffMinutes"].as<int>() > MAX_AUTO_OFF_MINUTES)
+            {
+                errorMessage = "Auto off moet 0 tot 1440 hele minuten zijn (0 = uit)";
+                return false;
+            }
+            alarm.autoOffMinutes = obj["autoOffMinutes"].as<uint16_t>();
+        }
 
         String modeString = obj["mode"].is<const char *>() ? String((const char *)obj["mode"]) : String("daily");
         alarm.mode = modeFromString(modeString);
@@ -270,6 +282,7 @@ void AlarmManager::appendAlarmsJson(JsonArray &array) const
         item["mode"] = modeToString(alarm.mode);
         item["dayMask"] = alarm.dayMask;
         item["snoozeMinutes"] = alarm.snoozeMinutes;
+        item["autoOffMinutes"] = alarm.autoOffMinutes;
     }
 }
 
@@ -377,6 +390,7 @@ bool AlarmManager::poll(time_t now, AlarmEntry &triggeredAlarm, bool &fromSnooze
         alarm.lastTriggeredMinuteKey = minuteKey;
         alarmRinging = true;
         currentAlarmId = alarm.id;
+        autoOffAt = alarm.autoOffMinutes > 0 ? now + static_cast<time_t>(alarm.autoOffMinutes) * 60 : 0;
         snoozePending = false;
         snoozeAlarmId = -1;
         triggeredAlarm = alarm;
@@ -420,6 +434,16 @@ bool AlarmManager::snoozeCurrentAlarm(time_t now, time_t &snoozeUntilOut)
     return false;
 }
 
+bool AlarmManager::stopIfAutoOffExpired(time_t now)
+{
+    if (autoOffAt == 0 || now < autoOffAt)
+    {
+        return false;
+    }
+    stopRinging();
+    return true;
+}
+
 void AlarmManager::stopRinging()
 {
     alarmRinging = false;
@@ -427,6 +451,7 @@ void AlarmManager::stopRinging()
     snoozePending = false;
     snoozeAlarmId = -1;
     snoozeUntil = 0;
+    autoOffAt = 0;
 }
 
 bool AlarmManager::isRinging() const

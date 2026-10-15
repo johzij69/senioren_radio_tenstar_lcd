@@ -716,6 +716,7 @@ String getAlarmScript(String ip)
           mode: "daily",
           dayMask: 0x7f,
           snoozeMinutes: 10,
+          autoOffMinutes: 0,
         };
       }
 
@@ -814,6 +815,10 @@ String getAlarmScript(String ip)
                 <label>Snooze (min)</label>
                 <input data-field="snoozeMinutes" data-index="${idx}" type="number" min="0" max="120" value="${alarm.snoozeMinutes}" />
               </div>
+              <div>
+                <label for="alarm-auto-off-${idx}">Auto off (min, 0 = uit)</label>
+                <input id="alarm-auto-off-${idx}" data-field="autoOffMinutes" data-index="${idx}" type="number" min="0" max="1440" step="1" value="${alarm.autoOffMinutes}" />
+              </div>
             </div>
             <div class="alarm-days" data-index="${idx}">
               ${dayNames
@@ -864,6 +869,8 @@ String getAlarmScript(String ip)
               return;
             } else if (field === "snoozeMinutes") {
               alarm.snoozeMinutes = Number(event.target.value);
+            } else if (field === "autoOffMinutes") {
+              alarm.autoOffMinutes = Number(event.target.value);
             } else if (field === "dayMask") {
               const dayIndex = Number(event.target.dataset.day);
               if (alarm.mode === "weekly" || alarm.mode === "once") {
@@ -901,6 +908,9 @@ String getAlarmScript(String ip)
       }
         
       async function saveAlarms() {
+        for (const input of document.querySelectorAll('[data-field="autoOffMinutes"]')) {
+          if (!input.reportValidity()) return;
+        }
         try {
           const payload = { alarms };
           const response = await fetch("/api/alarms", {
@@ -954,6 +964,7 @@ String getAlarmScript(String ip)
           mode: a.mode || "daily",
           dayMask: Number(a.dayMask || 0x7f),
           snoozeMinutes: Number(a.snoozeMinutes || 10),
+          autoOffMinutes: Number(a.autoOffMinutes ?? 0),
         }));
 
         renderAlarmList();

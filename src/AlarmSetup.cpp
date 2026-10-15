@@ -93,6 +93,9 @@ void AlarmSetup::onRotaryDelta(int delta) {
                 case FIELD_SNOOZE:
                     _editAlarm.snoozeMinutes = constrain(_editAlarm.snoozeMinutes + delta, 0, 120);
                     break;
+                case FIELD_AUTO_OFF:
+                    _editAlarm.autoOffMinutes = constrain(static_cast<int>(_editAlarm.autoOffMinutes) + delta, 0, static_cast<int>(AlarmManager::MAX_AUTO_OFF_MINUTES));
+                    break;
                 case FIELD_ENABLED:
                     _editAlarm.enabled = !_editAlarm.enabled;
                     break;
@@ -356,6 +359,15 @@ void AlarmSetup::drawEditField(int field, bool selected, bool editing) {
             snprintf(buf, sizeof(buf), "%d min", _editAlarm.snoozeMinutes);
             value = buf;
             break;
+        case FIELD_AUTO_OFF:
+            label = "Auto off";
+            if (_editAlarm.autoOffMinutes == 0) {
+                value = "UIT";
+            } else {
+                snprintf(buf, sizeof(buf), "%u min", static_cast<unsigned>(_editAlarm.autoOffMinutes));
+                value = buf;
+            }
+            break;
         case FIELD_ENABLED:
             label = "Status";
             value = _editAlarm.enabled ? "AAN" : "UIT";
@@ -435,6 +447,7 @@ void AlarmSetup::saveAlarm() {
         obj["mode"] = alarmModeToString(newAlarms[i].mode);
         obj["dayMask"] = newAlarms[i].dayMask;
         obj["snoozeMinutes"] = newAlarms[i].snoozeMinutes;
+        obj["autoOffMinutes"] = newAlarms[i].autoOffMinutes;
     }
     
     String jsonStr;
@@ -468,6 +481,7 @@ void AlarmSetup::deleteAlarm() {
         obj["mode"] = alarmModeToString(newAlarms[i].mode);
         obj["dayMask"] = newAlarms[i].dayMask;
         obj["snoozeMinutes"] = newAlarms[i].snoozeMinutes;
+        obj["autoOffMinutes"] = newAlarms[i].autoOffMinutes;
     }
     
     String jsonStr;

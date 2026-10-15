@@ -596,6 +596,11 @@ void checkAndRunAlarms()
     time_t now = time(nullptr);
     AlarmManager::AlarmEntry alarm;
     bool fromSnooze = false;
+    if (alarmManager.stopIfAutoOffExpired(now))
+    {
+        stopAudio();
+        refreshAlarmDisplayState(true);
+    }
     if (alarmManager.poll(now, alarm, fromSnooze))
     {
         triggerAlarmPlayback(alarm, fromSnooze);

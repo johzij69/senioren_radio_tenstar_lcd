@@ -46,6 +46,7 @@ private:
         FIELD_REPEAT,
         FIELD_DAY,
         FIELD_SNOOZE,
+        FIELD_AUTO_OFF,
         FIELD_ENABLED,
         FIELD_SAVE,
         FIELD_CANCEL,
