@@ -36,7 +36,7 @@ void playDlnaTrack(const char* url, const char* title, const char* artist,
 void resumePreviousStream();
 void spl(String mes);
 void cleanStreamTitle(struct DisplayData * data);
-void AdjustBackLight(Adafruit_VEML7700 veml);
+void AdjustBackLight();
 void SetBacklightPWM(int brightness);
 int mapLuxToPWM(float lux);
 void setup_backlight() ;

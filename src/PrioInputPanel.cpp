@@ -52,13 +52,9 @@ void PrioInputPanel::readPresetButtons() {
       _keyPressed = true;
       return;
     }
-    if (Wire.requestFrom(_address, 2) != 2) {
-      Serial.println("I2C fout: Kan PCF8575 niet uitlezen!");
-      return;
-    }
-    uint8_t buttonStates1 = Wire.read();
-    uint8_t buttonStates2 = Wire.read();
-    buttonStates = (buttonStates2 << 8) | buttonStates1;
+    uint8_t bytes[2];
+    if (!bus.readBytes(_address, bytes, sizeof(bytes), "PCF8575 buttons")) return;
+    buttonStates = (static_cast<uint16_t>(bytes[1]) << 8) | bytes[0];
   }
     // Serial.print("buttonStates: ");
     // printBinary(buttonStates, 16);
