@@ -64,6 +64,7 @@ private:
   void handleSettings(AsyncWebServerRequest *request, uint8_t *data);//, size_t len);
   void handleDeleteStream(AsyncWebServerRequest *request);
   void handleInstellingen(AsyncWebServerRequest *request);
+  void handleNetworkPage(AsyncWebServerRequest *request);
   void handleImportExportPage(AsyncWebServerRequest *request);
   void handleContactPage(AsyncWebServerRequest *request);
   void handleSynctime(AsyncWebServerRequest *request);

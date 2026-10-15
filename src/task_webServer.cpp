@@ -1,5 +1,6 @@
 #include "task_webServer.h"
 #include "task_shared.h"
+#include "NetworkSettings.h"
 
 void webServerTask(void *parameter)
 {
@@ -14,6 +15,7 @@ void webServerTask(void *parameter)
     // Infinite loop for the task
     while (true)
     {
+        NetworkSettings::poll();
         vTaskDelay(100 / portTICK_PERIOD_MS); // Adjust the delay as needed
     }
 }

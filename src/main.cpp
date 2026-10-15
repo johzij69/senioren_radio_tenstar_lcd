@@ -1,5 +1,6 @@
 #include "main.h"
 #include "AlarmManager.h"
+#include "NetworkSettings.h"
 #include "UrlManager.h"
 #include "driver/ledc.h" // Include LEDC driver header for PWM functionality
 #include "PrioRotaryMenu.h"
@@ -350,7 +351,11 @@ void setup()
     attachInterrupt(digitalPinToInterrupt(SLEEP_BUTTON_PIN), handleSleepButtonInterrupt, FALLING);
 
    Serial.println("Power button initialized.");
-    bool res = wm.autoConnect("prio-radio");
+    bool res = NetworkSettings::connectPreferred();
+    if (!res)
+    {
+        res = wm.autoConnect("prio-radio");
+    }
     //bool res = (WiFi.status() == WL_CONNECTED);
     Serial.println("WiFi autoConnect result: " + String(res));
     if (!res)
@@ -366,6 +371,7 @@ void setup()
     {
 
         Serial.println("[OK] Verbonden met WiFi");
+        NetworkSettings::connectionReady();
         Serial.println("SSID: " + WiFi.SSID());
         Serial.println("IP: " + WiFi.localIP().toString());
         Serial.print("DNS address: ");

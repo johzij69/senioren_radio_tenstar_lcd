@@ -59,6 +59,8 @@ PrioDlnaBrowser dlnaBrowser(prioTft.tft, dlnaClient, playDlnaTrack, resumePrevio
 /* Buttons */
 ezButton rotary_button(ROT_SW_PIN); // Initialize the button with the pin number and mode
 
+#include "NetworkSettings.h"
+
 static void updateClockModeMenuLabel()
 {
     myMenu.setActionLabel("set24hMode", pDateTime.is24HourMode() ? "Klok: 24u" : "Klok: 12u");
@@ -150,7 +152,8 @@ const char* menuJson = R"(
             { "label": "Sleep", "action": "setSleepMinutes" },
             { "label": "Backlight min", "action": "setBacklightMin" },
             { "label": "Backlight max", "action": "setBacklightMax" },
-      { "label": "Stop Webserver", "action": "stopWebserver" }
+    { "label": "Stop Webserver", "action": "stopWebserver" },
+    { "label": "reset network", "action": "resetNetwork" }
     ]
   },
   {
@@ -855,6 +858,8 @@ void onMenuAction(const char* action) {
     } else if (strcmp(action, "stopWebserver") == 0) {
         webServer.setEnabled(!webServer.isRunning());
         updateWebserverMenuLabel();
+    } else if (strcmp(action, "resetNetwork") == 0) {
+        NetworkSettings::reset();
     } else if (strcmp(action, "syncTime") == 0) {
         prioTft.showCenteredMessage("Tijd synchroniseren...");
         bool ok = pDateTime.syncTime(); // blokkeert dit scherm max. ~20s (NTP-timeout)

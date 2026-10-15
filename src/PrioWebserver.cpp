@@ -1,4 +1,5 @@
 #include "PrioWebServer.h"
+#include "NetworkSettings.h"
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
 #include <WiFiClient.h>
@@ -48,6 +49,49 @@ void PrioWebServer::begin()
 
   /* instellingen page , which handles instellingen */
   server.on("/instellingen", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleInstellingen(request); });
+
+  server.on("/netwerk", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleNetworkPage(request); });
+
+  server.on("/api/network", HTTP_GET, [](AsyncWebServerRequest *request) {
+    String json;
+    if (!NetworkSettings::getStatus(json))
+    {
+      request->send(503, "application/json", "{\"message\":\"Netwerkstatus is bezig\"}");
+      return;
+    }
+    AsyncWebServerResponse *response = request->beginResponse(200, "application/json", json);
+    response->addHeader("Cache-Control", "no-store");
+    request->send(response);
+  });
+
+  server.on("/api/network/scan", HTTP_POST, [](AsyncWebServerRequest *request) {
+    bool accepted = NetworkSettings::requestScan();
+    request->send(accepted ? 202 : 409, "application/json",
+      accepted ? "{\"message\":\"Wifi-scan aangevraagd\"}" : "{\"message\":\"Netwerk is bezig; probeer opnieuw\"}");
+  });
+
+  server.on("/api/network/select", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!request->hasParam("bssid", true) || !request->hasParam("timeout", true))
+    {
+      request->send(400, "application/json", "{\"message\":\"BSSID en timeout ontbreken\"}");
+      return;
+    }
+    String timeout = request->getParam("timeout", true)->value();
+    bool validTimeout = timeout.length() > 0 && timeout.length() <= 3;
+    for (size_t index = 0; index < timeout.length(); ++index)
+    {
+      if (!isDigit(timeout[index])) validTimeout = false;
+    }
+    if (!validTimeout || timeout.toInt() < 5 || timeout.toInt() > 300)
+    {
+      request->send(400, "application/json", "{\"message\":\"Timeout moet 5 tot 300 seconden zijn\"}");
+      return;
+    }
+    bool accepted = NetworkSettings::selectAccessPoint(request->getParam("bssid", true)->value(), timeout.toInt());
+    request->send(accepted ? 202 : 409, "application/json", accepted ?
+      "{\"message\":\"Keuze ontvangen; netwerkvoorkeur wordt opgeslagen\"}" :
+      "{\"message\":\"Selecteer een gescand accesspoint van het huidige netwerk, of probeer opnieuw\"}");
+  });
 
   /* import / export page */
   server.on("/importexport", HTTP_GET, [this](AsyncWebServerRequest *request){ this->handleImportExportPage(request); });
@@ -1342,6 +1386,151 @@ String PrioWebServer::getHtmlStart()
   return html;
 }
 
+void PrioWebServer::handleNetworkPage(AsyncWebServerRequest *request)
+{
+  String body = R"HTML(
+  <style>
+    .network-content { max-width: 760px; padding-bottom: 24px; }
+    .network-content h1 { font-size: 24px; }
+    .network-content dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; }
+    .network-content dd { margin: 0; overflow-wrap: anywhere; }
+    .network-content fieldset { border: 0; padding: 12px 0; margin: 0; min-width: 0; }
+    .network-content table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .network-content th, .network-content td { padding: 10px 6px; text-align: left; border-bottom: 1px solid #ddd; overflow-wrap: anywhere; }
+    .network-content caption { text-align: left; margin: 12px 0; font-weight: bold; }
+    .network-content .network-table { overflow-x: auto; }
+    .network-content table { min-width: 440px; }
+    .network-content button { cursor: pointer; min-height: 40px; padding: 8px 14px; margin: 8px 8px 8px 0; }
+    .network-content button:disabled { cursor: default; }
+    .network-content input[type=number] { width: 85px; min-height: 40px; }
+    .network-content input[type=radio] { width: 20px; height: 20px; }
+    #network-message { min-height: 36px; overflow-wrap: anywhere; }
+  </style>
+  <main class="content network-content">
+    <h1>Netwerkinstellingen</h1>
+    <dl>
+      <dt>Netwerk</dt><dd id="network-ssid">-</dd>
+      <dt>Verbonden met</dt><dd id="network-current">-</dd>
+      <dt>Voorkeursaccesspoint</dt><dd id="network-preferred">Geen voorkeur</dd>
+    </dl>
+    <form id="network-form">
+      <fieldset id="network-controls">
+        <label for="network-timeout">Timeout voor terugval (seconden)</label>
+        <input id="network-timeout" name="timeout" type="number" min="5" max="300" value="30" required>
+        <div>
+          <button type="button" id="network-scan">&#8635; Scannen</button>
+          <button type="submit" id="network-save" disabled>Opslaan en verbinden</button>
+        </div>
+        <div class="network-table">
+          <table>
+            <caption>Accesspoints binnen bereik (2,4 GHz)</caption>
+            <thead><tr><th scope="col">Keuze</th><th scope="col">Netwerk / BSSID</th><th scope="col">Signaal</th><th scope="col">Kanaal</th></tr></thead>
+            <tbody id="network-list"></tbody>
+          </table>
+        </div>
+      </fieldset>
+    </form>
+    <p id="network-message" role="status" aria-live="polite">Netwerkstatus ophalen...</p>
+  </main>)HTML";
+  String script = R"JS(<script>
+  (() => {
+    const list = document.getElementById('network-list');
+    const message = document.getElementById('network-message');
+    const scan = document.getElementById('network-scan');
+    const save = document.getElementById('network-save');
+    const timeout = document.getElementById('network-timeout');
+    const controls = document.getElementById('network-controls');
+    let initialized = false;
+    let busy = false;
+    let scanPending = false;
+    let scanRequestedAt = 0;
+    let selectionPending = false;
+    let selectionRequestedAt = 0;
+    let lastRows = '';
+    async function api(path, options) {
+      const response = await fetch(path, {cache: 'no-store', ...options});
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Netwerkverzoek mislukt');
+      return data;
+    }
+    async function refresh() {
+      try {
+        const data = await api('/api/network');
+        document.getElementById('network-ssid').textContent = data.ssid || 'Niet verbonden';
+        document.getElementById('network-current').textContent = data.bssid ? `${data.bssid} (${data.rssi} dBm)` : 'Niet verbonden';
+        document.getElementById('network-preferred').textContent = data.preferredBssid || 'Geen voorkeur';
+        if (!initialized) { timeout.value = data.timeout; initialized = true; }
+        if (data.scanning || Date.now() - scanRequestedAt > 2500) scanPending = false;
+        if (selectionPending && Date.now() - selectionRequestedAt > 2500) {
+          selectionPending = false;
+          controls.disabled = false;
+        }
+        const networks = data.networks || [];
+        const rows = JSON.stringify([networks, data.ssid, data.preferredBssid]);
+        if (rows !== lastRows) {
+          const selected = list.querySelector('input:checked')?.value || data.preferredBssid;
+          list.replaceChildren();
+          for (const network of networks.sort((first, second) => second.rssi - first.rssi)) {
+            const row = document.createElement('tr');
+            const choice = document.createElement('td');
+            const radio = document.createElement('input');
+            radio.type = 'radio'; radio.name = 'bssid'; radio.value = network.bssid;
+            radio.disabled = network.ssid !== data.ssid || !data.bssid;
+            radio.checked = !radio.disabled && network.bssid === selected;
+            radio.setAttribute('aria-label', `${network.ssid || 'Verborgen netwerk'} ${network.bssid}`);
+            radio.title = radio.disabled ? 'Ander netwerk' : network.bssid;
+            radio.addEventListener('change', () => { save.disabled = busy || selectionPending; });
+            choice.append(radio); row.append(choice);
+            const name = document.createElement('td');
+            const label = document.createElement('label');
+            radio.id = `ap-${network.bssid.replaceAll(':', '')}`;
+            label.htmlFor = radio.id;
+            label.append(document.createTextNode(network.ssid || 'Verborgen netwerk'), document.createElement('br'), document.createTextNode(network.bssid));
+            name.append(label); row.append(name);
+            const signal = document.createElement('td');
+            signal.textContent = `${network.rssi} dBm`;
+            row.append(signal);
+            const channel = document.createElement('td'); channel.textContent = network.channel;
+            row.append(channel); list.append(row);
+          }
+          lastRows = rows;
+        }
+        busy = data.scanning || scanPending;
+        scan.disabled = busy || selectionPending;
+        save.disabled = busy || selectionPending || !list.querySelector('input:checked:not(:disabled)');
+        message.textContent = busy ? 'Wifi-scan bezig...' : (data.error || data.message || (networks.length ? '' : 'Geen scanresultaten'));
+      } catch (error) {
+        message.textContent = 'Radio tijdelijk niet bereikbaar. Opnieuw verbinden...';
+      } finally {
+        window.setTimeout(refresh, 1500);
+      }
+    }
+    scan.addEventListener('click', async () => {
+      scan.disabled = true;
+      try {
+        await api('/api/network/scan', {method: 'POST'});
+        scanPending = true; scanRequestedAt = Date.now();
+        message.textContent = 'Wifi-scan aangevraagd...';
+      } catch (error) { message.textContent = error.message; scan.disabled = false; }
+    });
+    document.getElementById('network-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const selected = list.querySelector('input:checked:not(:disabled)');
+      if (!selected || busy) return;
+      const body = new URLSearchParams({bssid: selected.value, timeout: timeout.value});
+      controls.disabled = true;
+      try {
+        const data = await api('/api/network/select', {method: 'POST', body});
+        selectionPending = true; selectionRequestedAt = Date.now();
+        message.textContent = data.message;
+      } catch (error) { message.textContent = error.message; controls.disabled = false; }
+    });
+    refresh();
+  })();
+  </script>)JS";
+  request->send(200, "text/html", getHtmlStart() + setHtmlBody(body, script) + getHtmlEnd());
+}
+
 String PrioWebServer::getTopMenu()
 {
   String html PROGMEM = R"(
@@ -1351,6 +1540,7 @@ String PrioWebServer::getTopMenu()
     <a href='/inpustream'>Voeg toe</a>
     <a href='/alarmen'>Alarmen</a>
     <a href='/instellingen'>Instellingen</a>
+    <a href='/netwerk'>Netwerk</a>
     <a href='/importexport'>Import/Export</a>
     <a href='/contact'>Contact</a>
     <span class='alarm-badge alarm-uit' id='alarm-status-badge'>Alarm: uit</span>
