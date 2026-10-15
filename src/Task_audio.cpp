@@ -102,8 +102,6 @@ void AudioTask(void *parameter)
                     {
                         Serial.println("[AUDIO] Stopping current stream first");
                         audio->stopSong();
-                        // BELANGRIJK: wacht tot interne SSL buffers volledig vrij zijn
-                        vTaskDelay(1000 / portTICK_PERIOD_MS);
                     }
 
                     Serial.printf("[AUDIO] Heap before connect: %d | Largest block: %d\n",

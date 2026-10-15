@@ -648,7 +648,7 @@ void DisplayTask(void *parameter)
 
             if (millis() - lastBacklightUpdate > 200) // 200 ms = 5x per seconde
             {
-                AdjustBackLight();
+                AdjustBackLight(veml);
                 lastBacklightUpdate = millis();
             }
         }
@@ -692,16 +692,14 @@ void cleanStreamTitle(struct DisplayData *data)
     }
 }
 
-void AdjustBackLight()
+void AdjustBackLight(Adafruit_VEML7700 &veml)
 {
-    uint16_t rawLight;
+    float lux;
     {
         I2cBusGuard bus;
         if (!bus) return;
-        if (!bus.readRegister16(VEML7700_I2CADDR_DEFAULT, VEML7700_ALS_DATA, rawLight, "VEML7700 light sensor")) return;
+        lux = veml.readLux();
     }
-    constexpr float luxPerCountAtGain1Integration100ms = 0.0576f;
-    float lux = rawLight * luxPerCountAtGain1Integration100ms;
     int brightness = mapLuxToPWM(lux);
 
     SetBacklightPWM(brightness);

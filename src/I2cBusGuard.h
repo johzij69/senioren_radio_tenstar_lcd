@@ -26,29 +26,11 @@ public:
         size_t received = Wire.requestFrom(address, size);
         if (received != size || Wire.available() < static_cast<int>(size))
         {
-            Serial.printf("[I2C] %s address=0x%02X read failed: received=%u expected=%u; SDA=%d SCL=%d\n",
-                device, address, static_cast<unsigned>(received), static_cast<unsigned>(size), digitalRead(47), digitalRead(48));
+            log_e("[I2C] %s address=0x%02X read failed: received=%u expected=%u",
+                device, address, static_cast<unsigned>(received), static_cast<unsigned>(size));
             return false;
         }
         for (size_t index = 0; index < size; ++index) data[index] = Wire.read();
-        return true;
-    }
-
-    bool readRegister16(uint8_t address, uint8_t reg, uint16_t &value, const char *device)
-    {
-        if (!acquired) return false;
-        Wire.beginTransmission(address);
-        Wire.write(reg);
-        uint8_t result = Wire.endTransmission();
-        if (result != 0)
-        {
-            Serial.printf("[I2C] %s address=0x%02X register=0x%02X select failed: Wire status=%u; SDA=%d SCL=%d\n",
-                device, address, reg, result, digitalRead(47), digitalRead(48));
-            return false;
-        }
-        uint8_t bytes[2];
-        if (!readBytes(address, bytes, sizeof(bytes), device)) return false;
-        value = static_cast<uint16_t>(bytes[0]) | (static_cast<uint16_t>(bytes[1]) << 8);
         return true;
     }
 
